@@ -23,6 +23,9 @@ toolchain exposes only five bootstrap string intrinsics, `const char *`-backed
 `string`, and no end-to-end mutable byte slices; that surface is evidence only,
 not this library's conformance claim.
 
+Current source/organization audit (exact revisions + evidence boundaries):
+[`docs/audit/2026-08-30.md`](docs/audit/2026-08-30.md).
+
 ### Release ladder (SPEC §2.3 / §24)
 
 | Release | Scope |
