@@ -25,18 +25,13 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-        with: { path: sv0-strings }
-      - uses: actions/checkout@v4
-        with:
-          repository: sv4u/project-specs
-          path: project-specs
-        continue-on-error: true
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
+      # The governing SPEC (sv4u/project-specs) is private, so CI validates the
+      # committed requirements.tsv / standards.tsv for internal consistency only.
+      # The `--check` drift guards against SPEC.md run locally via scripts/check
+      # (see scripts/README.md) with $SV0_STRINGS_SPEC set.
       - name: scripts/check
-        working-directory: sv0-strings
-        env:
-          SV0_STRINGS_SPEC: ${{ github.workspace }}/project-specs/sv0-strings/SPEC.md
         run: bash scripts/check
 
   runner:
