@@ -62,3 +62,71 @@ variants, and they deliberately reuse field names (`available` in
 **Workaround (in `lib/strings_types.sv0`).** Error enums use **tuple variants**;
 positional meaning is documented per variant. Restore named fields when SS-U13
 lands. Recorded as a SPEC deviation (GOV-004 / GOV-006).
+
+---
+
+## #2 — generic `Option<T>` does not instantiate (`E0301`)
+
+**Slice:** SS-U06 &nbsp; **Owner:** sv0c (monomorphization) &nbsp; **Found:** SS-006, 2026-08-30
+&nbsp; **Status:** open, worked around (known gap — sv0-mathlib BUGS.md #9)
+
+**Symptom.**
+
+```sv0
+pub fn cadd(a: usize, b: usize) -> Option<usize> {   // error[E0301]: unknown type
+    return Option::Some(a + b);
+}
+```
+
+`Option<i32>` works in a single file (checker corpus), but a user function
+returning `Option<usize>` in project mode does not resolve. User generic
+monomorphization is deferred upstream.
+
+**Impact on SPEC.** SPEC BL-006 specifies `checked_add/sub/mul -> Option<usize>`;
+Sections 10–14 use `Option<usize>` throughout (`find`, `rfind`, `find_slice`,
+`MemccpyReport.next_offset`, …).
+
+**Workaround.** Reviewed concrete carriers with the same safe semantics
+(`strings_checked::CheckedUsize` = `Ok(usize) | Overflow`). Each carrier is a
+deliberate, reviewed public type per SPEC UP-020 / OQ-010; revisit if real
+monomorphization lands under SS-U06.
+
+---
+
+## #3 — native VM: u64/usize arithmetic that wraps near 2^64 → `arithmetic on non-int`
+
+**Slice:** SS-U14 &nbsp; **Owner:** sv0vm (native emitter / interpreter) &nbsp; **Found:** SS-006, 2026-08-30
+&nbsp; **Status:** open, C leg unblocked / VM leg blocked
+
+**Symptom.** `./scripts/sv0 vm-native-compile --project` emits fine, but
+`sv0vm` aborts at runtime:
+
+```
+uncaught exception Fail [Fail: interpreter: arithmetic on non-int]
+```
+
+for `usize` arithmetic whose operands or result sit in the high range, e.g.
+
+```sv0
+checked_add(18446744073709551615, 18446744073709551615)   // max + max, wraps
+checked_mul(18446744073709551615, 2)                       // wraps
+```
+
+**Not affected** (all `vm_exit:0`): small `usize` add/sub/mul/div, a bare
+`2^64 - 1` literal, `2^40`-range literals, `match`-by-value on the carrier,
+`checked_sub(0, 1)` (underflow path, no wide add). The C backend runs the full
+`test/property/checked_overflow.sv0` at `exit 0`.
+
+**Analysis.** The native VM emitter (see sv0-toolchain `task/sv0c-vm-float-parity.Rmd`)
+added width-specific `i64`/`u64`/`f64` bytecode, but SML/NJ's native `Int` is
+63-bit; a `u64` value above ~2^62, or a wrap-around result, is represented as a
+non-`Int` cell that the interpreter's integer arithmetic opcode rejects rather
+than reducing mod 2^64.
+
+**Impact on SPEC.** Blocks the native-VM leg of every checked-arithmetic and
+overflow-boundary test (SPEC BYTE-018, SEC-002, TEST-006). SPEC BACKEND-001
+(one semantic result on both backends) is not met for full-range `usize`.
+
+**Workaround.** None in the library — this is pure integer arithmetic that must
+be correct. `test/property/checked_overflow.sv0` gates on **C only** until
+SS-U14; `tools/catalogs/tests.tsv` records `backends=c` for it.

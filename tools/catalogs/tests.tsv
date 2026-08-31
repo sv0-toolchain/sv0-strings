@@ -3,3 +3,4 @@ T-TYPES-SMOKE-001	test/cases/types_smoke.sv0	MODEL-008,MODEL-009,ARCH-001,UP-019
 T-CATALOG-CHECK-001	tools/check_catalogs.py	TEST-002,TEST-003,GOV-007	c,vm	safe		tool	done
 T-REQ-EXTRACT-001	tools/extract_requirements.py	TEST-001,TEST-003	c,vm	safe		generator	done
 T-STANDARDS-MATRIX-001	tools/standards_matrix.py	C23-001,POSIX-001	c,vm	safe		generator	done
+T-CHECKED-OVERFLOW-001	test/property/checked_overflow.sv0	MODEL-002,SEC-002,BYTE-018	c	safe	runtime	property	done

@@ -1,0 +1,66 @@
+/* SS-006 checked-arithmetic boundary tests (SPEC MODEL-002, SEC-002).
+ * 0 = pass; nonzero = first failing check. Expected values are hand-checked
+ * byte algebra, not taken from the implementation under test
+ * (SPEC Appendix C.4).
+ *
+ * usize is 64-bit on the audited targets; MAX = 2^64 - 1.
+ */
+use strings_checked::CheckedUsize;
+use strings_checked::checked_add;
+use strings_checked::checked_sub;
+use strings_checked::checked_mul;
+
+fn expect_ok(r: CheckedUsize, want: usize, base: i32) -> i32 {
+    match r {
+        CheckedUsize::Ok(v) => {
+            if v != want { return base; }
+            return 0;
+        },
+        CheckedUsize::Overflow => { return base + 1; },
+    }
+}
+
+fn expect_overflow(r: CheckedUsize, base: i32) -> i32 {
+    match r {
+        CheckedUsize::Ok(v) => { return base; },
+        CheckedUsize::Overflow => { return 0; },
+    }
+}
+
+fn main() -> i32 {
+    let max: usize = 18446744073709551615;
+
+    /* add: ordinary, boundary-exact, wrap-by-one, wrap-far */
+    let mut e: i32 = expect_ok(checked_add(2, 3), 5, 10);
+    if e != 0 { return e; }
+    e = expect_ok(checked_add(max, 0), max, 12);
+    if e != 0 { return e; }
+    e = expect_overflow(checked_add(max, 1), 14);
+    if e != 0 { return e; }
+    e = expect_overflow(checked_add(max, max), 16);
+    if e != 0 { return e; }
+
+    /* sub: ordinary, to-zero, underflow-by-one */
+    e = expect_ok(checked_sub(9, 4), 5, 20);
+    if e != 0 { return e; }
+    e = expect_ok(checked_sub(7, 7), 0, 22);
+    if e != 0 { return e; }
+    e = expect_overflow(checked_sub(0, 1), 24);
+    if e != 0 { return e; }
+    e = expect_overflow(checked_sub(4, max), 26);
+    if e != 0 { return e; }
+
+    /* mul: ordinary, zero short-circuit, one, wrap */
+    e = expect_ok(checked_mul(6, 7), 42, 30);
+    if e != 0 { return e; }
+    e = expect_ok(checked_mul(0, max), 0, 32);
+    if e != 0 { return e; }
+    e = expect_ok(checked_mul(1, max), max, 34);
+    if e != 0 { return e; }
+    e = expect_overflow(checked_mul(max, 2), 36);
+    if e != 0 { return e; }
+    e = expect_overflow(checked_mul(max, max), 38);
+    if e != 0 { return e; }
+
+    return 0;
+}

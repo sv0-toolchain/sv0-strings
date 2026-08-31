@@ -1,0 +1,60 @@
+/* strings_checked -- checked unsigned size arithmetic.
+ *
+ * SPEC MODEL-002 (all public lengths/capacities/offsets/counts are `usize`;
+ * conversion to a narrower backend integer is checked), SEC-002 (length and
+ * capacity calculations use checked add / sub / mul before allocation or
+ * addressing), BYTE-018 / TEXT-006 / CSTR-009 (no wraparound in
+ * `start + len`).
+ *
+ * `usize` arithmetic wraps on overflow on both current backends (verified:
+ * C unsigned wrap; native-VM width arithmetic). These helpers detect the
+ * wrap and report it instead of silently producing a small value.
+ *
+ * DEVIATION from SPEC BL-006 (`-> Option<usize>`): generic `Option<usize>`
+ * does not instantiate in the current resolver ("E0301", docs/BUGS.md #2,
+ * slice SS-U06), so the result is the concrete carrier `CheckedUsize`.
+ *
+ * `strings_checked` is an internal helper module. It is not part of the
+ * SPEC Section 9 public surface (ARCH-001's seven modules) and safe modules
+ * import it directly; it is never re-exported to consumers.
+ */
+module strings_checked;
+
+/* Concrete stand-in for `Option<usize>`: `Ok(v)` on success, `Overflow`
+ * when the true mathematical result is not representable in `usize`.
+ */
+pub enum CheckedUsize {
+    Ok(usize),
+    Overflow,
+}
+
+/* `a + b`, or `Overflow` if the sum wraps. */
+pub fn checked_add(a: usize, b: usize) -> CheckedUsize {
+    let s: usize = a + b;
+    if s < a {
+        return CheckedUsize::Overflow;
+    }
+    return CheckedUsize::Ok(s);
+}
+
+/* `a - b`, or `Overflow` if `b > a` (the difference would be negative). */
+pub fn checked_sub(a: usize, b: usize) -> CheckedUsize {
+    if b > a {
+        return CheckedUsize::Overflow;
+    }
+    return CheckedUsize::Ok(a - b);
+}
+
+/* `a * b`, or `Overflow` if the product wraps. `a == 0` short-circuits so
+ * the `p / a` guard is always well defined.
+ */
+pub fn checked_mul(a: usize, b: usize) -> CheckedUsize {
+    if a == 0 {
+        return CheckedUsize::Ok(0);
+    }
+    let p: usize = a * b;
+    if p / a != b {
+        return CheckedUsize::Overflow;
+    }
+    return CheckedUsize::Ok(p);
+}
