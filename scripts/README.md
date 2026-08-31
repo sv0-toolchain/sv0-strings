@@ -1,5 +1,14 @@
 # sv0-strings scripts
 
+## `check` — dependency-free gate (SS-014)
+
+`bash scripts/check` — runs `tools/check_catalogs.py` + `tools/check_doc_fences.py`,
+and (when the SPEC is reachable via `$SV0_STRINGS_SPEC` or
+`../project-specs/sv0-strings/SPEC.md`) the `--check` drift guards for the
+generated `requirements.tsv` / `standards.tsv`. No sv0 toolchain needed. Run
+before every commit. CI (`.github/workflows/ci.yml`) runs this in a fast `lint`
+job, then `scripts/test` in a `runner` job that bootstraps the toolchain.
+
 ## `test` — staging test runner (SS-010, SPEC ARCH-011 / UP-010)
 
 Current sv0 `--project` discovery recursively compiles every `.sv0` file, so

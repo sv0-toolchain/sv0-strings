@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# sv0-strings dependency-free gate: traceability catalogs + doc-fence lint,
+# plus generator drift checks when the governing SPEC is reachable. No sv0
+# toolchain required. Run before every commit; CI runs this then scripts/test.
+#
+# SPEC path for the drift checks: $SV0_STRINGS_SPEC, else
+# ../project-specs/sv0-strings/SPEC.md relative to the repo root.
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+fail=0
+
+echo "== check_catalogs =="
+python3 tools/check_catalogs.py || fail=1
+
+echo "== check_doc_fences =="
+python3 tools/check_doc_fences.py || fail=1
+
+SPEC="${SV0_STRINGS_SPEC:-$HERE/../project-specs/sv0-strings/SPEC.md}"
+if [[ -f "$SPEC" ]]; then
+  echo "== extract_requirements --check ($SPEC) =="
+  python3 tools/extract_requirements.py --spec "$SPEC" --check || fail=1
+  echo "== standards_matrix --check =="
+  python3 tools/standards_matrix.py --spec "$SPEC" --check || fail=1
+else
+  echo "-- SPEC not found at $SPEC; skipping generator drift checks --"
+fi
+
+[[ "$fail" -eq 0 ]] && echo "scripts/check: PASS" || echo "scripts/check: FAIL"
+exit "$fail"

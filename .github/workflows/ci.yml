@@ -1,0 +1,99 @@
+# sv0-strings CI (slice SS-014). sv0-strings is a submodule of sv0-toolchain,
+# but this workflow also runs when sv0-strings is pushed on its own: it checks
+# out sv0-toolchain alongside, bootstraps just enough to get the native mega-TU
+# compiler + VM emitter, points SV0_TOOLCHAIN_ROOT at it, then runs the
+# dependency-free gate (scripts/check) and the staging runner (scripts/test).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: catalogs + doc-fences (no toolchain)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: sv0-strings }
+      - uses: actions/checkout@v4
+        with:
+          repository: sv4u/project-specs
+          path: project-specs
+        continue-on-error: true
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: scripts/check
+        working-directory: sv0-strings
+        env:
+          SV0_STRINGS_SPEC: ${{ github.workspace }}/project-specs/sv0-strings/SPEC.md
+        run: bash scripts/check
+
+  runner:
+    name: staging runner (C + native VM)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with: { path: sv0-strings }
+
+      - name: Use HTTPS for SSH-form submodule URLs in sv0-toolchain's .gitmodules
+        run: git config --global url."https://github.com/".insteadOf "git@github.com:"
+
+      - name: Checkout sv0-toolchain alongside (submodules recursive)
+        uses: actions/checkout@v4
+        with:
+          repository: sv0-toolchain/sv0-toolchain
+          submodules: recursive
+          path: sv0-toolchain
+
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+
+      - name: Cache SML/NJ install
+        uses: actions/cache@v4
+        with:
+          path: ~/smlnj-110.99.9
+          key: smlnj-110.99.9-${{ runner.os }}-${{ runner.arch }}-v1
+
+      - name: Install SML/NJ
+        working-directory: sv0-toolchain
+        run: bash scripts/ci-install-smlnj.sh
+
+      - name: Compile smoke (builds the SML heap the native compiler bootstraps from)
+        working-directory: sv0-toolchain
+        run: ./scripts/sv0 check
+
+      - name: Build native mega-TU compiler
+        working-directory: sv0-toolchain
+        run: bash scripts/build-sv0-megatu-native.sh
+
+      - name: Build native VM bytecode emitter
+        working-directory: sv0-toolchain
+        run: bash scripts/build-sv0-megatu-vm-native.sh
+
+      - name: scripts/test --backend=both --dir=test  (+ --self-test)
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: |
+          ./scripts/test --backend=both --dir=test --record=ci-results.tsv
+          ./scripts/test --self-test
+
+      - name: Upload run record
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ci-results
+          path: sv0-strings/ci-results.tsv
+          if-no-files-found: ignore
