@@ -1,1 +1,271 @@
 id	release	section	summary	text_sha1	verification	status
+MODEL-001	F0	8.3	byte SHALL be the canonical element type for raw string-compatible storage; char	3c663af65be4	API type inventory.	todo
+MODEL-002	F0	8.3	All public lengths, capacities, offsets, and counts SHALL use usize; conversion 	e9440a49554f	Signature lint; narrowing-boundary tests.	todo
+MODEL-003	F0	8.3	Raw byte operations SHALL accept slices whose length travels with the reference,	6873aab70924	Signature lint.	todo
+MODEL-004	R0.2	8.3	Text operations SHALL accept only values known to be valid UTF-8 and SHALL prese	cadc1b0d11e0	Invalid-input and boundary property tests.	todo
+MODEL-005	R0.2	8.3	CStr SHALL borrow storage and SHALL NOT outlive it; its logical length excludes 	578fe57ce778	Borrow-check compile-pass/fail suite.	todo
+MODEL-006	R0.2	8.3	CString SHALL own its storage and maintain exactly one trailing zero with no int	f2d750a92d73	Constructor and mutation invariant properties.	todo
+MODEL-007	R0.2	8.3	CBuffer SHALL borrow fully initialized storage, use storage.len() as capacity, a	58fef0e91179	Model-based state-machine test.	todo
+MODEL-008	F0	8.3	Ordering SHALL be the native result of comparisons. Native callers SHALL NOT dep	bbc3e15bec79	API test; ordering mapping test.	todo
+MODEL-009	F0	8.3	Recoverable errors SHALL use Result/Option; panic is reserved for violated inter	9f5238e6c342	Error-path inventory.	todo
+MODEL-010	R0.2	8.3	A borrowed result SHALL declare its source with the applicable borrows(...) rela	6dd4c01f8316	Borrow annotation lint and compile-fail cases.	todo
+MODEL-011	F0	8.3	Mutable access SHALL be exclusive. APIs that accept both destination and source 	e8d137d2c754	Signature and contract inspection.	todo
+MODEL-012	R0.2	8.3	Text U+0000 and byte 0x00 SHALL remain representable. Converting text to CString	fafe173abbb4	Embedded-NUL fixtures.	todo
+MODEL-013	R0.2	8.3	Converting CStr/CString to text SHALL validate UTF-8 and return TextError on inv	dfd0c1640204	Invalid UTF-8 fixtures.	todo
+MODEL-014	R0.2	8.3	Public constructors SHALL establish type invariants once; downstream methods SHA	f27590edd415	Constructor/mutation complexity and invariant tests.	todo
+MODEL-015	R1	8.3	Public type layout SHALL not be part of the stable contract except in the separa	f2b4af4f3e29	ABI documentation lint.	todo
+MODEL-016	F0	8.3	Interface inventories in this document SHALL distinguish semantic signatures fro	0200585f68bd	Documentation/source-fence lint and parser probes.	todo
+MODEL-017	R0.3	8.3	Operation-specific reports SHALL not overload fields with incompatible meanings.	c33e8a093894	Public report inventory and cross-operation fixtures.	todo
+ARCH-001	F0	9.1	The singular package SHALL expose flat, collision-resistant modules strings_type	5b95d274a739	Native and VM project compilation; public-surface inventory.	todo
+ARCH-002	F0	9.1	Compatibility modules SHALL be the separately imported flat modules strings_c23,	95c7f97ea22c	Explicit-import and negative namespace tests.	todo
+ARCH-003	R0.3	9.1	strings_c23 SHALL adapt to shared safe implementations rather than duplicate alg	fbb54e46572a	Implementation dependency review.	todo
+ARCH-004	R0.4	9.1	strings_posix2024 SHALL reuse strings_c23 and safe modules for common operations	da80eb96a55b	Call-graph and duplicate-code lint.	todo
+ARCH-005	R0.4	9.1	strings_legacy SHALL require an explicit import and mark every exported item dep	9787956b7dfb	Compile-warning fixtures and documentation lint.	todo
+ARCH-006	Future	9.1	strings_unsafe_abi SHALL be feature-gated, separately versioned, and excluded fr	27067edada8e	Feature-off symbol absence; feature-on ABI tests.	todo
+ARCH-007	F0	9.1	Pure sv0 implementations SHALL be the executable semantic reference. Accelerated	e736f00872f1	Reference/optimized implementation test matrix.	todo
+ARCH-008	F0	9.1	The package SHALL not depend on network services or ambient mutable global state	488e66c1f25f	Dependency and global-state scan.	todo
+ARCH-009	R0.2	9.1	Locale-independent modules SHALL return identical results under every host local	6bb6c642456b	Locale-matrix tests.	todo
+ARCH-010	R1	9.1	Packaging SHALL use the accepted sv0 project/module mechanism at release time; t	ef2a90ca2395	Clean-project consumer test and evidence manifest.	todo
+ARCH-011	F0	9.1	Because current project discovery recursively compiles every .sv0 file, each tes	f81b56087283	Test-runner self-test, duplicate-main negative probe, and path-permutation matrix.	todo
+ARCH-012	F0	9.1	sv0.toml, when present, SHALL be described only as native-build configuration. I	874c00806c50	Documentation lint and config-schema probe.	todo
+ARCH-013	Future	9.1	A hierarchical strings::... alias layer MAY be added only after nested modules a	60aa151c8529	Compatibility compile matrix.	todo
+ARCH-014	F0	9.1	The exported API SHALL be machine-inventoried. A helper documented as private SH	ca55cbd3a292	Public-surface manifest and cross-module privacy negative tests.	todo
+ARCH-015	F0	9.1	The package test runner SHALL use the native VM project emitter for VM conforman	b97177757984	Runner command audit and backend-identity manifest.	todo
+BYTE-001	F0	10.2	compare SHALL perform lexicographic unsigned-byte comparison and return Equal if	dc1bd5e80c0a	C23 `memcmp`-derived fixtures plus unequal-length cases.	todo
+BYTE-002	F0	10.2	equal SHALL be extensionally equivalent to compare(a, b) == Ordering::Equal. It 	02c50f40efb7	Property test over generated byte vectors.	todo
+BYTE-003	R0.1	10.2	copy SHALL copy the entire source or return DestinationTooSmall without modifyin	1eac5faa8b7c	Failure atomicity sentinel test.	todo
+BYTE-004	R0.1	10.2	copy SHALL define overlap safely. If the borrow checker cannot rule overlap out,	36b5b2e4f9ee	Exhaustive overlap matrix and sanitizer run.	todo
+BYTE-005	R0.1	10.2	On success, copy SHALL return src.len() and preserve bytes of dst after the writ	949eed0771b7	Postcondition fixture with sentinel suffix.	todo
+BYTE-006	R0.1	10.2	copy_prefix SHALL write min(dst.len(), src.len()) bytes and report required = sr	b290cf1c1f21	Size matrix including zero lengths.	todo
+BYTE-007	R0.1	10.2	move_within SHALL behave as if the source bytes were first copied to a temporary	c3ac0d75e00e	Differential test against a simple temporary-buffer model.	todo
+BYTE-008	R0.1	10.2	move_within SHALL reject any source or destination range outside buf before modi	c11127c37feb	Boundary and failure-atomicity tests.	todo
+BYTE-009	R0.1	10.2	fill SHALL write exactly the destination slice and no adjacent storage.	bbb910af82de	Guard-byte fixture and sanitizer run.	todo
+BYTE-010	R0.1	10.2	fill_explicit SHALL provide a backend-enforced guarantee that the writes are obs	4092986b1e3c	Generated-C inspection, optimizer test, and VM store trace.	todo
+BYTE-011	F0	10.2	find and rfind SHALL return the first and last matching byte index respectively,	292a404d5531	Table fixtures and model property.	todo
+BYTE-012	R0.1	10.2	find_slice SHALL return Some(0) for an empty needle, the first match for a non-e	81d494876eb0	C23 `strstr`/POSIX `memmem`-derived byte fixtures.	todo
+BYTE-013	R0.1	10.2	span_in SHALL return the length of the maximal input prefix whose bytes are memb	d9fcd9cd067b	`strspn`-derived fixtures.	todo
+BYTE-014	R0.1	10.2	span_not_in SHALL return the length of the maximal input prefix whose bytes are 	f44972cf5176	`strcspn`-derived fixtures.	todo
+BYTE-015	R0.1	10.2	starts_with and ends_with SHALL treat the empty sequence as a prefix and suffix 	20bd8cad5afa	Algebraic property tests.	todo
+BYTE-016	R0.1	10.2	All byte APIs SHALL accept embedded zero and all values 0x00 through 0xFF withou	7cb547b41831	Exhaustive single-byte fixtures and random vectors.	todo
+BYTE-017	R0.1	10.2	No loop SHALL read or write at index i unless its invariant proves i < relevant.	2aef5ef9bfcc	Contract/invariant review and boundary tests.	todo
+BYTE-018	R1	10.2	For inputs within representable memory, byte operations SHALL have no integer wr	e791f9fff2e7	Maximum-value symbolic tests and checked-arithmetic lint.	todo
+TEXT-001	F0	11.2	len_bytes SHALL return the number of UTF-8 code units and SHALL count embedded U	9cd4dd835dfb	ASCII, multibyte, and embedded-NUL fixtures on both backends.	todo
+TEXT-002	F0	11.2	is_empty(s) SHALL be equivalent to len_bytes(s) == 0.	287d80a431b1	Property test.	todo
+TEXT-003	F0	11.2	equal SHALL compare the complete UTF-8 byte sequences, including bytes following	0313197e6fa3	Embedded-NUL parity fixture.	todo
+TEXT-004	R0.2	11.2	compare_bytes SHALL be deterministic unsigned-byte lexicographic ordering and SH	4964c60fff00	Locale-matrix and unsigned-byte fixtures.	todo
+TEXT-005	R0.2	11.2	concat SHALL return a newly owned valid UTF-8 string equal to a followed by b; a	efa2eb4140d9	Ownership, allocation-failure, and content properties.	todo
+TEXT-006	R0.2	11.2	concat SHALL check a.len + b.len for overflow before allocation.	a03ad4477f27	Maximum-length model test.	todo
+TEXT-007	R0.2	11.2	find_byte SHALL search UTF-8 bytes. It MAY return an index that is not a scalar 	c250a8abe11f	Continuation-byte fixtures.	todo
+TEXT-008	R0.2	11.2	find and rfind SHALL return byte offsets that are scalar boundaries for valid UT	6efb15c6046e	Multibyte boundary property.	todo
+TEXT-009	R0.2	11.2	Searching for an empty string SHALL return Some(0) for find and Some(len_bytes(v	4e65c42f17b0	Empty-needle fixtures.	todo
+TEXT-010	R0.2	11.2	slice_bytes SHALL require start <= end <= len_bytes(value) and both offsets to b	05f15b210c84	Boundary matrix and invalid-continuation tests.	todo
+TEXT-011	R0.2	11.2	A successful slice_bytes result SHALL equal bytes [start, end) and remain valid 	27e349d6c69e	Round-trip property against byte view.	todo
+TEXT-012	R0.2	11.2	validate_utf8 SHALL accept exactly the RFC 3629 language: shortest forms only, n	1ef6db02cacd	Official-style valid/invalid UTF-8 corpus.	todo
+TEXT-013	R0.2	11.2	TextError::InvalidUtf8.valid_up_to SHALL equal the byte length of the longest pr	7ae696b62af2	Error-offset fixtures.	todo
+TEXT-014	R0.2	11.2	from_utf8 SHALL copy into owned storage unless an accepted ownership-transfer AP	941a645163f4	Aliasing and mutation-after-conversion tests.	todo
+TEXT-015	R0.2	11.2	as_bytes SHALL return a read-only borrow of the complete UTF-8 storage and prese	895a8828b033	Borrow-lifetime and embedded-NUL tests.	todo
+TEXT-016	R0.2	11.2	No R1 native text API SHALL depend on strlen, strcmp, or another NUL-terminated 	0ad347f13282	Generated-C/runtime call scan.	todo
+TEXT-017	R1	11.2	All text operations SHALL have C/VM parity for every valid Unicode scalar and re	ab3d00d5bf7f	Generated Unicode fixture matrix.	todo
+TEXT-018	R1	11.2	The documentation SHALL use “byte,” “Unicode scalar,” and “grapheme cluster” pre	391a65609dbb	Terminology lint and review.	todo
+ASCII-001	R0.1	12.2	ASCII case mapping SHALL affect only bytes A–Z or a–z; all other bytes SHALL be 	83866fb31169	Exhaustive 256-byte table.	todo
+ASCII-002	R0.1	12.2	ASCII case operations SHALL be independent of host locale and Unicode tables.	686b5bb66b6b	Multi-locale parity test.	todo
+ASCII-003	R0.1	12.2	equal_ignore_case SHALL require equal lengths and compare every byte after ASCII	e8ef3e1d6d1a	Generated vector properties.	todo
+ASCII-004	R0.1	12.2	compare_ignore_case SHALL compare folded bytes lexicographically, then length if	a6a9c3680118	POSIX-locale comparison fixtures.	todo
+ASCII-005	R0.1	12.2	compare_prefix_ignore_case SHALL compare no more than n bytes from each input an	a46e98d522d2	`n`/length cross-product test.	todo
+ASCII-006	R0.1	12.2	The native ASCII API SHALL NOT be documented as Unicode case-insensitive compari	ad105c0d5372	Documentation lint.	todo
+ASCII-007	R0.4	12.2	POSIX strcasecmp adapters SHALL delegate to ASCII behavior only in the POSIX loc	88234843ffca	Locale-profile tests.	todo
+ASCII-008	R1	12.2	Every ASCII function SHALL produce identical results for all 256 byte values on 	b09892b0c68c	Exhaustive cross-backend test.	todo
+CSTR-001	R0.2	13.2	from_bytes_with_nul SHALL accept only a slice whose final byte is zero and whose	4f0ecd0cc6c7	Constructor cross-product fixtures.	todo
+CSTR-002	R0.2	13.2	from_bytes_until_nul SHALL borrow through the first zero and ignore later bytes 	6ccbae190593	First-NUL and missing-NUL fixtures.	todo
+CSTR-003	R0.2	13.2	strings_cstr::len SHALL equal the number of payload bytes before the terminator 	d315fee64e5a	Instrumented scan-count test or implementation inspection.	todo
+CSTR-004	R0.2	13.2	as_bytes SHALL exclude the terminator; as_bytes_with_nul SHALL include exactly o	6d5c4a0ca25c	View-length and content tests.	todo
+CSTR-005	R0.2	13.2	from_text SHALL reject embedded U+0000 and preserve the exact UTF-8 payload othe	72363efa74a4	Embedded-NUL and multibyte fixtures.	todo
+CSTR-006	R0.2	13.2	from_bytes SHALL permit non-UTF-8 payload bytes but reject interior zero, append	f88da448b351	Arbitrary-byte fixtures.	todo
+CSTR-007	R0.2	13.2	to_text SHALL validate the payload as UTF-8; invalid bytes return TextError with	e6cd6fdcf26b	Invalid UTF-8 tests.	todo
+CSTR-008	R0.2	13.2	clone_owned and concat SHALL detect allocation and length failure and SHALL not 	41dc9be22231	Fault-injection and leak checks.	todo
+CSTR-009	R0.2	13.2	concat SHALL produce exactly the payload of a, followed by the payload of b, fol	b75f2f9a4932	Content property and overflow model.	todo
+CSTR-010	R0.2	13.2	buffer_from_storage SHALL scan only the bounded storage, caching its first-NUL o	975f20bd3baa	State-construction and guard-byte fixtures.	todo
+CSTR-011	R0.2	13.2	copy_into SHALL write at most capacity - 1 source bytes when capacity is nonzero	9c766ff8de03	POSIX `strlcpy` differential matrix.	todo
+CSTR-012	R0.2	13.2	append_into SHALL implement bounded strlcat semantics over the entire CBuffer: w	e1ae716467bd	POSIX `strlcat` differential matrix including unterminated storage and modeled overflow.	todo
+CSTR-013	R0.2	13.2	A zero-capacity CBuffer SHALL permit no write and SHALL still report the require	0ef246592b61	Zero-capacity fixtures.	todo
+CSTR-014	R0.2	13.2	Safe C-string methods SHALL never return a raw pointer or expose uninitialized c	cc6838612592	Public-surface lint.	todo
+CSTR-015	R1	13.2	Dropping CString SHALL release its owned allocation exactly once on every backen	70ad0ad98d87	Allocation counter and double-free/leak tests.	todo
+CSTR-016	R1	13.2	Mutation through CBuffer SHALL update or invalidate its cached first-NUL state a	0440e9022bc5	Model-based mutation sequences.	todo
+CSTR-017	R0.2	13.2	borrow and require_cstr SHALL return views whose borrows(...) source is explicit	14ca9c72a6a9	Borrow compile-pass/fail and scan-count tests.	todo
+CSTR-018	R0.2	13.2	CopyReport.written SHALL mean source payload bytes copied/appended, excluding an	1a54304762da	Report-field cross-operation table tests.	todo
+TOK-001	R0.2	14.2	Tokenization state SHALL be explicit in TokenCursor; no module-global or thread-	75ffb19ef315	Global-state scan and concurrency test.	todo
+TOK-002	R0.2	14.2	next SHALL skip one or more leading separators and return non-empty tokens betwe	62faf1de864f	Differential token-boundary fixtures.	todo
+TOK-003	R0.2	14.2	An empty separator set SHALL return the remaining input as one token, then compl	003e3fc80eb2	Empty-set fixture.	todo
+TOK-004	R0.2	14.2	Empty input or separator-only input SHALL return None and mark the cursor comple	67262b558ee0	Boundary fixtures.	todo
+TOK-005	R0.2	14.2	Returned token ranges SHALL satisfy start <= end <= input.len() and borrow only 	5d7d9d287538	Contracts and compile-fail lifetime tests.	todo
+TOK-006	R0.2	14.2	Calling next after completion SHALL deterministically return None without changi	53171bb53a34	Idempotence property.	todo
+TOK-007	R0.2	14.2	Two cursors over the same or different inputs SHALL advance independently.	62315b0473e7	Interleaved-cursor test.	todo
+TOK-008	R0.3	14.2	The C23 safe strtok façade SHALL return or wrap this explicit tokenizer; it SHAL	44fae0f2d031	Facade API inspection and interleaving test.	todo
+TOK-009	R0.3	14.2	The C23/POSIX tokenization façades SHALL operate only on bytes before the input 	1fec6bde17bc	Embedded-NUL and changing-separator differential fixtures.	todo
+C23-001	R0.3	15.2	Every C23 Section 7.26 core function SHALL appear exactly once in Appendix A wit	a9244ee7d7f1	Standards-matrix completeness script.	todo
+C23-002	R0.3	15.2	Functions marked Exact SHALL match C23 defined outputs and side effects for ever	d81396f23476	C oracle differential tests.	todo
+C23-003	R0.3	15.2	Functions marked Adapted SHALL document each type, error, ownership, overlap, or	733abdfa00f1	Adapter review and examples.	todo
+C23-004	R0.3	15.2	memcpy SHALL use strings_bytes::copy with non-overlap enforcement; memmove SHALL	2b3e918b00cf	Overlap differential/sanitizer matrix.	todo
+C23-005	R0.3	15.2	memccpy SHALL return MemccpyReport: written is the number of copied bytes and ne	bf0dd07a8394	Stop-byte/no-stop fixtures.	todo
+C23-006	R0.3	15.2	memchr/strchr/strrchr/strpbrk/strstr SHALL return Option<usize> offsets or typed	ba94b923765b	Search matrix and lifetime tests.	todo
+C23-007	R0.3	15.2	memcmp/strcmp/strncmp SHALL return Ordering in the safe façade. An explicit orde	81575423fd7c	Ordering sign-equivalence tests.	todo
+C23-008	R0.3	15.2	strcpy, strcat, and bounded variants SHALL require CBuffer destination capacity 	3c5bbf753cb2	Capacity-negative tests.	todo
+C23-009	R0.3	15.2	strncpy SHALL preserve its exact zero-padding behavior and SHALL return a byte-b	4278951a4a70	Differential padding/nontermination fixtures.	todo
+C23-010	R0.3	15.2	strncat SHALL append at most n source bytes and one terminator, with checked des	1ce5fe7093a2	Differential size and bounded-unterminated-source matrix.	todo
+C23-011	R0.3	15.2	strdup/strndup SHALL return owned CString; strndup SHALL accept a bounded initia	6a1cddaa1993	Differential allocation/content tests.	todo
+C23-012	R0.3	15.2	strspn/strcspn SHALL delegate to safe span algorithms over C-string payload byte	30bc41037539	Differential tests.	todo
+C23-013	R0.3	15.2	Safe strtok compatibility SHALL use explicit cursor state and immutable C-string	feb0ef0fe697	State, changing-separator, embedded-NUL, and mutation tests.	todo
+C23-014	R0.3	15.2	memset SHALL delegate to strings_bytes::fill; memset_explicit SHALL remain block	57514ef445e6	Call mapping and optimizer tests.	todo
+C23-015	R0.3	15.2	strlen SHALL accept CStr; it SHALL NOT scan arbitrary string values or unbounded	f1ca189eed8d	Type-surface and missing-NUL tests.	todo
+C23-016	R0.3	15.2	strcoll and strxfrm SHALL be Host-dependent until an explicit locale service has	b90b2aad31d8	Locale capability gate.	todo
+C23-017	R0.3	15.2	strerror SHALL be Host-dependent; stable tests SHALL compare structured error id	86eb2b3aa22c	Host error adapter tests.	todo
+C23-018	R0.3	15.2	The façade SHALL preserve bytes as unsigned for comparison, including values 0x8	e918439677f9	Exhaustive high-bit fixtures.	todo
+C23-019	R0.3	15.2	No safe façade function SHALL invoke C UB in generated code for any value constr	df7ac3b2a0e7	ASan/UBSan, fuzz, and contract suite.	todo
+C23-020	R0.3	15.2	C23 type-generic memchr/strchr/strpbrk/strrchr/strstr const-preserving behavior 	4182d98dbc7e	API mapping review.	todo
+C23-021	R0.3	15.2	strchr(s, 0) and strrchr(s, 0) adapters SHALL find the terminating zero at paylo	14043db67373	Terminator-search differential fixtures.	todo
+C23-022	R0.3	15.2	Character interpretation and int c conversion SHALL follow each C23 function: ob	cde42ec6cbe5	Function-specific conversion fixtures and target manifest.	todo
+C23-023	R0.3	15.2	strstr SHALL return offset zero for an empty needle and the first matching paylo	010f40723d9c	Empty/overlapping-match differential fixtures.	todo
+C23-024	R0.3	15.2	strxfrm size-query behavior, including a zero-sized destination, SHALL be modele	b90bb44a5973	Locale transform size-query tests.	todo
+C23-025	R0.3	15.2	Any C comparison integer adapter SHALL preserve only the required sign; tests SH	7032a39434aa	Cross-libc comparison test.	todo
+C23-026	R0.3	15.2	The C23 catalog SHALL include the non-function <string.h> surface: size_t, NULL,	37bab708425c	Header inventory and exact-profile compile probes.	todo
+C23-027	R0.3	15.2	strncmp and other n-bounded string operations SHALL not require a NUL within the	c58f0b4e217a	Guard-page bounded-unterminated fixtures.	todo
+C23-028	R0.3	15.2	The C23 type-generic search catalog SHALL distinguish the generic macro interfac	b4d78a13b69b	Macro-suppression and mutable/immutable API tests.	todo
+C23-029	R0.3	15.2	strxfrm adapters SHALL not expose destination bytes as initialized transformed d	cc983731e980	Exact-capacity, truncation, and size-query differential tests.	todo
+C23-030	R0.3	15.2	strerror SHALL accept every i32 value. Unsupported service or allocation may be 	5101ac2d8016	Known/unknown/error-range host tests.	todo
+C23K-001	R0.3	15.3	Annex K SHALL be labeled optional and Excluded from the core C23 claim unless a 	166b3acc6de1	Claim text and symbol-absence test.	todo
+C23K-002	Future	15.3	If implemented, the Annex K profile SHALL define rsize_t, runtime-constraint han	a973c13c44b2	Annex K completeness matrix.	todo
+C23K-003	Future	15.3	Annex K runtime-constraint handling SHALL not use an unscoped process-global mut	75fe66fcc8ec	Concurrency and global-state test.	todo
+POSIX-001	R0.4	16.2	Every function and required non-function declaration in POSIX.1-2024 Issue 8 <st	b4b01d12a0fd	POSIX matrix extraction/completeness script.	todo
+POSIX-002	R0.4	16.2	memmem SHALL map to binary-safe strings_bytes::find_slice and support embedded z	e690dbcdce99	POSIX differential vectors.	todo
+POSIX-003	R0.4	16.2	stpcpy/stpncpy SHALL return a safe written-end offset or view, not a raw interio	13f2e6174d14	Differential boundary fixtures.	todo
+POSIX-004	R0.4	16.2	strlcpy/strlcat SHALL return the total length attempted and expose truncation vi	85fc4d7d456b	Issue 8 differential matrix.	todo
+POSIX-005	R0.4	16.2	strnlen SHALL inspect at most n bytes and return min(first_nul_index, n) without	df8632b7d39d	Bounded-read guard-page test.	todo
+POSIX-006	R0.4	16.2	strtok_r SHALL use caller-owned explicit state. The safe native tokenizer remain	2cfc5d439b6e	Interleaved-state differential token boundaries.	todo
+POSIX-007	R0.4	16.2	strcasecmp/strncasecmp SHALL be exact for the POSIX locale profile; non-POSIX lo	9c05e27ff364	POSIX-locale exhaustive ASCII test.	todo
+POSIX-008	R0.4	16.2	_l functions SHALL reject an invalid or unsupported locale handle with a typed e	85acfdfa24d7	Invalid-locale and ambient-locale tests.	todo
+POSIX-009	R0.4	16.2	strcoll_l/strxfrm_l SHALL share one explicit locale object and satisfy the trans	ebbb519dee31	Locale-specific property tests.	todo
+POSIX-010	R0.4	16.2	strerror_r SHALL write only within caller-provided capacity, report insufficient	55903a10c339	Concurrency, capacity, and guard-byte tests.	todo
+POSIX-011	R0.4	16.2	strerror_l and strsignal SHALL be Host-dependent and SHALL define ownership/life	7d27c37794f7	Host adapter and lifetime tests.	todo
+POSIX-012	R0.4	16.2	ffs, ffsl, and ffsll SHALL remain in the XSI subprofile and use explicit-width s	c69245958ddb	Width and exhaustive/sampled bit tests.	todo
+POSIX-013	R0.4	16.2	Feature-profile documentation SHALL distinguish base POSIX, CX extensions, and X	38700397dc2c	Generated compatibility documentation.	todo
+POSIX-014	R0.4	16.2	Ambient process locale SHALL not affect any safe-native module or the POSIX-loca	9db136634762	Locale perturbation test.	todo
+POSIX-015	R1	16.2	The POSIX profile SHALL pass on every declared supported POSIX target; unsupport	08e8e33b6cc2	Target evidence manifest and fail-closed CI.	todo
+POSIX-016	R0.4	16.2	The POSIX header catalog SHALL include NULL, size_t, and locale_t where required	09eebcc199ce	Header inventory and feature-test compile matrix.	todo
+POSIX-017	R0.4	16.2	strncasecmp and strncasecmp_l SHALL stop at NUL or n, whichever comes first, and	6c316b5e1c12	Guard-page bounded-unterminated locale matrix.	todo
+LEGACY-001	R0.4	16.3	Removed interfaces SHALL exist only under strings_legacy and SHALL NOT contribut	111dbc6896bb	Namespace and claim tests.	todo
+LEGACY-002	R0.4	16.3	bcmp SHALL map to byte equality/ordering, bcopy to overlap-safe move, bzero to f	ca24dee248a7	Alias equivalence tests.	todo
+LEGACY-003	R0.4	16.3	Each legacy symbol SHALL emit or document a deprecation replacement.	56a50053bf37	Compile-warning and docs checks.	todo
+LEGACY-004	R0.4	16.3	Legacy aliases SHALL retain safe slice/CStr types; historical raw-pointer hazard	8199776c6c06	Signature lint.	todo
+HOST-001	R0.4	17.2	Locale-sensitive behavior SHALL require an explicit locale object or the named P	427ff6ebc4cf	API and perturbation tests.	todo
+HOST-002	R0.4	17.2	A locale object SHALL have documented ownership, thread-safety, and backend supp	b3d8f67bae4f	Capability lifecycle tests.	todo
+HOST-003	R0.4	17.2	Locale transform and comparison SHALL be consistent: comparing transformed outpu	1480ace97b71	Property test per supported locale.	todo
+HOST-004	R0.4	17.2	Unsupported locales SHALL return a typed error and SHALL not downgrade silently 	3256f2a29d64	Negative locale tests.	todo
+HOST-005	R0.3	17.2	Error and signal message adapters SHALL return owned sv0 strings or a documented	3c4208fba239	Concurrency/lifetime tests.	todo
+HOST-006	R0.4	17.2	Error messages SHALL not be treated as stable protocol identifiers. Structured e	01a2b139ac99	Documentation and snapshot-policy test.	todo
+HOST-007	R1	17.2	Host-service adapters SHALL declare whether they are available on C, VM, or both	1f20f2b8fc5a	Capability manifest.	todo
+UP-001	F0	18.1	string SHALL have one normative length-bearing representation contract that pres	551bd03a8c22	Cross-backend representation conformance probes.	todo
+UP-002	F0	18.1	len_bytes, complete equality, concatenation, byte access, and substring SHALL no	14489dcf0334	Embedded-NUL generated-C/VM tests.	todo
+UP-003	F0	18.1	Byte access and substring SHALL bounds-check before memory access and produce th	218a71f4f639	Negative parity tests and sanitizers.	todo
+UP-004	F0	18.1	Arrays, &[byte], &mut [byte], indexing, and mutation SHALL compile and execute o	4a4325aeabd9	End-to-end slice corpus.	todo
+UP-005	F0	18.1	Slice runtime representation SHALL carry data and length; mutable and immutable 	8188e64f226c	ABI/layout probes plus borrow compile-fail suite.	todo
+UP-006	F0	18.1	Range non-overlap SHALL be expressible or checkable by full intervals, not point	cd5c7d0dda0c	Partial-overlap contract tests.	todo
+UP-007	F0	18.1	Owned allocations used by string, Vec<byte>, and CString SHALL have checked allo	2bde4aac7d4b	Fault injection and allocation accounting.	todo
+UP-008	F0	18.1	usize length arithmetic and narrowing at C/VM ABI boundaries SHALL be checked.	2676af7e2654	Large-value tests and generated-code inspection.	todo
+UP-009	F0	18.1	The exact Option, Result, struct/enum payload, and borrowed-return shapes used b	78786075a0e9	Consumer project integration suite and generated-layout inspection.	todo
+UP-010	F0	18.1	The package SHALL provide a repeatable source-vendoring/staging test runner buil	fb1c8d1cd11c	Clean-checkout consumer and runner self-tests.	todo
+UP-011	R0.1	18.1	Runtime accelerators SHALL be versioned and capability-discoverable; absence SHA	455c9747ecf9	Capability-on/off parity matrix.	todo
+UP-012	R0.1	18.1	Backend panic/exception text SHALL not be the only machine-readable failure sign	9e6b69659f89	Typed-error tests.	todo
+UP-013	R0.2	18.1	String/CString destruction SHALL free owned allocations in C and retire correspo	15e37469a7fe	Lifetime and leak suite.	todo
+UP-014	R0.3	18.1	fill_explicit SHALL have a documented compiler/runtime primitive or observable-s	d94ac44399a9	Optimized generated-code and VM trace test.	todo
+UP-015	R0.4	18.1	Locale, error, and signal adapters SHALL use versioned host capabilities and det	2ff242e81cdd	Capability contract tests.	todo
+UP-016	Future	18.1	An exact C ABI profile SHALL define raw-pointer types, calling convention, symbo	b6ac7d44e6ea	ABI manifest and external C linkage suite.	todo
+UP-017	F0	18.1	Contract evidence SHALL identify each clause as parsed, runtime-checked, statica	e4a71a733c6c	Generated-C/bytecode inspection, deliberate-failure probes, and contract report audit.	todo
+UP-018	F0	18.1	The public byte spelling SHALL resolve consistently as the normative u8 alias in	967d446d81cf	Alias compile/execute matrix and public-surface lint.	todo
+UP-019	F0	18.1	Every release module SHALL use a flat strings_ declaration and explicit item imp	81a4a064c6db	Project-mode positive/negative module probes.	todo
+UP-020	F0	18.1	Generic result families used with more than one concrete payload representation 	8676f5756164	Multi-instantiation C-layout, VM, and round-trip corpus.	todo
+UP-021	F0	18.1	Every public return shape SHALL be representable by both backends. In particular	7c14f05fd72d	Signature inventory, generated layout, and negative probes.	todo
+UP-022	F0	18.1	The canonical C-backend test path SHALL use sv0c --emit=exe --project or the wor	b28391c97b81	Command audit, ABI-mismatch negative test, and build record.	todo
+UP-023	F0	18.1	Current known source-shape hazards affecting match results, struct-valued calls,	ac96960d4713	Targeted regression corpus derived from current consumer findings.	todo
+UP-024	F0	18.1	Repeated imports of one shared type from multiple files SHALL resolve as one dec	ec8312963f76	Diamond-import native/VM project test.	todo
+UP-025	F0	18.1	pub and non-pub item visibility SHALL be enforced across modules, or an accepted	fcb216d1b59f	Public/private import matrix on native and VM project paths.	todo
+UP-026	F0	18.1	Recursive project discovery SHALL produce the same semantic program for every le	f05f00a5b2d8	Path-permutation project corpus and diagnostic assertions on C/native VM.	todo
+UP-027	F0	18.1	Current VM conformance SHALL use ./scripts/sv0 vm-native-compile --project; the 	3d02c149385e	Native-VM project positive/negative tests, artifact validation, and command audit.	todo
+UP-028	F0	18.1	Every project run SHALL record the effective contract mode. A backend that canno	7b1420f9e657	C/native-VM contract-mode capability matrix.	todo
+BACKEND-001	F0	18.2	The same safe source program SHALL produce identical success/error classificatio	a3bf8588217a	Golden result diff.	todo
+BACKEND-002	F0	18.2	Embedded NUL, high-bit bytes, empty values, and maximum boundary values SHALL be	30879c523e13	Fixture inventory lint.	todo
+BACKEND-003	R0.1	18.2	Pure and accelerated implementations SHALL be selectable in tests and SHALL pass	ca82289be9c8	Implementation matrix.	todo
+BACKEND-004	R0.2	18.2	Allocation-failure injection SHALL exist on both backends with equivalent typed 	f733e6f4fdec	Fault-injection parity test.	todo
+BACKEND-005	R0.3	18.2	Generated C SHALL compile with warnings-as-errors under the supported C compiler	7ee369becc49	CI compiler/sanitizer jobs.	todo
+BACKEND-006	R0.3	18.2	The VM SHALL fail closed on malformed bytecode, invalid handles, or out-of-range	e8c2de5ddf64	Negative bytecode/runtime tests.	todo
+BACKEND-007	R1	18.2	Every release SHALL publish the exact toolchain revisions, target triples, compi	5a8714e67381	Release evidence schema.	todo
+BACKEND-008	F0	18.2	A contract clause that the selected backend cannot lower SHALL produce a diagnos	5f858f5456b4	Advanced-contract negative and report tests.	todo
+BACKEND-009	F0	18.2	Every backend result cited for a normative requirement SHALL be hard-failing. Ad	4c1b1d56b922	Gate-policy lint and injected VM mismatch test.	todo
+SEC-001	F0	19	Safe APIs SHALL prevent out-of-bounds reads and writes for every constructible i	a580203ede31	Contracts, fuzzing, guard pages, ASan/UBSan, and VM negative tests.	todo
+SEC-002	F0	19	Length/capacity calculations SHALL use checked addition, subtraction, and multip	2e52865c1d5b	Overflow corpus and static scan.	todo
+SEC-003	R0.1	19	Operations with insufficient capacity SHALL fail before modification unless thei	f0213200ce83	Failure-atomicity and truncation fixtures.	todo
+SEC-004	R0.1	19	Safe overlap behavior SHALL be deterministic; no safe path may reach C undefined	41fadc748eb1	Exhaustive overlap tests and sanitizers.	todo
+SEC-005	R0.2	19	Invalid UTF-8 SHALL never enter an owned string through this library. Lossy conv	090148c2253f	Invalid corpus and type-invariant tests.	todo
+SEC-006	R0.2	19	CStr/CString constructors SHALL prevent unterminated or interior-NUL values from	d747bfe91097	Constructor negative suite.	todo
+SEC-007	R0.2	19	Tokenization and searching SHALL have documented worst-case complexity and SHALL	fadbeeb6bf78	Complexity benchmarks and adversarial inputs.	todo
+SEC-008	R0.2	19	Allocation failures SHALL be typed and leak-free. Tests SHALL inject failure at 	a0ea1dcddb07	Fail-at-N allocation suite.	todo
+SEC-009	R0.3	19	Compatibility adapters SHALL convert C UB preconditions into safe type constrain	52bd89c0cc95	Per-matrix-row hazard review.	todo
+SEC-010	R0.3	19	fill_explicit SHALL not claim to clear registers, caches, swap, previous copies,	48448cac7308	Security documentation review.	todo
+SEC-011	R0.4	19	Locale and message adapters SHALL be thread-safe for the declared profile or ret	b26d3e77417f	Thread sanitizer/concurrency tests where available.	todo
+SEC-012	R1	19	Fuzz-discovered crashes, OOB behavior, leaks, or semantic divergences SHALL beco	7ef8f93e0b09	Regression provenance audit.	todo
+SEC-013	R1	19	The exact-ABI profile, if enabled, SHALL be excluded from safe-code guarantees a	93f07389c036	Unsafe API documentation coverage.	todo
+SEC-014	R1	19	No test shall rely on a crash as the successful handling of a recoverable error;	b1c22716ae68	Test-pattern lint.	todo
+PERF-001	R0.1	20	Single-pass length, compare, copy, fill, and byte-search operations SHALL be O(n	962be9ff5fad	Operation-count benchmarks.	todo
+PERF-002	R0.1	20	find_slice SHALL document its chosen algorithm and worst-case complexity. A naiv	7c767806854c	Adversarial repeated-prefix benchmark.	todo
+PERF-003	R0.2	20	strings_cstr::len SHALL be O(1) after validation; validation itself SHALL be O(n	dd1ecc7407e9	Instrumented scan count.	todo
+PERF-004	R0.2	20	CString concatenation SHALL allocate at most once after checking the final lengt	b1eeb124eb18	Allocation counter.	todo
+PERF-005	R0.2	20	Tokenization SHALL be O(n × membership-cost); the implementation SHOULD use a 25	4905e1f24f43	Operation-count benchmark.	todo
+PERF-006	R0.3	20	Compatibility adapters SHALL not introduce an extra full scan when the safe type	01da733ece93	Call/scan instrumentation.	todo
+PERF-007	R0.4	20	Locale transform operations MAY allocate according to host requirements but SHAL	7ec05f6fd6d5	Host adapter tests.	todo
+PERF-008	R1	20	Benchmarks SHALL report input distribution, sizes, backend, compiler flags, warm	3c6e98094660	Benchmark schema lint.	todo
+PERF-009	R1	20	No release gate SHALL require one backend to be faster than another; parity is s	86358c480a7c	Release checklist.	todo
+TEST-001	F0	21.3	Every in-scope normative requirement SHALL map to at least one test ID or an exp	c5bdbeb7e344	Generated requirement matrix.	todo
+TEST-002	F0	21.3	Every test SHALL map back to at least one requirement, acceptance scenario, or r	269c0854760c	Reverse-traceability lint.	todo
+TEST-003	F0	21.3	Requirement, test, scenario, backlog, and fixture identifiers SHALL be unique wi	a02a7b1b877f	Structural validator.	todo
+TEST-004	F0	21.3	Fixtures SHALL record source/provenance, standard version, generator version, an	e63c4931a723	Fixture schema validation.	todo
+TEST-005	F0	21.3	Native C and canonical native VM SHALL run the same logical fixture IDs; separat	a2df0a0fe9a0	Fixture digest comparison.	todo
+TEST-006	F0	21.3	Empty values, one-byte values, embedded zero, 0x80–0xFF, exact capacity, zero ca	15900ff92fe4	Fixture inventory lint.	todo
+TEST-007	R0.1	21.3	Copy/move tests SHALL enumerate disjoint, identical, adjacent, left-overlap, rig	3367c9033159	Overlap-matrix completeness check.	todo
+TEST-008	R0.1	21.3	Property tests using pseudo-random data SHALL use recorded seeds and print the s	f55b438a412d	Determinism rerun check.	todo
+TEST-009	R0.2	21.3	UTF-8 tests SHALL cover 1/2/3/4-byte scalars, boundary scalars, overlong forms, 	034f7b9487f1	UTF-8 category inventory.	todo
+TEST-010	R0.2	21.3	Borrow and ownership tests SHALL include compile-fail cases, use-after-move reje	347e4379e0fd	Compiler diagnostic and allocation suite.	todo
+TEST-011	R0.2	21.3	Token tests SHALL interleave at least two cursors and run equivalent cases concu	819716464c61	State isolation test.	todo
+TEST-012	R0.3	21.3	Differential C tests SHALL avoid invoking C UB; preconditions SHALL be validated	1d6d3fd84a78	Oracle harness review and sanitizer run.	todo
+TEST-013	R0.3	21.3	Safe compatibility tests SHALL compare semantic values, not raw pointer addresse	52b326782dad	Test lint.	todo
+TEST-014	R0.3	21.3	C backend tests SHALL run with warnings-as-errors and the supported sanitizer se	adaa26cfda20	CI evidence.	todo
+TEST-015	R0.4	21.3	Locale tests SHALL pin locale identity and SHALL distinguish unavailable locale 	fe1df0f46a1e	Locale fixture schema.	todo
+TEST-016	R0.4	21.3	Host message tests SHALL assert documented properties and error identity; exact 	aab97ed23923	Message-test review.	todo
+TEST-017	R1	21.3	Fuzzing SHALL meet a recorded minimum corpus/iteration or time budget on both pu	83e238fb9062	Fuzz evidence manifest.	todo
+TEST-018	R1	21.3	The full gate SHALL run from a clean checkout without network access using pinne	d698d9fade06	Offline clean-checkout release rehearsal.	todo
+TEST-019	R1	21.3	Tests SHALL run in runtime, verified, and disabled contract modes where the tool	e41370b12dc4	Contract-mode matrix.	todo
+TEST-020	R1	21.3	Release evidence SHALL contain zero unexplained skips, flaky retries, sanitizer 	e3b55d743e44	Fail-closed release audit.	todo
+TEST-021	F0	21.3	The package runner SHALL execute the same serialized fixture identity and expect	c13d19e0eab4	Runner self-test, deliberate value mismatch, and fixture-ID digest comparison.	todo
+GOV-001	F0	22.2	This SPEC.md SHALL be the governing product and engineering specification until 	369395c4c194	Repository documentation links.	todo
+GOV-002	F0	22.2	Current-state claims SHALL cite exact audited revisions and source paths; source	9b97766b157c	Source audit checklist.	todo
+GOV-003	F0	22.2	Implemented, specified, blocked, host-dependent, deferred, and excluded behavior	cb647eb4732c	Status-label lint.	todo
+GOV-004	F0	22.2	A source disagreement SHALL become an explicit decision or upstream issue; imple	c72d68836948	Discrepancy register.	todo
+GOV-005	F0	22.2	Stable IDs SHALL never be reused; retired IDs remain in the change log.	565c1638fbc1	ID history check.	todo
+GOV-006	F0	22.2	Material changes to public semantics, errors, ownership, standards disposition, 	ae9e80d28841	Change checklist.	todo
+GOV-007	R0.1	22.2	The standards, requirement, test, fixture, acceptance, and backlog catalogs SHAL	57abf507b125	Traceability validator.	todo
+GOV-008	R0.3	22.2	Compatibility claims SHALL name the exact standard edition and profile; vague “C	23ec0ccb2b30	Documentation lint.	todo
+GOV-009	R1	22.2	Release evidence SHALL be immutable, content-addressed, and retained for every s	ad7cf7d4d90e	Evidence storage audit.	todo
+GOV-010	R1	22.2	A release exception SHALL name the waived requirement, approver, rationale, expi	9676f24edef8	Exception schema and release audit.	todo
+GOV-011	F0	22.2	Examples SHALL be labeled Audited, Demonstrated, or Specified; examples that req	1620ae9dc3d0	Example-label lint.	todo
+GOV-012	R1	22.2	Documentation and tests SHALL state whether behavior is bytewise, ASCII, UTF-8, 	2b067c8f6bdb	Semantic-domain coverage lint.	todo
+GOV-013	F0	22.2	A sibling library's tag, gate name, self-classification, or passing suite SHALL 	a921ad963de0	Evidence-boundary review and source-path traceability.	todo
+DOC-001	F0	22.4	Every public function SHALL document its semantic domain (bytes, UTF-8, CStr, AS	f05b6898c743	Public documentation coverage lint.	todo
+DOC-002	F0	22.4	README.md SHALL state current implementation tier, supported releases/backends/p	7aa2a3399f37	Release documentation checklist.	todo
+DOC-003	R0.2	22.4	Examples SHALL include empty, embedded-NUL, non-ASCII UTF-8, invalid UTF-8, exac	f8c3bef49104	Example-category inventory.	todo
+DOC-004	R0.3	22.4	docs/compatibility.md SHALL be generated from Appendix A/catalog data and SHALL 	875b52491472	Generated-file digest/rebuild test.	todo
+DOC-005	R0.3	22.4	Unsafe/ABI documentation SHALL state every caller obligation and corresponding s	cd30e348ca5b	Unsafe API documentation lint.	todo
+DOC-006	R0.4	22.4	Locale and host-message documentation SHALL name supported targets/locales and d	33c1c6516ba4	Host-profile documentation review.	todo
+DOC-007	R1	22.4	The changelog SHALL identify every public contract, error, ownership, standards-	c26745028a25	Changelog completeness review.	todo
+LIC-001	F0	22.4	Implementation release SHALL be blocked until maintainers record an explicit sou	0431186fe635	Decision record and license files.	todo
+LIC-002	F0	22.4	Every source, fixture, generated artifact, and copied snippet SHALL carry or inh	d7cd60099c45	SPDX/REUSE-style structural lint.	todo
+LIC-003	F0	22.4	Standards wording SHALL be paraphrased except for short necessary interface name	771d0ece26ab	Provenance and licensing review.	todo
+LIC-004	R0.1	22.4	Third-party UTF-8, fuzz, and differential fixtures SHALL record source URL, vers	96c7067c3347	Fixture provenance schema.	todo
+LIC-005	R1	22.4	Release artifacts SHALL include all required license texts, dependency notices, 	442359834e4b	Release artifact audit.	todo

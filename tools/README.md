@@ -45,5 +45,7 @@ tools/check_catalogs.py --strict   # also fail on WARN (release-gate mode)
 tools/check_catalogs.py -v         # list every uncovered requirement
 ```
 
-Seed state: 293 requirements, 0 tests → 293 reverse-traceability warnings, 0
-errors. Warnings burn down as `tests.tsv` fills in.
+Current state: 270 requirements (SPEC v0.4.0-draft), 0 tests → 195
+reverse-traceability warnings (the other 75 requirements have review/inventory/
+lint verification methods and are exempt), 0 errors. Warnings burn down as
+`tests.tsv` fills in.
