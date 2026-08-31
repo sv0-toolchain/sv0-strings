@@ -1,1 +1,73 @@
 standard	edition	header	symbol	classification	disposition	requirements	tests
+C23	ISO/IEC 9899:2024 §7.26	string.h	size_t	declaration	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	NULL	declaration	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	__STDC_VERSION_STRING_H__	declaration	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	memcpy	Copy	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	memccpy	Copy	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	memmove	Copy	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strcpy	Copy	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strncpy	Copy	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strdup	Copy	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strndup	Copy	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strcat	Concatenation	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strncat	Concatenation	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	memcmp	Comparison	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strcmp	Comparison	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strcoll	Comparison	Host-dependent		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strncmp	Comparison	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strxfrm	Comparison	Host-dependent		
+C23	ISO/IEC 9899:2024 §7.26	string.h	memchr	Search	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strchr	Search	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strcspn	Search	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strpbrk	Search	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strrchr	Search	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strspn	Search	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strstr	Search	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strtok	Search/tokenization	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	memset	Miscellaneous	Adapted		
+C23	ISO/IEC 9899:2024 §7.26	string.h	memset_explicit	Miscellaneous	Blocked		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strerror	Miscellaneous	Host-dependent		
+C23	ISO/IEC 9899:2024 §7.26	string.h	strlen	Miscellaneous	Adapted		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	errno_t	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	rsize_t	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	memcpy_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	memmove_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strcpy_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strncpy_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strcat_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strncat_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strtok_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	memset_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strerror_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strerrorlen_s	annex-k	Excluded		
+C23-AnnexK	ISO/IEC 9899:2024 Annex K	string.h	strnlen_s	annex-k	Excluded		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	NULL	declaration	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	size_t	declaration	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	locale_t	declaration	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	memccpy	XSI in POSIX Issue 8; C23 core	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	memmem	CX, added Issue 8	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	stpcpy	CX	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	stpncpy	CX	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strcoll_l	CX	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strdup	CX in POSIX; C23 core	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strerror_l	CX	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strerror_r	CX	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strlcat	CX, added Issue 8	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strlcpy	CX, added Issue 8	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strndup	CX in POSIX; C23 core	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strnlen	CX	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strsignal	CX	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strtok_r	CX	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	string.h	strxfrm_l	CX	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	ffs	XSI	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	ffsl	XSI, added Issue 8	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	ffsll	XSI, added Issue 8	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	strcasecmp	Base	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	strcasecmp_l	Base	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	strncasecmp	Base	Adapted		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	strncasecmp_l	Base	Host-dependent		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	bcmp	removed	Legacy		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	bcopy	removed	Legacy		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	bzero	removed	Legacy		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	index	removed	Legacy		
+POSIX.1-2024	IEEE Std 1003.1-2024 (Issue 8)	strings.h	rindex	removed	Legacy		
