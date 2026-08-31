@@ -10,58 +10,43 @@ Audited toolchain revisions: see `docs/audit/2026-08-30.md`.
 
 ---
 
-## #1 — struct-variant field names collide in one global namespace (`E0301`)
+## #1 — enum struct-variant constructor literals unimplemented (`E0301`)
 
-**Slice:** SS-U13 &nbsp; **Owner:** sv0c (resolver) &nbsp; **Found:** SS-005, 2026-08-30
-&nbsp; **Status:** open, worked around
+**Slice:** SS-U13 &nbsp; **Owner:** sv0c (resolver + lowering) &nbsp; **Found:** SS-005, 2026-08-30
+&nbsp; **Status:** open, **deferred**; tuple-variant workaround stands
 
-**Symptom.** A `--project` build fails with
-
-```
-error[E0301]: unknown type
-  --> 1:1
-  | <first line of some unrelated lib file>
-  | ^
-```
-
-whenever two **struct variants** anywhere in the linked project declare a
-field of the same name — whether in the same enum or different enums.
-
-**Minimal repros** (all fail; `build/sv0-megatu-compiler-native --project`):
+**Corrected diagnosis (2026-08-31).** The SS-005 write-up blamed a
+"struct-variant field-name namespace collision". That was **wrong** — every
+repro happened to *construct* a struct variant, and construction is the real
+gap. `Enum::Variant { field: value, .. }` literal syntax is **unimplemented on
+both backends** (the SML reference `emit-c` also gives `E0301`), regardless of
+field names:
 
 ```sv0
-// (a) same field name across two enums
-pub enum A { P { a: usize } }
-pub enum B { Q { a: usize } }        // 'a' reused -> E0301
-
-// (b) same field name across two variants of ONE enum
-pub enum E {
-    D { needed: usize, available: usize },
-    R { start: usize, len: usize, available: usize },   // 'available' reused -> E0301
-}
-
-// (c) same variant name + different fields across enums
-pub enum A { Dup { a: usize } }
-pub enum B { Dup { b: usize } }      // E0301
+enum E { D { a: i32, b: i32 }, U }
+let x: E = E::D { a: 1, b: 2 };      // error[E0301]: unknown type `E::D`
 ```
 
-**Not affected:** unit variants (any names), **tuple variants** (`P(usize, usize)`)
-— including repeated arities and variant names reused across enums. Plain
-`struct`s with reused field names across different structs are also fine; only
-enum **struct variants** collide.
+The resolver's `ExprStruct` (tag 24) requires `res_type_exists("E::D")`, always
+false for a 2-segment variant path. **Working today:** enum declarations,
+tuple-variant construction (`E::T(a, b)`), and struct-variant *patterns*
+(`match .. { E::D { a, b } => }`). **Not working:** the struct-variant literal
+*expression*.
 
-**Diagnostic quality.** The error span is misattributed to line 1 of whichever
-`lib/*.sv0` file sorts first, not to the offending declaration. (Adjacent to
-the UP-026 project-discovery ordering issues.)
+**Deferred.** A prototype fix (resolver 2-segment acceptance + a `lowering.sv0`
+branch that builds `DeclNamed(enum) + StoreField(tag) + StoreField(p<slot>)`
+with name→slot mapping, on both let-init and rvalue paths) worked end to end for
+hand tests (C ↔ native VM parity), **but** compiling the modified `lowering.sv0`
+with itself triggered `sv0 panic: vec: index out of bounds` in the self-host
+loop — the exact self-hosting fragility the KC-006 comment in `lowering.sv0`
+already warns about for instruction-emitting additions to `lower_expr_to_value`.
+Not chased further: it is not on any release gate (SPEC §8.2 shapes are
+"Specified", not required) and the tuple-variant form is clean.
 
-**Impact on SPEC.** SPEC §8.2 writes every error enum with named struct
-variants, and they deliberately reuse field names (`available` in
-`BufferError`, `offset` across `TextError`/`CStrError`, `requested` across
-`BufferError`/`LocaleError`). None of that links today.
-
-**Workaround (in `lib/strings_types.sv0`).** Error enums use **tuple variants**;
-positional meaning is documented per variant. Restore named fields when SS-U13
-lands. Recorded as a SPEC deviation (GOV-004 / GOV-006).
+**Workaround (stands).** `lib/strings_types.sv0` error enums use **tuple
+variants** with per-variant positional documentation. Recorded SPEC deviation
+(GOV-004 / GOV-006). Revisit SS-U13 if enum struct-variant construction is
+implemented with a self-host-safe lowering shape (likely bundled with SS-U03).
 
 ---
 
