@@ -1,0 +1,14 @@
+/// strings_c23 -- safe semantic compatibility facade for ISO C23
+/// `<string.h>` (Section 7.26 / B.25).
+///
+/// SPEC.md Section 15 and Appendix A.2. Source-recognizable names with
+/// C23-equivalent results for inputs on which C defines behavior, using
+/// safe sv0 reference / slice / result / ownership types. Semantic
+/// compatibility, not binary ABI compatibility. C undefined behavior is
+/// translated to typed errors, contracts, or `CStr`/`CBuffer` constraints.
+/// Adapts shared safe implementations rather than duplicating algorithms
+/// (SPEC ARCH-003).
+///
+/// Status: unimplemented (pre-F0). Implementation begins at BL-059 (R0.3),
+/// after the independent C oracle exists.
+module strings_c23;

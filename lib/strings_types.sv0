@@ -1,0 +1,10 @@
+/// strings_types -- shared public types for the sv0-strings library.
+///
+/// SPEC.md Section 8 (conceptual model and public types): `Ordering`,
+/// `BufferError`, `TextError`, `CStrError`, `LocaleError`, `CopyReport`,
+/// `MemccpyReport`, `CStr`, `CString`, `CBuffer`, `TokenCursor`.
+///
+/// Status: unimplemented (pre-F0). This file is a flat-module placeholder
+/// (SPEC ARCH-001 / UP-019). Types land with BL-005 once `Ordering` and the
+/// shared error enums have compile-pass fixtures on both backends.
+module strings_types;

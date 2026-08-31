@@ -1,0 +1,12 @@
+# build artifacts
+/build/
+*.sv0b
+*.o
+*.out
+
+# generated C (from sv0c --emit=c / --keep-c)
+*.gen.c
+/staged/
+
+# editor / OS
+.DS_Store

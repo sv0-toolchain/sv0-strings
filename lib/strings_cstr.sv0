@@ -1,0 +1,13 @@
+/// strings_cstr -- validated borrowed `CStr`, owned `CString`, and bounded
+/// mutable `CBuffer`.
+///
+/// SPEC.md Section 13: from_bytes_with_nul, from_bytes_until_nul, from_text,
+/// from_bytes, borrow, as_bytes, as_bytes_with_nul, len, to_text,
+/// clone_owned, concat, copy_into, append_into, buffer_from_storage,
+/// empty_buffer, require_cstr. Invariants: exactly one terminating zero, no
+/// interior zero in a payload, capacity carried by the slice length.
+///
+/// Status: unimplemented (pre-F0). Blocked on owned-allocation failure and
+/// deterministic `Drop` for user libraries (SPEC UP-007 / UP-013, OQ-003).
+/// Implementation begins at BL-049 (R0.2).
+module strings_cstr;

@@ -1,0 +1,11 @@
+/// strings_unsafe_abi -- Future, feature-gated exact C ABI surface.
+///
+/// SPEC.md Section 7.1, ARCH-006, SEC-013, UP-016. Raw-pointer, exact
+/// calling-convention, and symbol-level C compatibility. NEVER imported by
+/// a safe module; excluded from the default build and from the stable safe
+/// conformance claim; separately versioned. Every function documents its
+/// full caller obligations and the corresponding safe alternative.
+///
+/// Status: not started -- gated behind an accepted sv0 FFI/ABI contract
+/// (OQ-007). Work is BL-103 / BL-104 in the Future backlog.
+module strings_unsafe_abi;

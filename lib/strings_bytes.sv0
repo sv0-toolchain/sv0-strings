@@ -1,0 +1,11 @@
+/// strings_bytes -- safe operations over arbitrary byte slices.
+///
+/// SPEC.md Section 10 (safe byte API): compare, equal, copy, copy_prefix,
+/// move_within, fill, fill_explicit, find, rfind, find_slice, span_in,
+/// span_not_in, starts_with, ends_with. Semantic domain: bytes (embedded
+/// zero and all values 0x00..0xFF allowed; no text decoding).
+///
+/// Status: unimplemented (pre-F0). Blocked on end-to-end byte-slice
+/// read/write/index on both backends (SPEC UP-004 / UP-005) and interval
+/// overlap semantics (UP-006). Implementation begins at BL-021 (R0.1).
+module strings_bytes;

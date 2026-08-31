@@ -1,0 +1,12 @@
+/// strings_posix2024 -- safe semantic compatibility facade for
+/// POSIX.1-2024 Issue 8 `<string.h>` and `<strings.h>`.
+///
+/// SPEC.md Section 16 and Appendix A.4 / A.5. Includes the C23 facade and
+/// adds the Issue 8 extensions (memmem, stpcpy/stpncpy, strlcpy/strlcat,
+/// strnlen, strtok_r, strcasecmp family, ffs family, `_l` locale variants,
+/// strerror_r/strerror_l/strsignal). Reuses `strings_c23` and the safe
+/// modules for common operations (SPEC ARCH-004). Base / CX / XSI
+/// classification is explicit; removed historical interfaces are not here.
+///
+/// Status: unimplemented (pre-F0). Implementation begins at BL-073 (R0.4).
+module strings_posix2024;

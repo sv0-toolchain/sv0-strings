@@ -1,0 +1,10 @@
+/// strings_tokenize -- explicit-state, reentrant tokenization.
+///
+/// SPEC.md Section 14: `Token borrows(input)` and
+/// `next(input, separators, cursor: &mut TokenCursor) -> Option<Token>`.
+/// The cursor is caller-owned; there is no module-global or thread-local
+/// continuation state, and the input is never mutated (unlike C `strtok`).
+///
+/// Status: unimplemented (pre-F0). Depends on byte-slice support
+/// (SPEC UP-004 / UP-005). Implementation begins at BL-055 (R0.2).
+module strings_tokenize;

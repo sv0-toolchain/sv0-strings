@@ -1,0 +1,12 @@
+/// strings_locale -- explicit locale, error, and signal capability functions.
+///
+/// SPEC.md Section 17: `LocaleId`, `Locale`, open, compare, transform,
+/// compare_ignore_case. Locale-sensitive behavior requires an explicit
+/// locale object or the named POSIX locale; the ambient process locale is
+/// never a native API input, and an unsupported locale fails closed rather
+/// than downgrading to ASCII or bytewise comparison.
+///
+/// Status: unimplemented (pre-F0). Host-dependent; blocked on a versioned
+/// host-capability ABI with equivalent VM behavior (SPEC UP-015, OQ-005).
+/// Implementation begins at BL-080 (R0.4).
+module strings_locale;

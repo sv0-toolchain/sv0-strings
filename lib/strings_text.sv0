@@ -1,0 +1,12 @@
+/// strings_text -- UTF-8-preserving operations over owned `string` and
+/// borrowed text views.
+///
+/// SPEC.md Section 11 (safe UTF-8 text API): len_bytes, is_empty, equal,
+/// compare_bytes, concat, find_byte, find, rfind, starts_with, ends_with,
+/// slice_bytes, validate_utf8, from_utf8, as_bytes. Semantic domain: valid
+/// UTF-8 (RFC 3629); byte offsets are not Unicode scalar indices.
+///
+/// Status: unimplemented (pre-F0). Blocked on a length-bearing owned
+/// `string` representation that preserves embedded NUL on both backends
+/// (SPEC UP-001 / UP-002, OQ-001). Implementation begins at BL-039 (R0.2).
+module strings_text;

@@ -1,0 +1,11 @@
+/// strings_legacy -- opt-in, deprecated aliases for interfaces removed from
+/// current POSIX `<strings.h>`.
+///
+/// SPEC.md Section 16.3 and Appendix A.6: bcmp, bcopy, bzero, index, rindex
+/// (legacy in Issue 6, removed in Issue 7). Available only for migration:
+/// requires an explicit import, contributes nothing to POSIX.1-2024
+/// conformance (SPEC LEGACY-001), every item is marked deprecated with its
+/// current replacement, and safe slice / `CStr` types are retained.
+///
+/// Status: unimplemented (pre-F0). Implementation begins at BL-085 (R0.4).
+module strings_legacy;

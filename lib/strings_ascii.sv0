@@ -1,0 +1,11 @@
+/// strings_ascii -- deterministic, locale-independent ASCII case operations.
+///
+/// SPEC.md Section 12 (deterministic ASCII API): to_lower, to_upper,
+/// equal_ignore_case, compare_ignore_case, compare_prefix_ignore_case.
+/// Case mapping affects only A-Z / a-z; every other byte is unchanged and
+/// the result never depends on the host locale or Unicode tables.
+///
+/// Status: unimplemented (pre-F0). Implementation begins at BL-035 (R0.1).
+/// This module is never documented as Unicode case-insensitive comparison
+/// (SPEC ASCII-006).
+module strings_ascii;
