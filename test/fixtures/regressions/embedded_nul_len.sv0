@@ -1,0 +1,16 @@
+/* SS-009 RED fixture -- SPEC UP-001 / UP-002 / AC-001, gap SPEC §4.4 #1.
+ *
+ * `"a\0b"` is a 3-byte value. `string_len` MUST count embedded U+0000
+ * (SPEC TEXT-001). The audited C backend stores `string` as `const char *`
+ * and lowers `string_len` to `strlen`, which stops at the first NUL.
+ *
+ * 0 = SPEC-correct. Expected: FAILS on C today (returns 1). This failure is
+ * the intended F0 signal that UP-001 is unmet -- hand to the Track U owner.
+ */
+fn main() -> i32 {
+    let n: i32 = string_len("a\0b");
+    if n != 3 {
+        return n + 100;
+    }
+    return 0;
+}

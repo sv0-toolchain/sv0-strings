@@ -1,0 +1,20 @@
+/* SS-009 RED fixture -- SPEC UP-002 / TEXT-003 / AC-001, gap SPEC §4.4 #2.
+ *
+ * Equality MUST compare the complete byte sequence, including bytes after
+ * an embedded U+0000. The audited C backend lowers `string_eq` to
+ * `strcmp(...) == 0`, which stops at the first NUL.
+ *
+ *   "a\0b" vs "a\0c"  -- differ at byte 2  -> MUST be not-equal
+ *   "a\0X" vs "a"     -- length 3 vs 1     -> MUST be not-equal
+ *
+ * 0 = SPEC-correct. Expected: FAILS on C today (strcmp reports both equal).
+ */
+fn main() -> i32 {
+    if string_eq("a\0b", "a\0c") {
+        return 1;
+    }
+    if string_eq("a\0X", "a") {
+        return 2;
+    }
+    return 0;
+}

@@ -1,0 +1,32 @@
+/* SS-009 RED fixture -- SPEC UP-002 / TEXT-005 / AC-001, gap SPEC §4.4 #2.
+ *
+ * `string_concat("a\0b", "cd")` MUST yield the 5-byte value
+ * `a 00 b c d`. The audited C backend sizes the result with
+ * `strlen(a) + strlen(b) + 1` and `memcpy`s NUL-terminated, so it produces
+ * the 3-byte `"acd"`.
+ *
+ * `string_char_at` reads the real byte at an index (unchecked `s[i]`), so it
+ * is used here as the measurement oracle -- it sees past the NUL even on the
+ * broken backend. 97='a' 98='b' 99='c' 100='d'.
+ *
+ * 0 = SPEC-correct. Expected: FAILS on C today (char_at(r,2) == 'd', not 0).
+ */
+fn main() -> i32 {
+    let r: string = string_concat("a\0b", "cd");
+    if string_char_at(r, 0) != 97 {
+        return 1;
+    }
+    if string_char_at(r, 1) != 0 {
+        return 2;
+    }
+    if string_char_at(r, 2) != 98 {
+        return 3;
+    }
+    if string_char_at(r, 3) != 99 {
+        return 4;
+    }
+    if string_char_at(r, 4) != 100 {
+        return 5;
+    }
+    return 0;
+}

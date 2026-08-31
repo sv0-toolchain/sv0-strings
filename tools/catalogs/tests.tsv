@@ -4,3 +4,7 @@ T-CATALOG-CHECK-001	tools/check_catalogs.py	TEST-002,TEST-003,GOV-007	c,vm	safe	
 T-REQ-EXTRACT-001	tools/extract_requirements.py	TEST-001,TEST-003	c,vm	safe		generator	done
 T-STANDARDS-MATRIX-001	tools/standards_matrix.py	C23-001,POSIX-001	c,vm	safe		generator	done
 T-CHECKED-OVERFLOW-001	test/property/checked_overflow.sv0	MODEL-002,SEC-002,BYTE-018	c	safe	runtime	property	done
+T-EMBEDDED-NUL-LEN-001	test/fixtures/regressions/embedded_nul_len.sv0	UP-001,UP-002,TEXT-001,BACKEND-001	c,vm	safe	runtime	red-regression	red
+T-EMBEDDED-NUL-EQ-001	test/fixtures/regressions/embedded_nul_eq.sv0	UP-002,TEXT-003,BACKEND-001	c,vm	safe	runtime	red-regression	red
+T-EMBEDDED-NUL-CONCAT-001	test/fixtures/regressions/embedded_nul_concat.sv0	UP-002,TEXT-005,BACKEND-001	c,vm	safe	runtime	red-regression	red
+T-EMBEDDED-NUL-SUBSTR-001	test/fixtures/regressions/embedded_nul_substr.sv0	UP-002,UP-003,BACKEND-001	c,vm	safe	runtime	red-regression	red
