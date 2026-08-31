@@ -69,7 +69,7 @@ resolve_case() {
   local c="$1"
   if [[ -f "$HERE/$c" ]]; then echo "$c"; return; fi
   local d
-  for d in test/cases test/property test/fixtures/regressions; do
+  for d in test/cases test/property test/fixtures/regressions test/compile_fail; do
     if [[ -f "$HERE/$d/$c" ]]; then echo "$d/$c"; return; fi
     if [[ -f "$HERE/$d/$c.sv0" ]]; then echo "$d/$c.sv0"; return; fi
   done
@@ -117,9 +117,39 @@ build_run_vm() {
   [[ -n "$code" ]] && echo "$(( code & 255 ))" || { echo "NO_EXIT"; return; }
 }
 
+run_compile_fail() {
+  # $1 = repo-relative path under test/compile_fail/. The C emit MUST fail
+  # and stderr MUST contain the file's `EXPECT-FAIL: <needle>` marker.
+  local main="$1" s needle
+  needle="$(sed -n '1,15p' "$HERE/$main" | grep -oE 'EXPECT-FAIL:[[:space:]]*[^*]+' | head -1 | sed 's/EXPECT-FAIL:[[:space:]]*//' | sed 's/[[:space:]]*$//')"
+  if [[ -z "$needle" ]]; then
+    log "  FAIL  $main   no 'EXPECT-FAIL: <needle>' marker"; RC=1; return
+  fi
+  s="$(mktemp -d)"; mkdir -p "$s/lib"
+  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  cp "$HERE/$main" "$s/main.sv0"
+  local rc
+  "$NC" --project "$s" > "$s/o.c" 2> "$s/e"; rc=$?
+  if [[ "$rc" -eq 0 ]]; then
+    [[ "$KEEP" -eq 1 ]] || rm -rf "$s"
+    log "  FAIL  $main   emit SUCCEEDED (expected failure w/ '$needle')"; RC=1; return
+  fi
+  if grep -qF "$needle" "$s/e"; then
+    [[ "$KEEP" -eq 1 ]] || rm -rf "$s"
+    log "  ok    $main   rejected: '$needle'"; RC=0; return
+  fi
+  log "  FAIL  $main   failed but needle '$needle' not in diagnostic:"
+  [[ "$QUIET" -eq 1 ]] || sed 's/^/        /' "$s/e" | head -4
+  [[ "$KEEP" -eq 1 ]] || rm -rf "$s"
+  RC=1
+}
+
 run_one() {
   # $1 = repo-relative main; sets RC (0 ok / 1 fail); prints a line
   local main="$1" s cexp vexp cgot vgot ok=1 detail=""
+  case "$main" in
+    test/compile_fail/*) run_compile_fail "$main"; return ;;
+  esac
   s="$(stage "$main")"
   if [[ "$BACKEND" == "c" || "$BACKEND" == "both" ]]; then
     cexp="$(expected_exit "$main" c)"
@@ -168,7 +198,7 @@ fi
 
 declare -a TARGETS=()
 if [[ "$SELFTEST" -eq 1 ]]; then
-  TARGETS=(test/cases/types_smoke.sv0 test/fixtures/regressions/embedded_nul_len.sv0)
+  TARGETS=(test/cases/types_smoke.sv0 test/fixtures/regressions/embedded_nul_len.sv0 test/compile_fail/nested_module.sv0)
 elif [[ -n "$DIR" ]]; then
   while IFS= read -r f; do TARGETS+=("${f#"$HERE/"}"); done < <(find "$HERE/$DIR" -name '*.sv0' | sort)
 elif [[ "${#CASES[@]}" -gt 0 ]]; then

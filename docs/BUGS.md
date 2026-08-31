@@ -158,3 +158,31 @@ form of the "entry sorts before `lib/`" hazard the SPEC already lists.
 **Workaround.** `scripts/test`'s `--self-test` runs the duplicate-`main` probe
 as **xfail**: it reports the silent acceptance without failing the run. Flip it
 to a hard assertion when SS-U09 lands.
+
+---
+
+## #5 — nested `module a::b;` accepted silently; `pub` items leak to global scope
+
+**Slice:** SS-U08 &nbsp; **Owner:** sv0c (resolver / module scoping) &nbsp; **Found:** SS-008, 2026-08-30
+&nbsp; **Status:** open; probe pins the one diagnosed form
+
+**Symptom.** `module strings::bytes;` compiles with **no diagnostic** in both
+single-file and `--project` mode. The item is then reachable every which way:
+
+```sv0
+// file: lib/nested.sv0   ->  module strings::bytes;  pub fn ping() -> i32 { return 7; }
+use strings::bytes::ping;   // error[E0309]: invalid use clause   <-- only this is rejected
+use bytes::ping;            // ok (last segment)
+use strings::ping;          // ok (first segment)
+ping()                      // ok with NO import at all (pub leaks to global scope)
+```
+
+**Impact on SPEC.** SPEC UP-019 (no gate may depend on nested modules), ARCH-001
+(flat `strings_*` only), ARCH-013 (hierarchical aliases are Future), UP-025
+(`pub`/private visibility must be enforced). The safe reading: nested module
+declarations should be a clean rejection, and `pub` should gate cross-module
+visibility. Neither holds.
+
+**Workaround.** The library uses only flat `module strings_*;` (already the
+plan). `test/compile_fail/nested_module.sv0` pins the `E0309` rejection of a
+fully-qualified multi-segment `use` so a regression is caught.

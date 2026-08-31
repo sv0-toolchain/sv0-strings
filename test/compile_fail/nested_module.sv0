@@ -1,0 +1,17 @@
+/* SS-008 compile-fail probe (SPEC UP-019, ARCH-001, BL-112 negative half).
+ *
+ * No F0..R1 gate may depend on nested module declarations or multi-segment
+ * paths (hierarchical `strings::...` aliases are ARCH-013 / Future). This
+ * pins the current rejection so a regression is caught.
+ *
+ * NOTE (docs/BUGS.md #5): `module a::b;` itself is accepted silently today,
+ * and `pub` items leak to global scope. The stable, diagnosed rejection is
+ * a fully-qualified multi-segment `use`, which is E0309.
+ *
+ * EXPECT-FAIL: E0309
+ */
+use strings_bytes::inner::compare;
+
+fn main() -> i32 {
+    return 0;
+}
