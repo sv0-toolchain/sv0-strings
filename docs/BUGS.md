@@ -186,3 +186,36 @@ visibility. Neither holds.
 **Workaround.** The library uses only flat `module strings_*;` (already the
 plan). `test/compile_fail/nested_module.sv0` pins the `E0309` rejection of a
 fully-qualified multi-segment `use` so a regression is caught.
+
+---
+
+## #6 — native-VM `--project` has no `--contract-mode` selector
+
+**Slice:** SS-U10 &nbsp; **Owner:** sv0-toolchain / sv0vm &nbsp; **Found:** SS-011, 2026-08-30
+&nbsp; **Status:** open (SPEC OQ-012 already names it)
+
+**Symptom.** The C driver honours the mode:
+
+```
+./scripts/sv0 native-compile --project D --contract-mode=disabled -o out
+  -> sv0c: built out (backend=c, profile=dev, contracts=disabled)     # ok
+```
+
+The VM driver does not — the flag is consumed as the output path:
+
+```
+./scripts/sv0 vm-native-compile --project D --contract-mode=disabled out
+  -> dirname: illegal option -- -   /   mkdir: : No such file or directory
+```
+
+The raw `build/sv0-megatu-compiler-native --project D --contract-mode=X` also
+panics (`read_dir: opendir failed`) — the flag is read as a second project dir.
+
+**Impact on SPEC.** SPEC UP-028 / TEST-019: every project run records its
+effective contract mode, and a backend that can't select a requested mode must
+report `unsupported` rather than ignore it. `scripts/test` does exactly that —
+VM mode is always `runtime`; `--contract-mode=verified|disabled` with
+`--backend=vm` reports the VM leg as skipped/unsupported, and the `--record`
+TSV carries `emitter` + `mode` per run.
+
+**Workaround.** None needed in the library; the runner records honestly.

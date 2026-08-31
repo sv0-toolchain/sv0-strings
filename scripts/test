@@ -8,8 +8,18 @@
 # Expected non-zero exits for RED fixtures live in `test/expectations.tsv`.
 #
 # Usage:
-#   scripts/test [--backend=c|vm|both] [--case <name-or-path>]... [--dir <dir>]
-#                [--list] [--self-test] [--keep] [-q]
+#   scripts/test [--backend=c|vm|both] [--contract-mode=runtime|verified|disabled]
+#                [--case <name-or-path>]... [--dir <dir>] [--record <file>]
+#                [--list] [--self-test] [--keep] [--fast] [-q]
+#
+# The C leg uses `./scripts/sv0 native-compile --project --contract-mode=<m>`
+# (SPEC UP-022 canonical path; honours the mode, verifies the runtime/entry
+# ABI manifests). The VM leg uses `./scripts/sv0 vm-native-compile --project`
+# + `vm-run` -- the NATIVE emitter, never frozen SML `vm-project-compile`
+# (SPEC UP-027 / ARCH-015). VM project mode has no contract-mode selector
+# (SPEC OQ-012); a non-runtime request is reported unsupported, not faked.
+# --fast bypasses the driver (raw megatu emitter + cc; contracts=runtime).
+# --record appends `case<TAB>backend<TAB>emitter<TAB>mode<TAB>want<TAB>got`.
 #
 # --case may be a bare stem (searched under test/cases, test/property,
 # test/fixtures/regressions) or a repo-relative path. With no --case and no
@@ -40,29 +50,43 @@ RUN_SV0B="$TC/sv0vm/scripts/run_sv0b.sml"
 EXPECT="$HERE/test/expectations.tsv"
 
 BACKEND=c
+CONTRACT_MODE=runtime
 QUIET=0
 KEEP=0
 SELFTEST=0
 LIST=0
+FAST=0
+RECORD=""
 declare -a CASES=()
 DIR=""
 
 for a in "$@"; do
   case "$a" in
-    --backend=*) BACKEND="${a#*=}" ;;
-    --case=*)    CASES+=("${a#*=}") ;;
-    --case)      echo "use --case=<name>" >&2; exit 2 ;;
-    --dir=*)     DIR="${a#*=}" ;;
-    --list)      LIST=1 ;;
-    --self-test) SELFTEST=1 ;;
-    --keep)      KEEP=1 ;;
-    -q|--quiet)  QUIET=1 ;;
-    -h|--help)   sed -n '2,20p' "$0"; exit 0 ;;
+    --backend=*)       BACKEND="${a#*=}" ;;
+    --contract-mode=*) CONTRACT_MODE="${a#*=}" ;;
+    --case=*)          CASES+=("${a#*=}") ;;
+    --case)            echo "use --case=<name>" >&2; exit 2 ;;
+    --dir=*)           DIR="${a#*=}" ;;
+    --record=*)        RECORD="${a#*=}" ;;
+    --list)            LIST=1 ;;
+    --self-test)       SELFTEST=1 ;;
+    --keep)            KEEP=1 ;;
+    --fast)            FAST=1 ;;
+    -q|--quiet)        QUIET=1 ;;
+    -h|--help)         sed -n '2,24p' "$0"; exit 0 ;;
     *) echo "sv0-strings/scripts/test: unknown arg: $a" >&2; exit 2 ;;
   esac
 done
+case "$CONTRACT_MODE" in runtime|verified|disabled) ;; *)
+  echo "scripts/test: --contract-mode must be runtime|verified|disabled" >&2; exit 2 ;;
+esac
+
+SV0="$TC/scripts/sv0"           # canonical workspace driver (SPEC UP-022/UP-027)
+USE_WRAPPER=1
+[[ -x "$SV0" && "$FAST" -eq 0 ]] || USE_WRAPPER=0
 
 log() { [[ "$QUIET" -eq 1 ]] || echo "$@"; }
+rec() { [[ -n "$RECORD" ]] && printf '%s\n' "$*" >> "$RECORD"; return 0; }
 
 resolve_case() {
   # echo repo-relative path for a stem or path; empty if not found
@@ -94,27 +118,54 @@ stage() {
   echo "$s"
 }
 
+# build_run_c echoes  <exit-or-status>|<emitter>|<mode>
 build_run_c() {
-  local s="$1" c bin
-  c="$s/out.c"; bin="$s/out_c"
-  "$NC" --project "$s" > "$c" 2> "$s/emit.err" || { echo "EMIT_FAIL"; return; }
-  [[ -s "$c" ]] || { echo "EMIT_EMPTY"; return; }
+  local s="$1" bin="$s/out_c"
+  if [[ "$USE_WRAPPER" -eq 1 ]]; then
+    # SPEC UP-022 canonical path: driver honours --contract-mode + ABI manifests.
+    if "$SV0" native-compile --project "$s" --contract-mode="$CONTRACT_MODE" -o "$bin" \
+         > "$s/build.log" 2>&1; then
+      local m; m="$(grep -oE 'contracts=[a-z]+' "$s/build.log" | head -1 | cut -d= -f2)"
+      "$bin"; echo "$?|native-compile|${m:-$CONTRACT_MODE}"; return
+    fi
+    echo "BUILD_FAIL|native-compile|$CONTRACT_MODE"; return
+  fi
+  # --fast / no driver: raw native emitter + cc; contracts always runtime.
+  local c="$s/out.c"
+  "$NC" --project "$s" > "$c" 2> "$s/emit.err" || { echo "EMIT_FAIL|megatu-raw|runtime"; return; }
+  [[ -s "$c" ]] || { echo "EMIT_EMPTY|megatu-raw|runtime"; return; }
   cc -std=c99 -O0 -w -I "$RT" "$c" "$RT/sv0_runtime.c" -o "$bin" 2> "$s/cc.err" \
-    || { echo "CC_FAIL"; return; }
-  "$bin"; echo "$?"
+    || { echo "CC_FAIL|megatu-raw|runtime"; return; }
+  "$bin"; echo "$?|megatu-raw|runtime"
 }
 
+# build_run_vm echoes  <exit-or-status>|<emitter>|<mode>
+# VM project mode has no contract-mode selector (SPEC OQ-012 / UP-028;
+# docs/BUGS.md #6). Effective mode is always runtime; a non-runtime request
+# is reported unsupported, never silently honoured.
 build_run_vm() {
-  local s="$1" b out
+  local s="$1" b out code
+  if [[ "$CONTRACT_MODE" != "runtime" ]]; then echo "MODE_UNSUPPORTED|-|$CONTRACT_MODE"; return; fi
   b="$s/out.sv0b"
-  [[ -x "$VC" ]] || { echo "NO_VM_EMITTER"; return; }
-  SV0_DRV_REQUEST="--project $s" "$VC" > "$b" 2> "$s/vemit.err" || { echo "EMIT_FAIL"; return; }
-  [[ -s "$b" ]] || { echo "EMIT_EMPTY"; return; }
+  if [[ "$USE_WRAPPER" -eq 1 ]]; then
+    "$SV0" vm-native-compile --project "$s" "$b" > "$s/vbuild.log" 2>&1 \
+      || { echo "EMIT_FAIL|vm-native-compile|runtime"; return; }
+    [[ -s "$b" ]] || { echo "EMIT_EMPTY|vm-native-compile|runtime"; return; }
+    out="$("$SV0" vm-run "$b" 2>&1)"
+    if [[ "$out" == *"arithmetic on non-int"* ]]; then echo "VM_NONINT|vm-native-compile|runtime"; return; fi
+    code="$(echo "$out" | grep -oE 'vm_exit:-?[0-9]+' | head -1 | cut -d: -f2)"
+    [[ -n "$code" ]] && echo "$(( code & 255 ))|vm-native-compile|runtime" \
+      || echo "NO_EXIT|vm-native-compile|runtime"
+    return
+  fi
+  [[ -x "$VC" ]] || { echo "NO_VM_EMITTER|megatu-vm-raw|runtime"; return; }
+  SV0_DRV_REQUEST="--project $s" "$VC" > "$b" 2> "$s/vemit.err" \
+    || { echo "EMIT_FAIL|megatu-vm-raw|runtime"; return; }
+  [[ -s "$b" ]] || { echo "EMIT_EMPTY|megatu-vm-raw|runtime"; return; }
   out="$(cd "$TC/sv0vm" && SV0B="$b" sml < "$RUN_SV0B" 2>&1)"
-  if [[ "$out" == *"arithmetic on non-int"* ]]; then echo "VM_NONINT"; return; fi
-  local code
+  if [[ "$out" == *"arithmetic on non-int"* ]]; then echo "VM_NONINT|megatu-vm-raw|runtime"; return; fi
   code="$(echo "$out" | grep -oE 'vm_exit:-?[0-9]+' | head -1 | cut -d: -f2)"
-  [[ -n "$code" ]] && echo "$(( code & 255 ))" || { echo "NO_EXIT"; return; }
+  [[ -n "$code" ]] && echo "$(( code & 255 ))|megatu-vm-raw|runtime" || echo "NO_EXIT|megatu-vm-raw|runtime"
 }
 
 run_compile_fail() {
@@ -151,19 +202,22 @@ run_one() {
     test/compile_fail/*) run_compile_fail "$main"; return ;;
   esac
   s="$(stage "$main")"
+  local raw em md
   if [[ "$BACKEND" == "c" || "$BACKEND" == "both" ]]; then
     cexp="$(expected_exit "$main" c)"
-    cgot="$(build_run_c "$s")"
+    raw="$(build_run_c "$s")"; cgot="${raw%%|*}"; em="${raw#*|}"; md="${em#*|}"; em="${em%%|*}"
     if [[ "$cexp" == "SKIP" ]]; then detail+=" C=skip"
     elif [[ "$cgot" == "$cexp" ]]; then detail+=" C=$cgot"
     else ok=0; detail+=" C=$cgot(want $cexp)"; fi
+    rec "$main	c	$em	$md	$cexp	$cgot"
   fi
   if [[ "$BACKEND" == "vm" || "$BACKEND" == "both" ]]; then
     vexp="$(expected_exit "$main" vm)"
-    vgot="$(build_run_vm "$s")"
-    if [[ "$vexp" == "SKIP" ]]; then detail+=" VM=skip"
+    raw="$(build_run_vm "$s")"; vgot="${raw%%|*}"; em="${raw#*|}"; md="${em#*|}"; em="${em%%|*}"
+    if [[ "$vexp" == "SKIP" || "$vgot" == "MODE_UNSUPPORTED" ]]; then detail+=" VM=skip"
     elif [[ "$vgot" == "$vexp" ]]; then detail+=" VM=$vgot"
     else ok=0; detail+=" VM=$vgot(want $vexp)"; fi
+    rec "$main	vm	$em	$md	$vexp	$vgot"
   fi
   [[ "$KEEP" -eq 1 ]] && detail+="  [$s]" || rm -rf "$s"
   if [[ "$ok" -eq 1 ]]; then log "  ok    $main   $detail"; RC=0
@@ -211,7 +265,9 @@ else
   while IFS= read -r f; do TARGETS+=("${f#"$HERE/"}"); done < <(find "$HERE/test/cases" -name '*.sv0' | sort)
 fi
 
-log "sv0-strings/scripts/test  backend=$BACKEND  toolchain=$TC"
+wrap_lbl=$([[ "$USE_WRAPPER" -eq 1 ]] && echo "driver" || echo "raw/--fast")
+log "sv0-strings/scripts/test  backend=$BACKEND  contract-mode=$CONTRACT_MODE  path=$wrap_lbl  toolchain=$TC"
+[[ -n "$RECORD" ]] && { : > "$RECORD"; log "  recording -> $RECORD"; }
 fails=0
 for t in "${TARGETS[@]}"; do
   RC=0; run_one "$t"; fails=$(( fails + RC ))
