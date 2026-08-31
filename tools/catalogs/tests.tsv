@@ -10,3 +10,4 @@ T-EMBEDDED-NUL-CONCAT-001	test/fixtures/regressions/embedded_nul_concat.sv0	UP-0
 T-EMBEDDED-NUL-SUBSTR-001	test/fixtures/regressions/embedded_nul_substr.sv0	UP-002,UP-003,BACKEND-001	c,vm	safe	runtime	red-regression	red
 T-RUNNER-SELFTEST-001	scripts/test	ARCH-011,UP-010	c,vm	safe	runtime	tool	wip
 T-COMPILEFAIL-NESTED-MODULE-001	test/compile_fail/nested_module.sv0	UP-019,ARCH-001	c	safe		compile-fail	done
+T-DOC-FENCE-LINT-001	tools/check_doc_fences.py	MODEL-016,GOV-011	c	safe		tool	done

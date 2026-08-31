@@ -33,6 +33,19 @@ Spec path resolution: `--spec` → `$SV0_STRINGS_SPEC` → `../project-specs/sv0
 Stores `text_sha1` (12 hex of the collapsed requirement text) + an 80-char
 summary + owning section, not the full SHALL text.
 
+## `check_doc_fences.py`
+
+Doc-fence lint (SPEC MODEL-016 / GOV-011): a ```` ```sv0 ```` block must be
+compilable, so header-only free-fn declarations (`fn f(...) -> T;`, no body)
+belong in a ```` ```text ```` interface-inventory block instead.
+
+```sh
+tools/check_doc_fences.py            # lint every *.md; ERROR -> exit 1
+tools/check_doc_fences.py --probe    # also shell to the compiler to confirm
+                                     # `fn f() -> i32;` is a parse error
+tools/check_doc_fences.py --strict   # WARN (all-signatures block) -> failure
+```
+
 ## `check_catalogs.py`
 
 Structural + enum + forward-traceability validation; reverse traceability
