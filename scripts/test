@@ -1,0 +1,198 @@
+#!/usr/bin/env bash
+# sv0-strings staging test runner (slice SS-010, SPEC ARCH-011 / UP-010).
+#
+# Current sv0 project discovery recursively compiles every .sv0 file, so each
+# test run stages `lib/` plus EXACTLY ONE selected `main.sv0` in a fresh temp
+# directory, then builds + runs it on the C backend and (optionally) the
+# canonical native-VM path. Exit code is the oracle (SPEC §21.1: 0 = pass).
+# Expected non-zero exits for RED fixtures live in `test/expectations.tsv`.
+#
+# Usage:
+#   scripts/test [--backend=c|vm|both] [--case <name-or-path>]... [--dir <dir>]
+#                [--list] [--self-test] [--keep] [-q]
+#
+# --case may be a bare stem (searched under test/cases, test/property,
+# test/fixtures/regressions) or a repo-relative path. With no --case and no
+# --dir, every .sv0 under test/cases is run.
+#
+# Toolchain: $SV0_TOOLCHAIN_ROOT, else the parent dir when sv0-strings is a
+# submodule, else ../sv0-toolchain. Needs build/sv0-megatu-compiler-native
+# (C) and, for the VM leg, build/sv0-megatu-vm-native + SML/NJ + sv0vm/.
+set -uo pipefail
+
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
+if [[ -n "${SV0_TOOLCHAIN_ROOT:-}" ]]; then
+  TC="$SV0_TOOLCHAIN_ROOT"
+elif [[ -d "$HERE/../sv0c" && -x "$HERE/../build/sv0-megatu-compiler-native" ]]; then
+  TC="$HERE/.."
+elif [[ -d "$HERE/../sv0-toolchain" ]]; then
+  TC="$HERE/../sv0-toolchain"
+else
+  echo "sv0-strings/scripts/test: cannot locate sv0-toolchain (set SV0_TOOLCHAIN_ROOT)" >&2
+  exit 2
+fi
+TC="$(cd "$TC" && pwd)"
+NC="$TC/build/sv0-megatu-compiler-native"
+VC="$TC/build/sv0-megatu-vm-native"
+RT="$TC/sv0c/runtime"
+RUN_SV0B="$TC/sv0vm/scripts/run_sv0b.sml"
+EXPECT="$HERE/test/expectations.tsv"
+
+BACKEND=c
+QUIET=0
+KEEP=0
+SELFTEST=0
+LIST=0
+declare -a CASES=()
+DIR=""
+
+for a in "$@"; do
+  case "$a" in
+    --backend=*) BACKEND="${a#*=}" ;;
+    --case=*)    CASES+=("${a#*=}") ;;
+    --case)      echo "use --case=<name>" >&2; exit 2 ;;
+    --dir=*)     DIR="${a#*=}" ;;
+    --list)      LIST=1 ;;
+    --self-test) SELFTEST=1 ;;
+    --keep)      KEEP=1 ;;
+    -q|--quiet)  QUIET=1 ;;
+    -h|--help)   sed -n '2,20p' "$0"; exit 0 ;;
+    *) echo "sv0-strings/scripts/test: unknown arg: $a" >&2; exit 2 ;;
+  esac
+done
+
+log() { [[ "$QUIET" -eq 1 ]] || echo "$@"; }
+
+resolve_case() {
+  # echo repo-relative path for a stem or path; empty if not found
+  local c="$1"
+  if [[ -f "$HERE/$c" ]]; then echo "$c"; return; fi
+  local d
+  for d in test/cases test/property test/fixtures/regressions; do
+    if [[ -f "$HERE/$d/$c" ]]; then echo "$d/$c"; return; fi
+    if [[ -f "$HERE/$d/$c.sv0" ]]; then echo "$d/$c.sv0"; return; fi
+  done
+  echo ""
+}
+
+expected_exit() {
+  # $1 = repo-relative path, $2 = c|vm  -> echoes expected code or "SKIP"
+  local p="$1" col="$2" line
+  line="$(awk -F'\t' -v p="$p" '$1==p {print; exit}' "$EXPECT" 2>/dev/null)"
+  if [[ -z "$line" ]]; then echo 0; return; fi
+  if [[ "$col" == "c" ]]; then echo "$line" | cut -f2; else echo "$line" | cut -f3; fi
+}
+
+stage() {
+  # $1 = main .sv0 (repo-relative)  -> echoes staged dir
+  local main="$1" s
+  s="$(mktemp -d)"
+  mkdir -p "$s/lib"
+  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  cp "$HERE/$main" "$s/main.sv0"
+  echo "$s"
+}
+
+build_run_c() {
+  local s="$1" c bin
+  c="$s/out.c"; bin="$s/out_c"
+  "$NC" --project "$s" > "$c" 2> "$s/emit.err" || { echo "EMIT_FAIL"; return; }
+  [[ -s "$c" ]] || { echo "EMIT_EMPTY"; return; }
+  cc -std=c99 -O0 -w -I "$RT" "$c" "$RT/sv0_runtime.c" -o "$bin" 2> "$s/cc.err" \
+    || { echo "CC_FAIL"; return; }
+  "$bin"; echo "$?"
+}
+
+build_run_vm() {
+  local s="$1" b out
+  b="$s/out.sv0b"
+  [[ -x "$VC" ]] || { echo "NO_VM_EMITTER"; return; }
+  SV0_DRV_REQUEST="--project $s" "$VC" > "$b" 2> "$s/vemit.err" || { echo "EMIT_FAIL"; return; }
+  [[ -s "$b" ]] || { echo "EMIT_EMPTY"; return; }
+  out="$(cd "$TC/sv0vm" && SV0B="$b" sml < "$RUN_SV0B" 2>&1)"
+  if [[ "$out" == *"arithmetic on non-int"* ]]; then echo "VM_NONINT"; return; fi
+  local code
+  code="$(echo "$out" | grep -oE 'vm_exit:-?[0-9]+' | head -1 | cut -d: -f2)"
+  [[ -n "$code" ]] && echo "$(( code & 255 ))" || { echo "NO_EXIT"; return; }
+}
+
+run_one() {
+  # $1 = repo-relative main; sets RC (0 ok / 1 fail); prints a line
+  local main="$1" s cexp vexp cgot vgot ok=1 detail=""
+  s="$(stage "$main")"
+  if [[ "$BACKEND" == "c" || "$BACKEND" == "both" ]]; then
+    cexp="$(expected_exit "$main" c)"
+    cgot="$(build_run_c "$s")"
+    if [[ "$cexp" == "SKIP" ]]; then detail+=" C=skip"
+    elif [[ "$cgot" == "$cexp" ]]; then detail+=" C=$cgot"
+    else ok=0; detail+=" C=$cgot(want $cexp)"; fi
+  fi
+  if [[ "$BACKEND" == "vm" || "$BACKEND" == "both" ]]; then
+    vexp="$(expected_exit "$main" vm)"
+    vgot="$(build_run_vm "$s")"
+    if [[ "$vexp" == "SKIP" ]]; then detail+=" VM=skip"
+    elif [[ "$vgot" == "$vexp" ]]; then detail+=" VM=$vgot"
+    else ok=0; detail+=" VM=$vgot(want $vexp)"; fi
+  fi
+  [[ "$KEEP" -eq 1 ]] && detail+="  [$s]" || rm -rf "$s"
+  if [[ "$ok" -eq 1 ]]; then log "  ok    $main   $detail"; RC=0
+  else                       log "  FAIL  $main   $detail"; RC=1; fi
+}
+
+# ---- duplicate-main negative probe (ARCH-011, UP-026) ----
+# Two files each defining `fn main` MUST be a stable diagnostic. Today the
+# native compiler silently keeps the last one by filename order and emits a
+# working binary (docs/BUGS.md #4, slice SS-U09). Reported as xfail so
+# --self-test stays green while tracking the gap; flip to a hard assertion
+# when SS-U09 lands.
+dup_main_probe() {
+  local s; s="$(mktemp -d)"; mkdir -p "$s/lib"
+  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  printf 'fn main() -> i32 { return 0; }\n' > "$s/main.sv0"
+  printf 'fn main() -> i32 { return 1; }\n' > "$s/main_two.sv0"
+  if "$NC" --project "$s" > "$s/o.c" 2> "$s/e"; then
+    rm -rf "$s"
+    log "  xfail <dup-main probe>   two 'main' entries accepted silently (SS-U09 / BUGS.md #4)"
+    return 0
+  fi
+  rm -rf "$s"; log "  ok    <dup-main probe>   build rejected as expected"; return 0
+}
+
+[[ -x "$NC" ]] || { echo "scripts/test: missing $NC — build the toolchain first" >&2; exit 2; }
+
+if [[ "$LIST" -eq 1 ]]; then
+  find "$HERE/test" -name '*.sv0' | sed "s#$HERE/##" | sort
+  exit 0
+fi
+
+declare -a TARGETS=()
+if [[ "$SELFTEST" -eq 1 ]]; then
+  TARGETS=(test/cases/types_smoke.sv0 test/fixtures/regressions/embedded_nul_len.sv0)
+elif [[ -n "$DIR" ]]; then
+  while IFS= read -r f; do TARGETS+=("${f#"$HERE/"}"); done < <(find "$HERE/$DIR" -name '*.sv0' | sort)
+elif [[ "${#CASES[@]}" -gt 0 ]]; then
+  for c in "${CASES[@]}"; do
+    r="$(resolve_case "$c")"
+    [[ -n "$r" ]] || { echo "scripts/test: no such case: $c" >&2; exit 2; }
+    TARGETS+=("$r")
+  done
+else
+  while IFS= read -r f; do TARGETS+=("${f#"$HERE/"}"); done < <(find "$HERE/test/cases" -name '*.sv0' | sort)
+fi
+
+log "sv0-strings/scripts/test  backend=$BACKEND  toolchain=$TC"
+fails=0
+for t in "${TARGETS[@]}"; do
+  RC=0; run_one "$t"; fails=$(( fails + RC ))
+done
+if [[ "$SELFTEST" -eq 1 ]]; then
+  dup_main_probe || fails=$(( fails + 1 ))
+fi
+
+n="${#TARGETS[@]}"
+if [[ "$fails" -gt 0 ]]; then
+  echo "scripts/test: $fails failed / $n case(s)"
+  exit 1
+fi
+echo "scripts/test: $n/$n case(s) passed (backend=$BACKEND)"

@@ -130,3 +130,31 @@ overflow-boundary test (SPEC BYTE-018, SEC-002, TEST-006). SPEC BACKEND-001
 **Workaround.** None in the library — this is pure integer arithmetic that must
 be correct. `test/property/checked_overflow.sv0` gates on **C only** until
 SS-U14; `tools/catalogs/tests.tsv` records `backends=c` for it.
+
+---
+
+## #4 — `--project` silently accepts two `fn main`, last-by-filename wins
+
+**Slice:** SS-U09 &nbsp; **Owner:** sv0c (project discovery / link) &nbsp; **Found:** SS-010, 2026-08-30
+&nbsp; **Status:** open, runner tracks it as xfail
+
+**Symptom.** A project with two files each defining `fn main() -> i32` emits C
+with **no diagnostic**, `cc` succeeds, and the resulting binary runs exactly
+one of them — the one whose **filename sorts last**:
+
+```
+main.sv0 (return 7) + main_two.sv0 (return 9)   -> binary exits 9
+zzz_main.sv0 (return 7) + aaa_main.sv0 (return 9) -> binary exits 7
+```
+
+The emitted C contains a single `int main`; the earlier definition is dropped
+silently.
+
+**Impact on SPEC.** SPEC ARCH-011 requires a duplicate-`main` negative probe;
+UP-026 / AC-036 require project discovery to be order-independent and to emit a
+stable non-empty diagnostic on a discovery/link failure. This is the two-entry
+form of the "entry sorts before `lib/`" hazard the SPEC already lists.
+
+**Workaround.** `scripts/test`'s `--self-test` runs the duplicate-`main` probe
+as **xfail**: it reports the silent acceptance without failing the run. Flip it
+to a hard assertion when SS-U09 lands.
