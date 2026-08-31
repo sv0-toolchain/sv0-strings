@@ -1,10 +1,109 @@
-/// strings_types -- shared public types for the sv0-strings library.
-///
-/// SPEC.md Section 8 (conceptual model and public types): `Ordering`,
-/// `BufferError`, `TextError`, `CStrError`, `LocaleError`, `CopyReport`,
-/// `MemccpyReport`, `CStr`, `CString`, `CBuffer`, `TokenCursor`.
-///
-/// Status: unimplemented (pre-F0). This file is a flat-module placeholder
-/// (SPEC ARCH-001 / UP-019). Types land with BL-005 once `Ordering` and the
-/// shared error enums have compile-pass fixtures on both backends.
+/* strings_types -- shared public value types for the sv0-strings library.
+ *
+ * SPEC.md Section 8.2 (required type shapes). This slice (SS-005) lands the
+ * value types that do not borrow: `Ordering`, the error enums, and the
+ * report structs. `CStr` / `CString` / `CBuffer` and `TokenCursor` stay out
+ * until byte slices and `Vec<byte>` execute end to end (SPEC UP-004,
+ * UP-005; slice SS-U03).
+ *
+ * DEVIATION from SPEC Section 8.2 (recorded per GOV-004; see docs/BUGS.md
+ * #1 and slice SS-U13): the error enums use TUPLE variants, not the named
+ * struct variants the SPEC writes. The current native resolver registers
+ * struct-variant field names in one global namespace, so any field name
+ * reused across two struct variants -- `available` in BufferError, `offset`
+ * across TextError/CStrError, `requested` across BufferError/LocaleError --
+ * fails to resolve ("E0301: unknown type", span misattributed to an
+ * unrelated file). Tuple variants have no such namespace and compile on
+ * both backends. Positional meaning is documented per variant below; the
+ * named-field form returns when SS-U13 lands.
+ *
+ * MODEL-008 (Ordering is the native compare result), MODEL-009 (recoverable
+ * errors are data, not panics).
+ */
 module strings_types;
+
+/* Total order result of a comparison (SPEC MODEL-008). Native callers match
+ * on this; they never depend on an arbitrary signed magnitude. A
+ * C-compatible `-1 / 0 / 1` adapter lives in `strings_c23`.
+ */
+pub enum Ordering {
+    Less,
+    Equal,
+    Greater,
+}
+
+/* Capacity, range, overlap, overflow, and allocation failures for byte and
+ * C-string operations (SPEC MODEL-009, Section 8.2). Every failable byte
+ * API returns one of these in its `Result::Err`.
+ *
+ *   DestinationTooSmall(needed, available)
+ *   RangeOutOfBounds(start, len, available)
+ *   OverlapForbidden
+ *   LengthOverflow
+ *   AllocationFailed(requested)
+ */
+pub enum BufferError {
+    DestinationTooSmall(usize, usize),
+    RangeOutOfBounds(usize, usize, usize),
+    OverlapForbidden,
+    LengthOverflow,
+    AllocationFailed(usize),
+}
+
+/* UTF-8 validity failures (SPEC Section 8.2, TEXT-012/013).
+ *
+ *   InvalidUtf8(valid_up_to)      -- byte length of the longest well-formed prefix
+ *   NotScalarBoundary(offset)     -- a byte offset that is not a scalar start
+ */
+pub enum TextError {
+    InvalidUtf8(usize),
+    NotScalarBoundary(usize),
+}
+
+/* C-string invariant failures (SPEC Section 8.2, CSTR-001/002/005/006).
+ *
+ *   MissingTerminator
+ *   InteriorNul(offset)
+ */
+pub enum CStrError {
+    MissingTerminator,
+    InteriorNul(usize),
+}
+
+/* Locale service failures (SPEC Section 8.2, HOST-004). An unsupported
+ * locale is reported, never silently downgraded to ASCII or bytewise.
+ *
+ *   InvalidLocale
+ *   UnsupportedLocale(locale_id)   -- SPEC spells `{ requested: string }`;
+ *                                    `string` is blocked by UP-001 (SS-U02*),
+ *                                    so a caller-supplied id token stands in.
+ *   AllocationFailed
+ */
+pub enum LocaleError {
+    InvalidLocale,
+    UnsupportedLocale(usize),
+    AllocationFailed,
+}
+
+/* Result of a bounded / truncating copy (SPEC Section 8.2, CSTR-018).
+ * `written` = source payload bytes copied (excludes any NUL);
+ * `required` = the full destination payload length attempted;
+ * `truncated` is derived from the operation's bound, not from `written`.
+ */
+pub struct CopyReport {
+    pub written: usize,
+    pub required: usize,
+    pub truncated: bool,
+}
+
+/* Result of a `memccpy`-style stop-byte copy (SPEC Section 8.2, C23-005,
+ * MODEL-017). `next_offset_present` + `next_offset` stand in for
+ * `Option<usize>` until generic result payloads across modules are proven
+ * (SPEC UP-020, OQ-010; slice SS-U06): `next_offset_present` is true iff the
+ * stop byte was copied, and then `next_offset == written`.
+ */
+pub struct MemccpyReport {
+    pub written: usize,
+    pub next_offset_present: bool,
+    pub next_offset: usize,
+}

@@ -1,1 +1,2 @@
 id	path	requirements	backends	profiles	modes	kind	status
+T-TYPES-SMOKE-001	test/cases/types_smoke.sv0	MODEL-008,MODEL-009,ARCH-001,UP-019	c,vm	safe	runtime	compile-pass	done

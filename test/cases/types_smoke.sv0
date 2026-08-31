@@ -1,0 +1,82 @@
+/* SS-005 compile-pass smoke: construct and destructure every non-borrowing
+ * value type in strings_types. Exit 0 = pass; nonzero = first failing check
+ * (SPEC Section 21.1 convention). Staged as the sole `main` over `lib/`.
+ *
+ * `match` is used only as a bare statement here (arms `return` or fall
+ * through), never as a value-binding expression -- the latter mistypes its
+ * result temp in the current compiler (sv0-mathlib BUGS.md #11/#12).
+ * The error enums use tuple variants (strings_types DEVIATION, docs/BUGS.md
+ * #1, slice SS-U13).
+ */
+use strings_types::Ordering;
+use strings_types::BufferError;
+use strings_types::TextError;
+use strings_types::CStrError;
+use strings_types::LocaleError;
+use strings_types::CopyReport;
+use strings_types::MemccpyReport;
+
+fn main() -> i32 {
+    let o: Ordering = Ordering::Equal;
+    match o {
+        Ordering::Less => { return 1; },
+        Ordering::Equal => {},
+        Ordering::Greater => { return 1; },
+    }
+
+    let e1: BufferError = BufferError::DestinationTooSmall(8, 4);
+    match e1 {
+        BufferError::DestinationTooSmall(needed, available) => {
+            if needed != 8 { return 2; }
+            if available != 4 { return 3; }
+        },
+        BufferError::RangeOutOfBounds(start, len, avail) => { return 4; },
+        BufferError::OverlapForbidden => { return 5; },
+        BufferError::LengthOverflow => { return 6; },
+        BufferError::AllocationFailed(requested) => { return 7; },
+    }
+
+    let e2: BufferError = BufferError::RangeOutOfBounds(2, 5, 4);
+    match e2 {
+        BufferError::DestinationTooSmall(needed, available) => { return 8; },
+        BufferError::RangeOutOfBounds(start, len, avail) => {
+            if start != 2 { return 9; }
+            if len != 5 { return 10; }
+            if avail != 4 { return 11; }
+        },
+        BufferError::OverlapForbidden => { return 12; },
+        BufferError::LengthOverflow => { return 13; },
+        BufferError::AllocationFailed(requested) => { return 14; },
+    }
+
+    let t1: TextError = TextError::InvalidUtf8(3);
+    match t1 {
+        TextError::InvalidUtf8(valid_up_to) => { if valid_up_to != 3 { return 15; } },
+        TextError::NotScalarBoundary(offset) => { return 16; },
+    }
+
+    let c1: CStrError = CStrError::InteriorNul(1);
+    match c1 {
+        CStrError::MissingTerminator => { return 17; },
+        CStrError::InteriorNul(offset) => { if offset != 1 { return 18; } },
+    }
+
+    let l1: LocaleError = LocaleError::UnsupportedLocale(5);
+    match l1 {
+        LocaleError::InvalidLocale => { return 19; },
+        LocaleError::UnsupportedLocale(requested) => { if requested != 5 { return 20; } },
+        LocaleError::AllocationFailed => { return 21; },
+    }
+
+    let r: CopyReport = CopyReport { written: 4, required: 7, truncated: true };
+    if r.written != 4 { return 22; }
+    if r.required != 7 { return 23; }
+    if !r.truncated { return 24; }
+
+    let m: MemccpyReport = MemccpyReport { written: 2, next_offset_present: true, next_offset: 2 };
+    if m.next_offset_present {
+        if m.next_offset != m.written { return 25; }
+    }
+
+    return 0;
+}
