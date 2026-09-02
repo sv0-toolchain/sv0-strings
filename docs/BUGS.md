@@ -108,6 +108,30 @@ added width-specific `i64`/`u64`/`f64` bytecode, but SML/NJ's native `Int` is
 non-`Int` cell that the interpreter's integer arithmetic opcode rejects rather
 than reducing mod 2^64.
 
+**Update 2026-09-02 (re-probed).** The *crash* is **gone** — subsequent i64 /
+`Word64` VM work (`arithLL`, `w64` / `unw64` in `sv0vm/src/interpreter/interpreter.sml`)
+made `max + max`, `max * 2`, `(2^63-1) + 1` etc. run to `vm_exit` without
+aborting, wrapping mod 2^64 as they should. The **remaining** divergence is
+**signedness of comparison**: `u64` / `usize` `<` `<=` `>` `>=` on the VM go
+through `Int64.<` (signed), so `18446744073709551615` — stored as the `Int64`
+value `-1` — compares *less than* `0`. Minimal repro (C `exit 42`, VM `exit 3`):
+
+```sv0
+enum CU { Val(u64), Over }
+fn cadd(a: u64, b: u64) -> CU {
+    let s: u64 = a + b;
+    if s < a { return CU::Over; }   // wrap detector: on the VM, 0 < (2^64-1)==-1 is FALSE
+    return CU::Val(s);
+}
+// cadd(18446744073709551615, 1)  ->  C: Over   VM: Val(0)
+```
+
+So SS-U14's remaining work is unsigned comparison for `u64` / `usize`: the
+native emitter emits an unsigned compare op for those operand types,
+`sv0vm/src/bytecode/bytecode.sml` gains it, and the interpreter's `cmp` gets a
+`Word64` comparator alongside `ii` / `rr` / `ll`. `div` / `rem` would likewise
+need the unsigned form; add / sub / mul are already `Word64`-wrapped and fine.
+
 **Impact on SPEC.** Blocks the native-VM leg of every checked-arithmetic and
 overflow-boundary test (SPEC BYTE-018, SEC-002, TEST-006). SPEC BACKEND-001
 (one semantic result on both backends) is not met for full-range `usize`.
