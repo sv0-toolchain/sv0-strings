@@ -53,7 +53,7 @@ implemented with a self-host-safe lowering shape (likely bundled with SS-U03).
 ## #2 — generic `Option<T>` does not instantiate (`E0301`)
 
 **Slice:** SS-U06 &nbsp; **Owner:** sv0c (monomorphization) &nbsp; **Found:** SS-006, 2026-08-30
-&nbsp; **Status:** open, worked around (known gap — sv0-mathlib BUGS.md #9)
+&nbsp; **Status:** PARTIALLY RESOLVED 2026-09-02 — sv0vm `ccd6c9f`+`4dc06a7` (parent `d2fb5c7`). Framing corrected: user-**declared** generic enums (`enum Res<T,E>`) already monomorphize + run on C + native VM, single-file and cross-file, multi-layout (`sv0c/test/integration/modules_generic_carrier/`). The `E0301` is specifically that `Option`/`Result` are **not predefined**. Two `CI64`-in-narrow-context VM bugs fixed (wide-int `main` return silently exited 0; `arithII` crashed on a wide payload narrowed to i32). Still deferred: predefined `Option`/`Result` (bootstrap-generics-policy call), borrowed generic returns. Concrete-carrier workaround stands.
 
 **Symptom.**
 
@@ -81,7 +81,7 @@ monomorphization lands under SS-U06.
 ## #3 — native VM: u64/usize arithmetic that wraps near 2^64 → `arithmetic on non-int`
 
 **Slice:** SS-U14 &nbsp; **Owner:** sv0vm (native emitter / interpreter) &nbsp; **Found:** SS-006, 2026-08-30
-&nbsp; **Status:** open, C leg unblocked / VM leg blocked
+&nbsp; **Status:** RESOLVED 2026-09-02 — sv0c `82b0a7b` + sv0vm `f447230`+`7fcfe48` + sv0doc `6b3e2ba`+`008ef23`. Root cause was signed `Int64.<` for `u64` compare (the `arithmetic on non-int` crash was already gone); fixed with VM operand category 3 + unsigned opcodes `DIV_U64`/`MOD_U64`/`LT_U64..GTE_U64` and wide shifts `SHL_I64`/`SHR_I64`/`SHR_U64`. `checked_overflow.sv0`'s VM leg can flip from SKIP.
 
 **Symptom.** `./scripts/sv0 vm-native-compile --project` emits fine, but
 `sv0vm` aborts at runtime:
@@ -145,7 +145,7 @@ SS-U14; `tools/catalogs/tests.tsv` records `backends=c` for it.
 ## #4 — `--project` silently accepts two `fn main`, last-by-filename wins
 
 **Slice:** SS-U09 &nbsp; **Owner:** sv0c (project discovery / link) &nbsp; **Found:** SS-010, 2026-08-30
-&nbsp; **Status:** open, runner tracks it as xfail
+&nbsp; **Status:** RESOLVED 2026-09-02 — sv0c `dbde3d2` (parent `b3afd87`). `link.sv0` `link_project_concat_sources_from_dir` fails closed with a stable stderr `E0302` when >1 file **directly in** the `--project` dir defines a top-level `fn main` (a `fn main` under `test/` is not an entry candidate, so `--project sv0-mathlib` is untouched). Both backends. The `scripts/test --self-test` dup-`main` probe can be flipped from xfail to a hard assertion.
 
 **Symptom.** A project with two files each defining `fn main() -> i32` emits C
 with **no diagnostic**, `cc` succeeds, and the resulting binary runs exactly
@@ -173,7 +173,7 @@ to a hard assertion when SS-U09 lands.
 ## #5 — nested `module a::b;` accepted silently; `pub` items leak to global scope
 
 **Slice:** SS-U08 &nbsp; **Owner:** sv0c (resolver / module scoping) &nbsp; **Found:** SS-008, 2026-08-30
-&nbsp; **Status:** open; probe pins the one diagnosed form
+&nbsp; **Status:** PARTIALLY RESOLVED 2026-09-02 — sv0c `44916c3` (parent `10ed819`). Dotted `module a::b;` is now rejected with a stable `E0310` on both backends (was silently accepted). Deferred: `pub`/private cross-module visibility enforcement — the flat-concat `--project` model has no module boundaries; not F0-blocking since the library is flat `module strings_*;` all-`pub`.
 
 **Symptom.** `module strings::bytes;` compiles with **no diagnostic** in both
 single-file and `--project` mode. The item is then reachable every which way:
@@ -201,7 +201,7 @@ fully-qualified multi-segment `use` so a regression is caught.
 ## #6 — native-VM `--project` has no `--contract-mode` selector
 
 **Slice:** SS-U10 &nbsp; **Owner:** sv0-toolchain / sv0vm &nbsp; **Found:** SS-011, 2026-08-30
-&nbsp; **Status:** open (SPEC OQ-012 already names it)
+&nbsp; **Status:** RESOLVED at the driver 2026-09-02 — parent `669207e`. `scripts/sv0 vm-native-compile` parses `--contract-mode=<X>` before the positional args; `runtime`/absent proceeds, `verified`/`disabled` → stderr `unsupported on the native VM backend` + exit 2, other → `unknown contract-mode` + exit 2. (The raw-binary form is still not hardened — use `scripts/sv0`.)
 
 **Symptom.** The C driver honours the mode:
 
