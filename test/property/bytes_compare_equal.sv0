@@ -1,0 +1,89 @@
+/* SS-101 (SPEC BYTE-001, BYTE-002): `strings_bytes::compare` / `equal`.
+ * Exit 0 = pass; nonzero = first failing check (SPEC Section 21.1).
+ *
+ * Expected orderings are hand-derived lexicographic-unsigned facts, never
+ * taken from the implementation under test (SPEC Appendix C.4). Every case
+ * also asserts the BYTE-002 property `equal(a,b) == (compare(a,b) == Equal)`.
+ */
+use strings_types::Ordering;
+use strings_bytes::compare;
+use strings_bytes::equal;
+
+fn is_eq(o: Ordering) -> bool {
+    return match o { Ordering::Equal => true, Ordering::Less => false, Ordering::Greater => false };
+}
+fn is_lt(o: Ordering) -> bool {
+    return match o { Ordering::Less => true, Ordering::Equal => false, Ordering::Greater => false };
+}
+fn is_gt(o: Ordering) -> bool {
+    return match o { Ordering::Greater => true, Ordering::Equal => false, Ordering::Less => false };
+}
+
+/* one case: assert the ordering AND the equal/compare property.
+ * want: 0 = Equal, 1 = Less, 2 = Greater. returns `base` on failure, 0 ok. */
+fn chk(a: &[byte], b: &[byte], want: i32, base: i32) -> i32 {
+    let o: Ordering = compare(a, b);
+    if want == 0 { if is_eq(o) != true { return base; } }
+    if want == 1 { if is_lt(o) != true { return base + 1; } }
+    if want == 2 { if is_gt(o) != true { return base + 2; } }
+    /* BYTE-002: equal iff compare == Equal */
+    let e: bool = equal(a, b);
+    if want == 0 { if e != true { return base + 3; } }
+    if want != 0 { if e != false { return base + 4; } }
+    return 0;
+}
+
+fn main() -> i32 {
+    let x: [byte; 4] = [1, 2, 3, 4];
+    let y: [byte; 4] = [1, 2, 3, 4];
+    let lo: [byte; 4] = [1, 2, 0, 4];      /* differs at [2]: 0 < 3 */
+    let hi: [byte; 4] = [1, 2, 9, 4];      /* differs at [2]: 9 > 3 */
+    let pre: [byte; 2] = [1, 2];           /* proper prefix of x */
+    let empty: [byte; 0] = [];
+    let nul: [byte; 3] = [0, 0, 0];        /* embedded 0x00 is content */
+    let nul2: [byte; 3] = [0, 0, 1];
+    let ff: [byte; 1] = [255];             /* 0xFF -- unsigned, not -1 */
+    let one: [byte; 1] = [1];
+
+    /* equal / self */
+    let e: i32 = chk(&x[..], &y[..], 0, 10);
+    if e != 0 { return e; }
+    e = chk(&x[..], &x[..], 0, 20);
+    if e != 0 { return e; }
+
+    /* first-difference orderings */
+    e = chk(&x[..], &hi[..], 1, 30);       /* 3 < 9 */
+    if e != 0 { return e; }
+    e = chk(&x[..], &lo[..], 2, 40);       /* 3 > 0 */
+    if e != 0 { return e; }
+    e = chk(&hi[..], &x[..], 2, 50);
+    if e != 0 { return e; }
+
+    /* prefix / length tiebreak */
+    e = chk(&pre[..], &x[..], 1, 60);      /* pre is shorter -> Less */
+    if e != 0 { return e; }
+    e = chk(&x[..], &pre[..], 2, 70);
+    if e != 0 { return e; }
+
+    /* empty */
+    e = chk(&empty[..], &empty[..], 0, 80);
+    if e != 0 { return e; }
+    e = chk(&empty[..], &x[..], 1, 90);
+    if e != 0 { return e; }
+    e = chk(&x[..], &empty[..], 2, 100);
+    if e != 0 { return e; }
+
+    /* embedded NUL is a value, not a terminator */
+    e = chk(&nul[..], &nul[..], 0, 110);
+    if e != 0 { return e; }
+    e = chk(&nul[..], &nul2[..], 1, 120);  /* [2]: 0 < 1 */
+    if e != 0 { return e; }
+
+    /* unsigned: 0xFF (255) > 0x01 (1) */
+    e = chk(&ff[..], &one[..], 2, 130);
+    if e != 0 { return e; }
+    e = chk(&one[..], &ff[..], 1, 140);
+    if e != 0 { return e; }
+
+    return 0;
+}

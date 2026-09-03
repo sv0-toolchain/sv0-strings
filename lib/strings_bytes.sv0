@@ -5,7 +5,54 @@
 /// span_not_in, starts_with, ends_with. Semantic domain: bytes (embedded
 /// zero and all values 0x00..0xFF allowed; no text decoding).
 ///
-/// Status: unimplemented (pre-F0). Blocked on end-to-end byte-slice
-/// read/write/index on both backends (SPEC UP-004 / UP-005) and interval
-/// overlap semantics (UP-006). Implementation begins at BL-021 (R0.1).
+/// R0.1 progress:
+///   SS-101  compare / equal              -- IMPLEMENTED (this file)
+///   SS-102+ find/rfind/starts_with/...   -- unimplemented
+///
+/// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
+/// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
 module strings_bytes;
+
+use strings_types::Ordering;
+
+/// BYTE-001 (F0): lexicographic unsigned-byte comparison. Returns
+/// `Ordering::Equal` iff both slices have the same length and every byte is
+/// equal; otherwise the ordering is decided by the first differing byte
+/// (unsigned value), and if one slice is a proper prefix of the other the
+/// shorter slice is `Less`.
+///
+/// Not constant-time (BYTE-002 note): returns on the first difference.
+pub fn compare(a: &[byte], b: &[byte]) -> Ordering {
+    let alen: usize = slice_len(a);
+    let blen: usize = slice_len(b);
+
+    let mut n: usize = alen;
+    if blen < alen { n = blen; }
+
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(n <= alen)
+        loop_invariant(n <= blen)
+    {
+        let av: byte = a[i];
+        let bv: byte = b[i];
+        if av < bv { return Ordering::Less; }
+        if av > bv { return Ordering::Greater; }
+        i = i + 1;
+    }
+
+    if alen < blen { return Ordering::Less; }
+    if alen > blen { return Ordering::Greater; }
+    return Ordering::Equal;
+}
+
+/// BYTE-002 (F0): extensionally equivalent to
+/// `compare(a, b) == Ordering::Equal`. Not constant-time.
+pub fn equal(a: &[byte], b: &[byte]) -> bool {
+    return match compare(a, b) {
+        Ordering::Equal => true,
+        Ordering::Less => false,
+        Ordering::Greater => false,
+    };
+}
