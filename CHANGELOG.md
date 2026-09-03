@@ -27,14 +27,17 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 - **`docs/complexity.md`** (PERF-001 / PERF-002) and **`docs/r0.1-gate-review.md`** (SS-111 / SPEC §24.2 requirement trace) added.
 - **R0.2 opened.** `strings_text`: `validate_utf8` (SS-121, RFC 3629, exact
   `valid_up_to`; `Utf8Check` carrier), `len_bytes` / `is_empty` / `equal` /
-  `compare_bytes` (SS-122), and `concat` (SS-123, one `string_concat`
-  allocation after a checked `len_bytes(a) + len_bytes(b)`; `ConcatResult`
-  carrier). Whole-string semantics run on the length-bearing owned `string`
-  (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed toolchain slice
-  **SS-U15** (collision-gated per-module symbol mangling in the `--project`
-  concat, so `strings_bytes::equal` and `strings_text::equal` co-compile) plus
-  its sv0vm `idxInt` follow-up. Deviation **D-6**: text APIs take `string` by
-  value (sv0 has no surface `&string`). `scripts/test --backend=both` = 21/21.
+  `compare_bytes` (SS-122), `concat` (SS-123, one `string_concat` allocation
+  after a checked `len_bytes(a) + len_bytes(b)`; `ConcatResult` carrier), and
+  `find_byte` / `find` / `rfind` / `starts_with` / `ends_with` / `slice_bytes`
+  (SS-124, byte-level UTF-8 search + scalar-boundary-checked slicing;
+  `SliceResult` carrier). Whole-string semantics run on the length-bearing
+  owned `string` (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed
+  toolchain slice **SS-U15** (collision-gated per-module symbol mangling in
+  the `--project` concat, so `strings_bytes` and `strings_text` can each
+  export `equal` / `find` / `rfind` / `starts_with` / `ends_with`) plus its
+  sv0vm `idxInt` follow-up. Deviation **D-6**: text APIs take `string` by
+  value (sv0 has no surface `&string`). `scripts/test --backend=both` = 22/22.
 - **`strings_types`: library-local `Option<T>` / `Result<T, E>`** (SS-U06
   decision B). sv0c has no built-in `Option`/`Result`; a user-declared generic
   enum with scalar payloads monomorphizes on both backends. Structured error

@@ -18,9 +18,13 @@
 ///   SS-123  concat -- IMPLEMENTED (this file). One `string_concat`
 ///           allocation after a checked `len_bytes(a) + len_bytes(b)`;
 ///           `ConcatResult` carrier (SPEC `Result<string, BufferError>`).
+///   SS-124  find_byte / find / rfind / starts_with / ends_with /
+///           slice_bytes -- IMPLEMENTED (this file). Byte-level UTF-8
+///           search + scalar-boundary-checked slicing (`SliceResult`
+///           carrier for SPEC `Result<string, TextError>`).
 ///
-/// The remaining Section 11 surface (find* / slice_bytes / from_utf8 /
-/// as_bytes) is unimplemented -- R0.2 slices SS-124..SS-125.
+/// The remaining Section 11 surface (from_utf8 / as_bytes) is unimplemented
+/// -- R0.2 slice SS-125.
 ///
 /// DEVIATION (recorded per GOV-004; f0-deviations.md D-6): the SPEC signatures
 /// take `&string` (and `as_bytes` returns `&[byte] borrows(value)`). sv0 has
@@ -35,8 +39,10 @@
 module strings_text;
 
 use strings_types::Ordering;
+use strings_types::Option;
 use strings_types::Utf8Check;
 use strings_types::ConcatResult;
+use strings_types::SliceResult;
 use strings_checked::checked_add;
 use strings_checked::CheckedUsize;
 
@@ -114,6 +120,131 @@ pub fn concat(a: string, b: string) -> ConcatResult {
         return ConcatResult::LengthOverflow;
     }
     return ConcatResult::Joined(string_concat(a, b));
+}
+
+/// True iff the `nlen` bytes of `needle` occur in `value` starting at byte
+/// offset `off`. The caller guarantees `off + nlen <= len_bytes(value)`.
+fn text_match_at(value: string, off: usize, needle: string, nlen: usize) -> bool {
+    let mut j: usize = 0;
+    while j < nlen
+        loop_invariant(j <= nlen)
+    {
+        if string_char_at(value, off + j) != string_char_at(needle, j) { return false; }
+        j = j + 1;
+    }
+    return true;
+}
+
+/// TEXT-007 (R0.2): byte index of the first byte of `value` equal to
+/// `needle`, or `Option::None`; an empty `value` yields `None`. This
+/// searches raw UTF-8 bytes -- when `needle` is a UTF-8 continuation byte
+/// (`0x80..0xBF`) the returned index MAY fall inside a multibyte scalar and
+/// is NOT guaranteed to be a scalar boundary.
+pub fn find_byte(value: string, needle: byte) -> Option<usize> {
+    let n: usize = len_bytes(value);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if string_char_at(value, i) == needle { return Option::Some(i); }
+        i = i + 1;
+    }
+    return Option::None;
+}
+
+/// TEXT-008 / TEXT-009 (R0.2): byte offset of the first occurrence of
+/// `needle` in `value`, or `Option::None`. An empty needle returns
+/// `Option::Some(0)`; a needle longer than `value` returns `Option::None`.
+/// For a valid-UTF-8 needle the offset is a UTF-8 scalar boundary.
+///
+/// Naive left-to-right scan, O(n*m) worst case (see `docs/complexity.md`,
+/// PERF-002); an R1 linear-time replacement is planned.
+pub fn find(value: string, needle: string) -> Option<usize> {
+    let n: usize = len_bytes(value);
+    let m: usize = len_bytes(needle);
+    if m == 0 { return Option::Some(0); }
+    if m > n { return Option::None; }
+
+    let last: usize = n - m;
+    let mut i: usize = 0;
+    while i <= last
+        loop_invariant(i <= last + 1)
+        loop_invariant(m <= n)
+    {
+        if text_match_at(value, i, needle, m) { return Option::Some(i); }
+        i = i + 1;
+    }
+    return Option::None;
+}
+
+/// TEXT-008 / TEXT-009 (R0.2): byte offset of the LAST occurrence of
+/// `needle` in `value`, or `Option::None`. An empty needle returns
+/// `Option::Some(len_bytes(value))`; a needle longer than `value` returns
+/// `Option::None`.
+pub fn rfind(value: string, needle: string) -> Option<usize> {
+    let n: usize = len_bytes(value);
+    let m: usize = len_bytes(needle);
+    if m == 0 { return Option::Some(n); }
+    if m > n { return Option::None; }
+
+    let mut i: usize = n - m + 1;
+    while i > 0
+        loop_invariant(i <= n - m + 1)
+        loop_invariant(m <= n)
+    {
+        i = i - 1;
+        if text_match_at(value, i, needle, m) { return Option::Some(i); }
+    }
+    return Option::None;
+}
+
+/// TEXT-009 (R0.2): `true` iff `prefix` is a leading byte sequence of
+/// `value`. The empty string is a prefix of every string.
+pub fn starts_with(value: string, prefix: string) -> bool {
+    let vlen: usize = len_bytes(value);
+    let plen: usize = len_bytes(prefix);
+    if plen > vlen { return false; }
+    return text_match_at(value, 0, prefix, plen);
+}
+
+/// TEXT-009 (R0.2): `true` iff `suffix` is a trailing byte sequence of
+/// `value`. The empty string is a suffix of every string.
+pub fn ends_with(value: string, suffix: string) -> bool {
+    let vlen: usize = len_bytes(value);
+    let slen: usize = len_bytes(suffix);
+    if slen > vlen { return false; }
+    return text_match_at(value, vlen - slen, suffix, slen);
+}
+
+/// True iff byte offset `i` (`i <= n`) is a UTF-8 scalar boundary of
+/// `value`, assumed valid UTF-8 (the `Text` domain precondition): the
+/// start, the end, or a byte that is not a continuation byte
+/// (`0x80..0xBF`).
+fn text_is_boundary(value: string, i: usize, n: usize) -> bool {
+    if i == 0 { return true; }
+    if i == n { return true; }
+    let b: byte = string_char_at(value, i);
+    if b < 128 { return true; }
+    if b > 191 { return true; }
+    return false;
+}
+
+/// TEXT-010 / TEXT-011 (R0.2): the bytes `[start, end)` of `value` as a new
+/// owned `string`. Requires `start <= end <= len_bytes(value)` and both
+/// offsets to be UTF-8 scalar boundaries. Any violation returns
+/// `SliceResult::NotScalarBoundary(off)` for the first offending offset --
+/// checked in the order start-past-end, end-past-end, `start > end`, start
+/// not on a boundary, end not on a boundary -- and never reads outside
+/// `value` or constructs a malformed `string`. On success the result equals
+/// bytes `[start, end)` and is valid UTF-8.
+pub fn slice_bytes(value: string, start: usize, end: usize) -> SliceResult {
+    let n: usize = len_bytes(value);
+    if start > n { return SliceResult::NotScalarBoundary(start); }
+    if end > n { return SliceResult::NotScalarBoundary(end); }
+    if start > end { return SliceResult::NotScalarBoundary(start); }
+    if text_is_boundary(value, start, n) != true { return SliceResult::NotScalarBoundary(start); }
+    if text_is_boundary(value, end, n) != true { return SliceResult::NotScalarBoundary(end); }
+    return SliceResult::Slice(string_substr(value, start, end - start));
 }
 
 /// TEXT-012 (R0.2): accept exactly the RFC 3629 language -- shortest form

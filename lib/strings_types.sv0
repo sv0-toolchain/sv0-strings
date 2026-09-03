@@ -184,6 +184,30 @@ pub enum ConcatResult {
     LengthOverflow,
 }
 
+/* Result of `strings_text::slice_bytes` (SPEC Section 11, TEXT-010 /
+ * TEXT-011; slice SS-124). Same GOV-004 / D-4 deviation as the carriers
+ * above: the SPEC signature is `-> Result<string, TextError>`; a structured
+ * `TextError` in a generic `Result` Err slot does not lower on the C
+ * backend.
+ *
+ *   Slice(s)                       -- Ok: bytes `[start, end)` as a new
+ *                                    owned `string`, still valid UTF-8
+ *   NotScalarBoundary(off)         -- Err: `off` (the first offending of
+ *                                    `start` / `end`) is past
+ *                                    `len_bytes(value)`, breaks
+ *                                    `start <= end`, or is not a UTF-8
+ *                                    scalar boundary. `value` was not read
+ *                                    outside its bounds and no malformed
+ *                                    `string` was built. `TextError`'s
+ *                                    `InvalidUtf8` variant is unreachable
+ *                                    here (the input is already valid UTF-8
+ *                                    by the `Text` domain precondition).
+ */
+pub enum SliceResult {
+    Slice(string),
+    NotScalarBoundary(usize),
+}
+
 /* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
  * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
  * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a
