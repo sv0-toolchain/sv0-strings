@@ -6,14 +6,16 @@
 /// zero and all values 0x00..0xFF allowed; no text decoding).
 ///
 /// R0.1 progress:
-///   SS-101  compare / equal              -- IMPLEMENTED (this file)
-///   SS-102+ find/rfind/starts_with/...   -- unimplemented
+///   SS-101  compare / equal                      -- IMPLEMENTED (this file)
+///   SS-102  find / rfind / starts_with / ends_with -- IMPLEMENTED (this file)
+///   SS-103+ find_slice / span_* / copy / ...     -- unimplemented
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
 module strings_bytes;
 
 use strings_types::Ordering;
+use strings_types::Option;
 
 /// BYTE-001 (F0): lexicographic unsigned-byte comparison. Returns
 /// `Ordering::Equal` iff both slices have the same length and every byte is
@@ -55,4 +57,67 @@ pub fn equal(a: &[byte], b: &[byte]) -> bool {
         Ordering::Less => false,
         Ordering::Greater => false,
     };
+}
+
+/// BYTE-011 (F0): index of the first byte in `haystack` equal to `needle`,
+/// or `Option::None`. An empty haystack yields `None`.
+pub fn find(haystack: &[byte], needle: byte) -> Option<usize> {
+    let n: usize = slice_len(haystack);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if haystack[i] == needle { return Option::Some(i); }
+        i = i + 1;
+    }
+    return Option::None;
+}
+
+/// BYTE-011 (F0): index of the last byte in `haystack` equal to `needle`,
+/// or `Option::None`. An empty haystack yields `None`.
+pub fn rfind(haystack: &[byte], needle: byte) -> Option<usize> {
+    let n: usize = slice_len(haystack);
+    let mut i: usize = n;
+    while i > 0
+        loop_invariant(i <= n)
+    {
+        i = i - 1;
+        if haystack[i] == needle { return Option::Some(i); }
+    }
+    return Option::None;
+}
+
+/// BYTE-015 (R0.1): `true` iff `prefix` is a leading subsequence of `input`.
+/// The empty sequence is a prefix of every sequence.
+pub fn starts_with(input: &[byte], prefix: &[byte]) -> bool {
+    let plen: usize = slice_len(prefix);
+    let ilen: usize = slice_len(input);
+    if plen > ilen { return false; }
+    let mut i: usize = 0;
+    while i < plen
+        loop_invariant(i <= plen)
+        loop_invariant(plen <= ilen)
+    {
+        if input[i] != prefix[i] { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+/// BYTE-015 (R0.1): `true` iff `suffix` is a trailing subsequence of `input`.
+/// The empty sequence is a suffix of every sequence.
+pub fn ends_with(input: &[byte], suffix: &[byte]) -> bool {
+    let slen: usize = slice_len(suffix);
+    let ilen: usize = slice_len(input);
+    if slen > ilen { return false; }
+    let off: usize = ilen - slen;
+    let mut i: usize = 0;
+    while i < slen
+        loop_invariant(i <= slen)
+        loop_invariant(off + slen <= ilen)
+    {
+        if input[off + i] != suffix[i] { return false; }
+        i = i + 1;
+    }
+    return true;
 }

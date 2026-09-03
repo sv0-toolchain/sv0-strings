@@ -1,0 +1,84 @@
+/* SS-102 (SPEC BYTE-011, BYTE-015): strings_bytes::find / rfind /
+ * starts_with / ends_with. Exit 0 = pass; nonzero = first failing check.
+ *
+ * Table facts are hand-derived, never from the impl (SPEC Appendix C.4).
+ * Property assertions: empty-prefix/suffix rules, self prefix/suffix,
+ * find/rfind agree on existence, and find(x,b)==Some(k) => x[k]==b.
+ */
+use strings_types::Option;
+use strings_bytes::find;
+use strings_bytes::rfind;
+use strings_bytes::starts_with;
+use strings_bytes::ends_with;
+
+fn opt_eq(o: Option<usize>, want: usize) -> bool {
+    return match o { Option::Some(v) => v == want, Option::None => false };
+}
+fn opt_none(o: Option<usize>) -> bool {
+    return match o { Option::Some(v) => false, Option::None => true };
+}
+fn opt_some(o: Option<usize>) -> bool {
+    return match o { Option::Some(v) => true, Option::None => false };
+}
+
+fn main() -> i32 {
+    let v: [byte; 5] = [1, 2, 3, 2, 1];
+    let one: [byte; 1] = [7];
+    let empty: [byte; 0] = [];
+    let nul: [byte; 3] = [0, 0, 5];
+    let ff: [byte; 3] = [255, 1, 255];
+
+    /* ---- find (BYTE-011) ---- */
+    if opt_eq(find(&v[..], 2), 1) != true { return 10; }        /* first match */
+    if opt_none(find(&v[..], 9)) != true { return 11; }         /* absent */
+    if opt_none(find(&empty[..], 5)) != true { return 12; }     /* empty input */
+    if opt_eq(find(&one[..], 7), 0) != true { return 13; }
+    if opt_eq(find(&nul[..], 5), 2) != true { return 14; }      /* skip embedded 0x00 */
+    if opt_eq(find(&nul[..], 0), 0) != true { return 15; }      /* 0x00 is a value */
+    if opt_eq(find(&ff[..], 255), 0) != true { return 16; }     /* 0xFF needle */
+
+    /* ---- rfind (BYTE-011) ---- */
+    if opt_eq(rfind(&v[..], 2), 3) != true { return 20; }       /* last match */
+    if opt_none(rfind(&v[..], 9)) != true { return 21; }
+    if opt_none(rfind(&empty[..], 5)) != true { return 22; }
+    if opt_eq(rfind(&one[..], 7), 0) != true { return 23; }
+    if opt_eq(rfind(&ff[..], 255), 2) != true { return 24; }
+    if opt_eq(rfind(&nul[..], 0), 1) != true { return 25; }
+
+    /* ---- property: find / rfind agree on existence ---- */
+    if opt_some(find(&v[..], 3)) != opt_some(rfind(&v[..], 3)) { return 30; }
+    if opt_some(find(&v[..], 8)) != opt_some(rfind(&v[..], 8)) { return 31; }
+    /* property: find(x,b) == Some(k)  =>  x[k] == b */
+    let fk: Option<usize> = find(&v[..], 2);
+    let kv: i32 = match fk { Option::Some(k) => v[k], Option::None => 0 - 1 };
+    if kv != 2 { return 32; }
+
+    /* ---- starts_with (BYTE-015) ---- */
+    let p12: [byte; 2] = [1, 2];
+    let p13: [byte; 2] = [1, 3];
+    let p123: [byte; 3] = [1, 2, 3];
+    let abc: [byte; 3] = [1, 2, 3];
+    if starts_with(&abc[..], &p12[..]) != true { return 40; }
+    if starts_with(&abc[..], &p13[..]) != false { return 41; }
+    if starts_with(&abc[..], &empty[..]) != true { return 42; }    /* empty prefix */
+    if starts_with(&empty[..], &empty[..]) != true { return 43; }
+    if starts_with(&p12[..], &p123[..]) != false { return 44; }    /* prefix longer */
+    if starts_with(&abc[..], &p123[..]) != true { return 45; }     /* self */
+    let z2: [byte; 2] = [0, 0];
+    let z1: [byte; 1] = [0];
+    if starts_with(&z2[..], &z1[..]) != true { return 46; }
+
+    /* ---- ends_with (BYTE-015) ---- */
+    let s23: [byte; 2] = [2, 3];
+    if ends_with(&abc[..], &s23[..]) != true { return 50; }
+    if ends_with(&abc[..], &p13[..]) != false { return 51; }
+    if ends_with(&abc[..], &empty[..]) != true { return 52; }      /* empty suffix */
+    if ends_with(&empty[..], &empty[..]) != true { return 53; }
+    if ends_with(&p12[..], &p123[..]) != false { return 54; }      /* suffix longer */
+    if ends_with(&abc[..], &p123[..]) != true { return 55; }       /* self */
+    let z50: [byte; 3] = [5, 0, 0];
+    if ends_with(&z50[..], &z2[..]) != true { return 56; }
+    if ends_with(&z50[..], &z1[..]) != true { return 57; }
+
+    return 0;
+}

@@ -7,3 +7,4 @@ test/fixtures/regressions/embedded_nul_concat.sv0	0	0	SS-009 GREEN on C + VM (SS
 test/fixtures/regressions/embedded_nul_substr.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
 test/cases/prelude_option_result.sv0	0	0	SS-U06 decision B; strings_types Option<T>/Result<T,E>, scalar payloads, C + VM
 test/property/bytes_compare_equal.sv0	0	0	SS-101 BYTE-001/002; strings_bytes::compare/equal, C + VM
+test/property/bytes_find_prefix.sv0	0	0	SS-102 BYTE-011/015; strings_bytes::find/rfind/starts_with/ends_with, C + VM
