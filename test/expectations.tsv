@@ -1,7 +1,7 @@
 path	c_exit	vm_exit	note
 test/cases/types_smoke.sv0	0	0	SS-005
-test/property/checked_overflow.sv0	0	SKIP	SS-006; VM blocked on SS-U14 (BUGS.md #3)
-test/fixtures/regressions/embedded_nul_len.sv0	101	0	SS-009 RED; C fixed by SS-U02b
-test/fixtures/regressions/embedded_nul_eq.sv0	1	0	SS-009 RED; C fixed by SS-U02b
-test/fixtures/regressions/embedded_nul_concat.sv0	2	0	SS-009 RED; C fixed by SS-U02b
-test/fixtures/regressions/embedded_nul_substr.sv0	4	0	SS-009 RED; C fixed by SS-U02b
+test/property/checked_overflow.sv0	0	SKIP	SS-006; SS-U14 RESOLVED (sv0c 82b0a7b + sv0vm f447230) -- VM leg ready to flip from SKIP after a re-check
+test/fixtures/regressions/embedded_nul_len.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
+test/fixtures/regressions/embedded_nul_eq.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
+test/fixtures/regressions/embedded_nul_concat.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
+test/fixtures/regressions/embedded_nul_substr.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
