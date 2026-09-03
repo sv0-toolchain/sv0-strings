@@ -13,3 +13,4 @@ test/property/bytes_span.sv0	0	0	SS-104 BYTE-013/014; strings_bytes::span_in/spa
 test/property/bytes_copy.sv0	0	0	SS-105 BYTE-003/004/005/006; strings_bytes::copy (CopyResult carrier) + copy_prefix, C + VM
 test/property/bytes_fill.sv0	0	0	SS-106 BYTE-009; strings_bytes::fill (guard-byte fixtures), C + VM
 test/property/bytes_move_within.sv0	0	0	SS-106 BYTE-007/008; strings_bytes::move_within (memmove semantics, 7-way overlap matrix vs temp-buffer model), C + VM
+test/property/ascii_case.sv0	0	0	SS-109 ASCII-001..006/008; strings_ascii (exhaustive 256-byte table), C + VM

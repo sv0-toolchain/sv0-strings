@@ -1,0 +1,103 @@
+/* SS-109 (SPEC ASCII-001..006, ASCII-008): strings_ascii.
+ * Exit 0 = pass; nonzero = first failing check.
+ *
+ * ASCII-001: EXHAUSTIVE 256-byte table for to_lower / to_upper -- only
+ * A-Z / a-z change, by exactly +-0x20; every other byte is identity.
+ * The expected mapping is the byte-range definition, not the impl.
+ * ASCII-002/008: the same table runs on the C backend and the native VM
+ * (the staging runner does both legs); locale is never consulted.
+ */
+use strings_types::Ordering;
+use strings_ascii::to_lower;
+use strings_ascii::to_upper;
+use strings_ascii::equal_ignore_case;
+use strings_ascii::compare_ignore_case;
+use strings_ascii::compare_prefix_ignore_case;
+
+fn is_eq(o: Ordering) -> bool { return match o { Ordering::Equal => true, Ordering::Less => false, Ordering::Greater => false }; }
+fn is_lt(o: Ordering) -> bool { return match o { Ordering::Less => true, Ordering::Equal => false, Ordering::Greater => false }; }
+fn is_gt(o: Ordering) -> bool { return match o { Ordering::Greater => true, Ordering::Equal => false, Ordering::Less => false }; }
+
+fn main() -> i32 {
+    /* ---- ASCII-001: exhaustive 0..255 for to_lower / to_upper ---- */
+    let mut v: i32 = 0;
+    while v < 256 {
+        let b: byte = v as byte;
+        let lo: byte = to_lower(b);
+        let up: byte = to_upper(b);
+
+        /* expected, from the byte-range definition */
+        let mut want_lo: i32 = v;
+        if v >= 65 { if v <= 90 { want_lo = v + 32; } }
+        let mut want_up: i32 = v;
+        if v >= 97 { if v <= 122 { want_up = v - 32; } }
+
+        if (lo as i32) != want_lo { return 1000 + v; }
+        if (up as i32) != want_up { return 2000 + v; }
+
+        /* round-trip within the letter ranges; identity outside */
+        if v >= 65 { if v <= 90 {
+            if (to_upper(lo) as i32) != v { return 3000 + v; }   /* upper(lower(X)) == X */
+        } }
+        if v >= 97 { if v <= 122 {
+            if (to_lower(up) as i32) != v { return 4000 + v; }   /* lower(upper(x)) == x */
+        } }
+        /* outside the letter ranges: both are identity */
+        let is_letter: bool = (v >= 65 && v <= 90) || (v >= 97 && v <= 122);
+        if is_letter != true {
+            if (lo as i32) != v { return 5000 + v; }
+            if (up as i32) != v { return 6000 + v; }
+        }
+
+        v = v + 1;
+    }
+
+    /* ---- ASCII-003: equal_ignore_case ---- */
+    let x1: [byte; 5] = [72, 101, 108, 108, 111];     /* "Hello" */
+    let x2: [byte; 5] = [104, 69, 76, 108, 111];      /* "hELlo" */
+    let x3: [byte; 5] = [72, 101, 108, 108, 112];     /* "Hellp" */
+    let x4: [byte; 4] = [72, 101, 108, 108];          /* "Hell"  */
+    if equal_ignore_case(&x1[..], &x2[..]) != true { return 10; }
+    if equal_ignore_case(&x1[..], &x3[..]) != false { return 11; }
+    if equal_ignore_case(&x1[..], &x4[..]) != false { return 12; }   /* length differs */
+    let e0a: [byte; 0] = [];
+    let e0b: [byte; 0] = [];
+    if equal_ignore_case(&e0a[..], &e0b[..]) != true { return 13; }
+    /* non-letters must match exactly even ignoring case */
+    let p1: [byte; 3] = [64, 91, 96];   /* '@' '[' '`' -- adjacent to the letter ranges */
+    let p2: [byte; 3] = [64, 91, 96];
+    if equal_ignore_case(&p1[..], &p2[..]) != true { return 14; }
+    let p3: [byte; 3] = [64, 92, 96];
+    if equal_ignore_case(&p1[..], &p3[..]) != false { return 15; }
+
+    /* ---- ASCII-004: compare_ignore_case ---- */
+    if is_eq(compare_ignore_case(&x1[..], &x2[..])) != true { return 20; }
+    if is_lt(compare_ignore_case(&x1[..], &x3[..])) != true { return 21; }   /* 'o' < 'p' */
+    if is_gt(compare_ignore_case(&x3[..], &x1[..])) != true { return 22; }
+    if is_lt(compare_ignore_case(&x4[..], &x1[..])) != true { return 23; }   /* prefix -> shorter Less */
+    if is_gt(compare_ignore_case(&x1[..], &x4[..])) != true { return 24; }
+    /* case does not affect ordering: "ABC" vs "abd" -> Less (c < d) */
+    let abc: [byte; 3] = [65, 66, 67];
+    let abd: [byte; 3] = [97, 98, 100];
+    if is_lt(compare_ignore_case(&abc[..], &abd[..])) != true { return 25; }
+
+    /* ---- ASCII-005: compare_prefix_ignore_case ---- */
+    /* first 3 bytes fold-equal -> Equal regardless of the rest */
+    if is_eq(compare_prefix_ignore_case(&x1[..], &x3[..], 3)) != true { return 30; }
+    /* n covers the difference -> Less */
+    if is_lt(compare_prefix_ignore_case(&x1[..], &x3[..], 5)) != true { return 31; }
+    /* n larger than both lengths -> full compare; equal fold -> Equal */
+    if is_eq(compare_prefix_ignore_case(&x1[..], &x2[..], 99)) != true { return 32; }
+    /* n=0 -> always Equal, reads nothing */
+    if is_eq(compare_prefix_ignore_case(&x1[..], &abd[..], 0)) != true { return 33; }
+    /* shorter effective length (within n) -> Less */
+    if is_lt(compare_prefix_ignore_case(&x4[..], &x1[..], 10)) != true { return 34; }
+    /* n caps below the shorter side: only first n compared, equal -> Equal */
+    let hz: [byte; 2] = [72, 101];   /* "He" */
+    if is_eq(compare_prefix_ignore_case(&x1[..], &hz[..], 2)) != true { return 35; }
+    /* never reads past a slice: n huge, one side length 0 */
+    if is_eq(compare_prefix_ignore_case(&e0a[..], &x1[..], 100)) != false { return 36; }  /* 0 < 5 -> Less */
+    if is_lt(compare_prefix_ignore_case(&e0a[..], &x1[..], 100)) != true { return 37; }
+
+    return 0;
+}

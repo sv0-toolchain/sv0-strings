@@ -5,7 +5,109 @@
 /// Case mapping affects only A-Z / a-z; every other byte is unchanged and
 /// the result never depends on the host locale or Unicode tables.
 ///
-/// Status: unimplemented (pre-F0). Implementation begins at BL-035 (R0.1).
-/// This module is never documented as Unicode case-insensitive comparison
-/// (SPEC ASCII-006).
+/// This is ASCII case folding, NOT Unicode case-insensitive comparison
+/// (SPEC ASCII-006). It is defined purely by the byte-value ranges below.
+///
+/// Slice length is read with `slice_len(s)` (toolchain SS-U03e).
 module strings_ascii;
+
+use strings_types::Ordering;
+
+/// ASCII-001 / ASCII-002 (R0.1): map `A`..`Z` (0x41..0x5A) to `a`..`z` by
+/// adding 0x20; return every other byte -- including all of 0x00..0x40,
+/// 0x5B..0x60, 0x7B..0xFF -- unchanged. Locale-independent.
+pub fn to_lower(value: byte) -> byte {
+    if value >= 65 {
+        if value <= 90 { return value + 32; }
+    }
+    return value;
+}
+
+/// ASCII-001 / ASCII-002 (R0.1): map `a`..`z` (0x61..0x7A) to `A`..`Z` by
+/// subtracting 0x20; return every other byte unchanged. Locale-independent.
+pub fn to_upper(value: byte) -> byte {
+    if value >= 97 {
+        if value <= 122 { return value - 32; }
+    }
+    return value;
+}
+
+/// ASCII-003 (R0.1): `true` iff `a` and `b` have the same length and every
+/// byte is equal after ASCII case folding (`to_lower`). Not constant-time.
+pub fn equal_ignore_case(a: &[byte], b: &[byte]) -> bool {
+    let alen: usize = slice_len(a);
+    let blen: usize = slice_len(b);
+    if alen != blen { return false; }
+    let mut i: usize = 0;
+    while i < alen
+        loop_invariant(i <= alen)
+        loop_invariant(alen == blen)
+    {
+        if to_lower(a[i]) != to_lower(b[i]) { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+/// ASCII-004 (R0.1): compare the case-folded bytes of `a` and `b`
+/// lexicographically; if one folded sequence is a proper prefix of the
+/// other, the shorter is `Less`. No ambient locale.
+pub fn compare_ignore_case(a: &[byte], b: &[byte]) -> Ordering {
+    let alen: usize = slice_len(a);
+    let blen: usize = slice_len(b);
+
+    let mut n: usize = alen;
+    if blen < alen { n = blen; }
+
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(n <= alen)
+        loop_invariant(n <= blen)
+    {
+        let av: byte = to_lower(a[i]);
+        let bv: byte = to_lower(b[i]);
+        if av < bv { return Ordering::Less; }
+        if av > bv { return Ordering::Greater; }
+        i = i + 1;
+    }
+
+    if alen < blen { return Ordering::Less; }
+    if alen > blen { return Ordering::Greater; }
+    return Ordering::Equal;
+}
+
+/// ASCII-005 (R0.1): compare no more than `n` case-folded bytes from each of
+/// `a` and `b`, never reading past either slice. The effective compare
+/// length for a side is `min(n, side.len())`; folded bytes are compared up
+/// to `min` of the two effective lengths, then the shorter effective length
+/// is `Less` (equal effective lengths compare `Equal`).
+pub fn compare_prefix_ignore_case(a: &[byte], b: &[byte], n: usize) -> Ordering {
+    let alen: usize = slice_len(a);
+    let blen: usize = slice_len(b);
+
+    let mut ae: usize = alen;
+    if n < ae { ae = n; }
+    let mut be: usize = blen;
+    if n < be { be = n; }
+
+    let mut m: usize = ae;
+    if be < m { m = be; }
+
+    let mut i: usize = 0;
+    while i < m
+        loop_invariant(i <= m)
+        loop_invariant(m <= alen)
+        loop_invariant(m <= blen)
+    {
+        let av: byte = to_lower(a[i]);
+        let bv: byte = to_lower(b[i]);
+        if av < bv { return Ordering::Less; }
+        if av > bv { return Ordering::Greater; }
+        i = i + 1;
+    }
+
+    if ae < be { return Ordering::Less; }
+    if ae > be { return Ordering::Greater; }
+    return Ordering::Equal;
+}
