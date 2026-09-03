@@ -1,0 +1,18 @@
+/* SS-108 compile-fail evidence (SPEC BYTE-010).
+ *
+ * `fill_explicit` requires a backend-enforced guarantee that its stores are
+ * observable and not removed as dead stores. Neither the C backend nor the
+ * native VM provides that today (see docs/fill-explicit-blocked.md), so
+ * BYTE-010 requires the function to stay Blocked and MUST NOT be aliased to
+ * ordinary `fill`. `strings_bytes` therefore does not export it. This probe
+ * pins that: importing it fails to resolve, and if a plain alias were ever
+ * added the fixture would start compiling and the compile-fail gate would
+ * catch the regression.
+ *
+ * EXPECT-FAIL: E0309
+ */
+use strings_bytes::fill_explicit;
+
+fn main() -> i32 {
+    return 0;
+}

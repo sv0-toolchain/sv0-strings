@@ -13,7 +13,9 @@
 ///   SS-105  copy / copy_prefix                     -- IMPLEMENTED (this file)
 ///   SS-107  fill                                   -- IMPLEMENTED (this file)
 ///   SS-106  move_within                            -- IMPLEMENTED (this file)
-///   SS-108  fill_explicit                          -- Blocked (SS-U11 / R0.3)
+///   SS-108  fill_explicit                          -- Blocked (BYTE-010): NOT
+///           exported; neither backend guarantees non-elision. Evidence +
+///           unblock path: docs/fill-explicit-blocked.md. Never alias to `fill`.
 ///
 /// SS-110: accelerable ops dispatch through `accel_available` (SPEC UP-011);
 /// no accelerator exists at R0.1 so the pure path is always selected.
@@ -288,9 +290,10 @@ pub fn copy_prefix(dst: &mut [byte], src: &[byte]) -> CopyReport {
 /// BYTE-009 (R0.1): set every byte of `dst` to `value`, touching no adjacent
 /// storage. The write is bounded by `dst.len()` on every path (BYTE-017).
 ///
-/// This is the plain fill. `fill_explicit` (BYTE-010) is the version with a
-/// backend-enforced guarantee that the stores are not elided; it is a
-/// separate function and MUST NOT be aliased to this one.
+/// This is the *plain* fill. `fill_explicit` (BYTE-010) -- the version with a
+/// backend-enforced non-elision guarantee -- is a SEPARATE function that
+/// `strings_bytes` does not export while it is Blocked (SS-108; see
+/// docs/fill-explicit-blocked.md). `fill` MUST NOT be presented as it.
 pub fn fill(dst: &mut [byte], value: byte) -> () {
     let n: usize = slice_len(dst);
     let mut i: usize = 0;

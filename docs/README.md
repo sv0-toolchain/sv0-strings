@@ -13,6 +13,12 @@ in the `project-specs` repository:
 - Release gates: SPEC §24
 - Dependency-ordered backlog BL-001..BL-121: SPEC Appendix D
 
+## Authored
+
+- `complexity.md` — per-operation worst-case time/space (PERF-001/002); the R1 `find_slice` replacement plan.
+- `fill-explicit-blocked.md` — SS-108 / BYTE-010: why `fill_explicit` stays Blocked (optimizer + VM-trace evidence) and the SS-U11 unblock path.
+- `f0-deviations.md` — the reviewed F0 deviation register (D-1..D-5).
+
 ## Generated / authored later
 
 These are produced during the R0.3+ backlog, not now:
