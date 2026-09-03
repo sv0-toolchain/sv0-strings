@@ -19,3 +19,4 @@ test/property/utf8_validate.sv0	0	0	SS-121 TEXT-012/013/BL-039/040; strings_text
 test/property/text_concat.sv0	0	0	SS-123 TEXT-005/006; strings_text::concat (ConcatResult carrier, checked_add pre-alloc), C + VM
 test/property/text_length_equality.sv0	0	0	SS-122 TEXT-001..004/016; strings_text::len_bytes/is_empty/equal/compare_bytes (owned string, no strlen/strcmp), C + VM
 test/property/text_search_slice.sv0	0	0	SS-124 TEXT-007..011; strings_text::find_byte/find/rfind/starts_with/ends_with/slice_bytes (SliceResult carrier, scalar-boundary checked), C + VM
+test/property/text_from_utf8.sv0	0	0	SS-125 TEXT-014/015; strings_text::from_utf8 (FromUtf8Result carrier, owned copy) / as_bytes (&[byte] view via SS-U16), C + VM

@@ -22,9 +22,11 @@
 ///           slice_bytes -- IMPLEMENTED (this file). Byte-level UTF-8
 ///           search + scalar-boundary-checked slicing (`SliceResult`
 ///           carrier for SPEC `Result<string, TextError>`).
+///   SS-125  from_utf8 / as_bytes -- IMPLEMENTED (this file). Owned-copy
+///           conversion + borrowed byte view, over the SS-U16 toolchain
+///           bridges `string_from_bytes` / `string_byte_view`.
 ///
-/// The remaining Section 11 surface (from_utf8 / as_bytes) is unimplemented
-/// -- R0.2 slice SS-125.
+/// The full Section 11 surface is now implemented.
 ///
 /// DEVIATION (recorded per GOV-004; f0-deviations.md D-6): the SPEC signatures
 /// take `&string` (and `as_bytes` returns `&[byte] borrows(value)`). sv0 has
@@ -43,6 +45,7 @@ use strings_types::Option;
 use strings_types::Utf8Check;
 use strings_types::ConcatResult;
 use strings_types::SliceResult;
+use strings_types::FromUtf8Result;
 use strings_checked::checked_add;
 use strings_checked::CheckedUsize;
 
@@ -245,6 +248,38 @@ pub fn slice_bytes(value: string, start: usize, end: usize) -> SliceResult {
     if text_is_boundary(value, start, n) != true { return SliceResult::NotScalarBoundary(start); }
     if text_is_boundary(value, end, n) != true { return SliceResult::NotScalarBoundary(end); }
     return SliceResult::Slice(string_substr(value, start, end - start));
+}
+
+/// TEXT-014 (R0.2): validate `bytes` as RFC 3629 UTF-8 (via `validate_utf8`)
+/// and, on success, COPY them into a new owned `string` -- mutating the
+/// source slice afterward never changes the returned string. On failure
+/// `FromUtf8Result::Invalid(valid_up_to)` is returned and nothing is
+/// allocated. Embedded U+0000 is content and is preserved.
+///
+/// Built with plain `return` statements (not `return match { ... Enum::V }`,
+/// which mistypes its result temp on the C emitter -- mathlib bug #12).
+pub fn from_utf8(bytes: &[byte]) -> FromUtf8Result {
+    let check: Utf8Check = validate_utf8(bytes);
+    let ok: bool = match check {
+        Utf8Check::Valid => { true },
+        Utf8Check::Invalid(_k) => { false },
+    };
+    let bad_at: usize = match check {
+        Utf8Check::Valid => { 0 },
+        Utf8Check::Invalid(k) => { k },
+    };
+    if ok != true {
+        return FromUtf8Result::Invalid(bad_at);
+    }
+    return FromUtf8Result::Text(string_from_bytes(bytes));
+}
+
+/// TEXT-015 (R0.2): a read-only `&[byte]` view of the complete UTF-8 storage
+/// of `value`, embedded U+0000 included. The view's backing store is
+/// arena-lived (SS-U16 `string_byte_view`), so it cannot dangle; `value` is
+/// immutable, so the view can never observe a later change.
+pub fn as_bytes(value: string) -> &[byte] {
+    return string_byte_view(value);
 }
 
 /// TEXT-012 (R0.2): accept exactly the RFC 3629 language -- shortest form

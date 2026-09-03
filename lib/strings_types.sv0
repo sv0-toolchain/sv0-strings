@@ -208,6 +208,23 @@ pub enum SliceResult {
     NotScalarBoundary(usize),
 }
 
+/* Result of `strings_text::from_utf8` (SPEC Section 11, TEXT-014; slice
+ * SS-125). Same GOV-004 / D-4 deviation as the carriers above: the SPEC
+ * signature is `-> Result<string, TextError>`.
+ *
+ *   Text(s)                        -- Ok: `bytes` copied into a new owned
+ *                                    `string` (embedded U+0000 preserved)
+ *   Invalid(valid_up_to)           -- Err: `bytes` is not RFC 3629 UTF-8;
+ *                                    `valid_up_to` is the byte length of the
+ *                                    longest well-formed prefix (as
+ *                                    `validate_utf8` / TEXT-013). No string
+ *                                    is allocated.
+ */
+pub enum FromUtf8Result {
+    Text(string),
+    Invalid(usize),
+}
+
 /* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
  * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
  * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a

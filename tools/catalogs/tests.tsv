@@ -16,3 +16,4 @@ T-UTF8-VALIDATE-001	test/property/utf8_validate.sv0	TEXT-012,TEXT-013,MODEL-004	
 T-TEXT-LEN-EQ-001	test/property/text_length_equality.sv0	TEXT-001,TEXT-002,TEXT-003,TEXT-004,TEXT-016	c,vm	safe	runtime	property	done
 T-TEXT-CONCAT-001	test/property/text_concat.sv0	TEXT-005,TEXT-006	c,vm	safe	runtime	property	done
 T-TEXT-SEARCH-SLICE-001	test/property/text_search_slice.sv0	TEXT-007,TEXT-008,TEXT-009,TEXT-010,TEXT-011	c,vm	safe	runtime	property	done
+T-TEXT-FROM-UTF8-001	test/property/text_from_utf8.sv0	TEXT-014,TEXT-015	c,vm	safe	runtime	property	done

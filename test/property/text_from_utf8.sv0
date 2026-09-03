@@ -1,0 +1,111 @@
+/* SS-125 (SPEC TEXT-014, TEXT-015, AC-006): strings_text::from_utf8 /
+ * as_bytes.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * from_utf8 validates RFC 3629 UTF-8 then COPIES into an owned `string`
+ * (mutating the source afterward must not change the result). as_bytes
+ * returns a read-only &[byte] view of the complete storage, embedded NUL
+ * included. Byte values are decimal; hex is in the comment.
+ */
+use strings_types::FromUtf8Result;
+use strings_text::from_utf8;
+use strings_text::as_bytes;
+use strings_text::equal;
+use strings_text::len_bytes;
+
+/* -1 = Text and byte-equals `want`; else the reported valid_up_to. */
+fn fu(b: &[byte], want: string) -> i32 {
+    return match from_utf8(b) {
+        FromUtf8Result::Text(s) => {
+            if equal(s, want) {
+                if len_bytes(s) == len_bytes(want) { 0 - 1 } else { 0 - 2 }
+            } else { 0 - 3 }
+        },
+        FromUtf8Result::Invalid(k) => { k as i32 },
+    };
+}
+
+/* true iff as_bytes(from_utf8(b)) reproduces exactly the bytes of `b`. */
+fn roundtrips(b: &[byte]) -> bool {
+    return match from_utf8(b) {
+        FromUtf8Result::Text(s) => {
+            let view: &[byte] = as_bytes(s);
+            let n: usize = slice_len(b);
+            if slice_len(view) != n { return false; }
+            let mut i: usize = 0;
+            while i < n
+                loop_invariant(i <= n)
+            {
+                if view[i] != b[i] { return false; }
+                i = i + 1;
+            }
+            true
+        },
+        FromUtf8Result::Invalid(_k) => { false },
+    };
+}
+
+fn main() -> i32 {
+    /* ---- from_utf8 valid (TEXT-014) ---- */
+    let ascii: [byte; 3] = [65, 66, 67];
+    if fu(&ascii[..], "ABC") != 0 - 1 { return 1; }
+
+    let g: [byte; 6] = [65, 195, 169, 230, 176, 180];   /* "Aé水" */
+    if fu(&g[..], "A\xc3\xa9\xe6\xb0\xb4") != 0 - 1 { return 2; }
+
+    let withnul: [byte; 4] = [97, 0, 98, 0];            /* a NUL b NUL */
+    if fu(&withnul[..], "a\0b\0") != 0 - 1 { return 3; }
+
+    let empty: [byte; 0] = [];
+    if fu(&empty[..], "") != 0 - 1 { return 4; }
+
+    /* ---- from_utf8 invalid (AC-006): exact valid_up_to ---- */
+    let overlong: [byte; 2] = [192, 128];              /* C0 80 */
+    if fu(&overlong[..], "") != 0 { return 10; }
+
+    let surrogate: [byte; 3] = [237, 160, 128];        /* ED A0 80 -> U+D800 */
+    if fu(&surrogate[..], "") != 0 { return 11; }
+
+    let truncated: [byte; 2] = [230, 176];             /* E6 B0, 1 cont short */
+    if fu(&truncated[..], "") != 0 { return 12; }
+
+    let bad_cont: [byte; 3] = [65, 195, 40];           /* 'A' then C3 '(' */
+    if fu(&bad_cont[..], "") != 1 { return 13; }       /* valid prefix "A" */
+
+    let over_10ffff: [byte; 4] = [244, 144, 128, 128]; /* F4 90 80 80 */
+    if fu(&over_10ffff[..], "") != 0 { return 14; }
+
+    let tail_bad: [byte; 5] = [97, 98, 99, 255, 100];  /* "abc" then FF */
+    if fu(&tail_bad[..], "") != 3 { return 15; }
+
+    /* ---- mutation-after-conversion: from_utf8 copied (TEXT-014) ---- */
+    let mut m: [byte; 3] = [120, 121, 122];            /* "xyz" */
+    let held: string = match from_utf8(&m[..]) {
+        FromUtf8Result::Text(s) => { s },
+        FromUtf8Result::Invalid(_k) => { "" },
+    };
+    if equal(held, "xyz") != true { return 20; }
+    m[0] = 90;                                          /* 'Z' */
+    m[2] = 65;                                          /* 'A' */
+    if equal(held, "xyz") != true { return 21; }        /* unchanged: it copied */
+    if len_bytes(held) != 3 { return 22; }
+
+    /* ---- as_bytes round-trip + embedded NUL (TEXT-015) ---- */
+    if roundtrips(&ascii[..]) != true { return 30; }
+    if roundtrips(&g[..]) != true { return 31; }
+    if roundtrips(&withnul[..]) != true { return 32; }
+    if roundtrips(&empty[..]) != true { return 33; }
+
+    /* as_bytes directly on a literal-sourced string */
+    let lit: string = "hi\0!";
+    let lv: &[byte] = as_bytes(lit);
+    if slice_len(lv) != 4 { return 40; }
+    if lv[0] != 104 { return 41; }                      /* 'h' */
+    if lv[2] != 0 { return 42; }                        /* embedded NUL preserved */
+    if lv[3] != 33 { return 43; }                       /* '!' */
+
+    let ev: &[byte] = as_bytes("");
+    if slice_len(ev) != 0 { return 44; }
+
+    return 0;
+}

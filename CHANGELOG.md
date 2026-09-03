@@ -31,13 +31,19 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   after a checked `len_bytes(a) + len_bytes(b)`; `ConcatResult` carrier), and
   `find_byte` / `find` / `rfind` / `starts_with` / `ends_with` / `slice_bytes`
   (SS-124, byte-level UTF-8 search + scalar-boundary-checked slicing;
-  `SliceResult` carrier). Whole-string semantics run on the length-bearing
+  `SliceResult` carrier), and `from_utf8` / `as_bytes` (SS-125, owned-copy
+  conversion + borrowed `&[byte]` view; `FromUtf8Result` carrier). This
+  completes the SPEC Section 11 text surface. Whole-string semantics run on
+  the length-bearing
   owned `string` (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed
   toolchain slice **SS-U15** (collision-gated per-module symbol mangling in
   the `--project` concat, so `strings_bytes` and `strings_text` can each
   export `equal` / `find` / `rfind` / `starts_with` / `ends_with`) plus its
-  sv0vm `idxInt` follow-up. Deviation **D-6**: text APIs take `string` by
-  value (sv0 has no surface `&string`). `scripts/test --backend=both` = 22/22.
+  sv0vm `idxInt` follow-up, and **SS-U16** (`string_from_bytes` /
+  `string_byte_view` compiler builtins) for `from_utf8` / `as_bytes` —
+  `as_bytes` keeps its exact SPEC `-> &[byte]` signature, no deviation.
+  Deviation **D-6**: text APIs take `string` by value (sv0 has no surface
+  `&string`). `scripts/test --backend=both` = 23/23.
 - **`strings_types`: library-local `Option<T>` / `Result<T, E>`** (SS-U06
   decision B). sv0c has no built-in `Option`/`Result`; a user-declared generic
   enum with scalar payloads monomorphizes on both backends. Structured error
