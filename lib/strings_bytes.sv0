@@ -8,7 +8,8 @@
 /// R0.1 progress:
 ///   SS-101  compare / equal                      -- IMPLEMENTED (this file)
 ///   SS-102  find / rfind / starts_with / ends_with -- IMPLEMENTED (this file)
-///   SS-103+ find_slice / span_* / copy / ...     -- unimplemented
+///   SS-103  find_slice                           -- IMPLEMENTED (this file)
+///   SS-104+ span_* / copy / ...                  -- unimplemented
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
@@ -120,4 +121,45 @@ pub fn ends_with(input: &[byte], suffix: &[byte]) -> bool {
         i = i + 1;
     }
     return true;
+}
+
+/// True iff `needle` (`nlen` bytes) matches `hay` starting at byte offset
+/// `off`. Assumes `off + nlen <= slice_len(hay)` (the caller enforces it).
+fn slice_match_at(hay: &[byte], off: usize, needle: &[byte], nlen: usize) -> bool {
+    let mut j: usize = 0;
+    while j < nlen
+        loop_invariant(j <= nlen)
+    {
+        if hay[off + j] != needle[j] { return false; }
+        j = j + 1;
+    }
+    return true;
+}
+
+/// BYTE-012 (R0.1): index of the first occurrence of `needle` in `haystack`,
+/// or `Option::None`. An empty needle returns `Option::Some(0)`; a needle
+/// longer than the haystack returns `Option::None`.
+///
+/// Algorithm: naive left-to-right scan. It tries each start offset
+/// `0 ..= haystack.len() - needle.len()` and compares byte-by-byte, stopping
+/// at the first mismatch. Time is O(n * m) worst case (n = haystack length,
+/// m = needle length) on adversarial repeated-prefix inputs, O(1) auxiliary
+/// storage. This is the F0 reference implementation; an R1 replacement with a
+/// linear-time algorithm is planned. See `docs/complexity.md` (PERF-002).
+pub fn find_slice(haystack: &[byte], needle: &[byte]) -> Option<usize> {
+    let hlen: usize = slice_len(haystack);
+    let nlen: usize = slice_len(needle);
+    if nlen == 0 { return Option::Some(0); }
+    if nlen > hlen { return Option::None; }
+
+    let last: usize = hlen - nlen;
+    let mut s: usize = 0;
+    while s <= last
+        loop_invariant(s <= last + 1)
+        loop_invariant(nlen <= hlen)
+    {
+        if slice_match_at(haystack, s, needle, nlen) { return Option::Some(s); }
+        s = s + 1;
+    }
+    return Option::None;
 }

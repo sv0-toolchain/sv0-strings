@@ -1,0 +1,75 @@
+/* SS-103 (SPEC BYTE-012, PERF-002): strings_bytes::find_slice.
+ * Exit 0 = pass; nonzero = first failing check.
+ *
+ * Table facts hand-derived, never from the impl (SPEC Appendix C.4). The
+ * last case is the adversarial repeated-prefix input the naive O(n*m) scan
+ * is worst on (documented in docs/complexity.md).
+ */
+use strings_types::Option;
+use strings_bytes::find_slice;
+
+fn opt_eq(o: Option<usize>, want: usize) -> bool {
+    return match o { Option::Some(v) => v == want, Option::None => false };
+}
+fn opt_none(o: Option<usize>) -> bool {
+    return match o { Option::Some(v) => false, Option::None => true };
+}
+
+fn main() -> i32 {
+    let hay: [byte; 6] = [9, 1, 2, 3, 1, 2];
+    let empty: [byte; 0] = [];
+
+    /* BYTE-012: empty needle -> Some(0), always */
+    if opt_eq(find_slice(&hay[..], &empty[..]), 0) != true { return 10; }
+    if opt_eq(find_slice(&empty[..], &empty[..]), 0) != true { return 11; }
+
+    /* first match, non-empty */
+    let n123: [byte; 3] = [1, 2, 3];
+    if opt_eq(find_slice(&hay[..], &n123[..]), 1) != true { return 20; }
+
+    /* match at the very end */
+    let n12: [byte; 2] = [1, 2];
+    if opt_eq(find_slice(&hay[..], &n12[..]), 1) != true { return 21; }   /* first, not the tail 1,2 */
+    let tail: [byte; 4] = [3, 1, 2, 3];
+    let n3end: [byte; 2] = [2, 3];
+    if opt_eq(find_slice(&tail[..], &n3end[..]), 2) != true { return 22; }
+
+    /* absent */
+    let n99: [byte; 2] = [9, 9];
+    if opt_none(find_slice(&hay[..], &n99[..])) != true { return 30; }
+
+    /* needle longer than haystack -> None */
+    let big: [byte; 8] = [1, 2, 3, 4, 5, 6, 7, 8];
+    if opt_none(find_slice(&hay[..], &big[..])) != true { return 31; }
+    /* non-empty needle, empty haystack -> None */
+    if opt_none(find_slice(&empty[..], &n12[..])) != true { return 32; }
+
+    /* needle == haystack -> Some(0) */
+    let self3: [byte; 3] = [1, 2, 3];
+    if opt_eq(find_slice(&n123[..], &self3[..]), 0) != true { return 33; }
+
+    /* overlapping candidate: first start wins */
+    let ones: [byte; 4] = [1, 1, 1, 1];
+    let n11: [byte; 2] = [1, 1];
+    if opt_eq(find_slice(&ones[..], &n11[..]), 0) != true { return 40; }
+
+    /* single-byte needle behaves like a byte search */
+    let n2: [byte; 1] = [2];
+    if opt_eq(find_slice(&hay[..], &n2[..]), 2) != true { return 41; }
+
+    /* embedded 0x00 is content, not a terminator */
+    let z: [byte; 5] = [5, 0, 0, 7, 0];
+    let nz: [byte; 2] = [0, 7];
+    if opt_eq(find_slice(&z[..], &nz[..]), 2) != true { return 42; }
+
+    /* adversarial repeated-prefix: needle = 0^k then 1, haystack = 0^m,
+       no match -- O(n*m) comparisons, returns None (PERF-002). */
+    let zeros: [byte; 12] = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+    let adv: [byte; 5] = [0, 0, 0, 0, 1];
+    if opt_none(find_slice(&zeros[..], &adv[..])) != true { return 50; }
+    /* ... but the same prefix WITH the trailing 1 present does match */
+    let zeros1: [byte; 8] = [0, 0, 0, 0, 0, 0, 0, 1];
+    if opt_eq(find_slice(&zeros1[..], &adv[..]), 3) != true { return 51; }
+
+    return 0;
+}
