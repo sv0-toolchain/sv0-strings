@@ -10,3 +10,4 @@ test/property/bytes_compare_equal.sv0	0	0	SS-101 BYTE-001/002; strings_bytes::co
 test/property/bytes_find_prefix.sv0	0	0	SS-102 BYTE-011/015; strings_bytes::find/rfind/starts_with/ends_with, C + VM
 test/property/bytes_find_slice.sv0	0	0	SS-103 BYTE-012/PERF-002; strings_bytes::find_slice (naive O(n*m) reference), C + VM
 test/property/bytes_span.sv0	0	0	SS-104 BYTE-013/014; strings_bytes::span_in/span_not_in (strspn/strcspn-derived), C + VM
+test/property/bytes_copy.sv0	0	0	SS-105 BYTE-003/004/005/006; strings_bytes::copy (CopyResult carrier) + copy_prefix, C + VM

@@ -1,0 +1,130 @@
+/* SS-105 (SPEC BYTE-003/004/005/006): strings_bytes::copy / copy_prefix.
+ * Exit 0 = pass; nonzero = first failing check.
+ *
+ * Checks: success returns src.len() and preserves the dst tail (BYTE-005);
+ * DestinationTooSmall leaves dst byte-for-byte unmodified (BYTE-003
+ * atomicity, sentinel); copy_prefix writes min(dst,src) and reports
+ * required = src.len(), truncated = dst.len() < src.len() (BYTE-006),
+ * including every zero-length combination.
+ */
+use strings_types::CopyReport;
+use strings_types::CopyResult;
+use strings_bytes::copy;
+use strings_bytes::copy_prefix;
+
+fn copied_n(r: CopyResult) -> i32 {
+    return match r {
+        CopyResult::Copied(n) => n,
+        CopyResult::DestinationTooSmall(need, have) => 0 - 1,
+    };
+}
+fn too_small(r: CopyResult, want_need: i32, want_have: i32) -> bool {
+    return match r {
+        CopyResult::Copied(n) => false,
+        CopyResult::DestinationTooSmall(need, have) => {
+            if need != want_need { false } else { have == want_have }
+        },
+    };
+}
+
+fn main() -> i32 {
+    /* ---- copy: success, dst longer than src -> tail preserved (BYTE-005) ---- */
+    let d1: [byte; 5] = [9, 9, 9, 9, 9];
+    let s1: [byte; 3] = [1, 2, 3];
+    let r1: CopyResult = copy(&mut d1[..], &s1[..]);
+    if copied_n(r1) != 3 { return 10; }
+    if d1[0] != 1 { return 11; }
+    if d1[1] != 2 { return 12; }
+    if d1[2] != 3 { return 13; }
+    if d1[3] != 9 { return 14; }        /* tail untouched */
+    if d1[4] != 9 { return 15; }
+
+    /* ---- copy: exact fit ---- */
+    let d2: [byte; 3] = [9, 9, 9];
+    let s2: [byte; 3] = [4, 5, 6];
+    if copied_n(copy(&mut d2[..], &s2[..])) != 3 { return 20; }
+    if d2[0] != 4 { return 21; }
+    if d2[2] != 6 { return 22; }
+
+    /* ---- copy: too small -> DestinationTooSmall, dst UNMODIFIED (BYTE-003) ---- */
+    let d3: [byte; 2] = [7, 8];
+    let s3: [byte; 4] = [1, 2, 3, 4];
+    let r3: CopyResult = copy(&mut d3[..], &s3[..]);
+    if too_small(r3, 4, 2) != true { return 30; }
+    if d3[0] != 7 { return 31; }        /* sentinel: untouched */
+    if d3[1] != 8 { return 32; }
+
+    /* ---- copy: empty src -> Copied(0), dst untouched ---- */
+    let d4: [byte; 2] = [5, 6];
+    let e0: [byte; 0] = [];
+    if copied_n(copy(&mut d4[..], &e0[..])) != 0 { return 40; }
+    if d4[0] != 5 { return 41; }
+
+    /* ---- copy: empty dst + non-empty src -> DestinationTooSmall(slen, 0) ---- */
+    let d5: [byte; 0] = [];
+    let s5: [byte; 2] = [1, 2];
+    if too_small(copy(&mut d5[..], &s5[..]), 2, 0) != true { return 42; }
+
+    /* ---- copy: embedded 0x00 is content ---- */
+    let d6: [byte; 4] = [9, 9, 9, 9];
+    let s6: [byte; 3] = [0, 0, 5];
+    if copied_n(copy(&mut d6[..], &s6[..])) != 3 { return 50; }
+    if d6[0] != 0 { return 51; }
+    if d6[1] != 0 { return 52; }
+    if d6[2] != 5 { return 53; }
+    if d6[3] != 9 { return 54; }
+
+    /* ---- copy_prefix: no truncation ---- */
+    let p1: [byte; 4] = [9, 9, 9, 9];
+    let ps1: [byte; 2] = [1, 2];
+    let cr1: CopyReport = copy_prefix(&mut p1[..], &ps1[..]);
+    if cr1.written != 2 { return 60; }
+    if cr1.required != 2 { return 61; }
+    if cr1.truncated { return 62; }
+    if p1[0] != 1 { return 63; }
+    if p1[1] != 2 { return 64; }
+    if p1[2] != 9 { return 65; }        /* tail untouched */
+
+    /* ---- copy_prefix: truncation ---- */
+    let p2: [byte; 2] = [9, 9];
+    let ps2: [byte; 4] = [1, 2, 3, 4];
+    let cr2: CopyReport = copy_prefix(&mut p2[..], &ps2[..]);
+    if cr2.written != 2 { return 70; }
+    if cr2.required != 4 { return 71; }
+    if cr2.truncated != true { return 72; }
+    if p2[0] != 1 { return 73; }
+    if p2[1] != 2 { return 74; }
+
+    /* ---- copy_prefix: exact ---- */
+    let p3: [byte; 3] = [9, 9, 9];
+    let ps3: [byte; 3] = [1, 2, 3];
+    let cr3: CopyReport = copy_prefix(&mut p3[..], &ps3[..]);
+    if cr3.written != 3 { return 80; }
+    if cr3.required != 3 { return 81; }
+    if cr3.truncated { return 82; }
+
+    /* ---- copy_prefix: zero-length combinations ---- */
+    let z0a: [byte; 0] = [];
+    let z0b: [byte; 0] = [];
+    let crz1: CopyReport = copy_prefix(&mut z0a[..], &z0b[..]);
+    if crz1.written != 0 { return 90; }
+    if crz1.required != 0 { return 91; }
+    if crz1.truncated { return 92; }
+
+    let z1: [byte; 2] = [3, 4];
+    let z0c: [byte; 0] = [];
+    let crz2: CopyReport = copy_prefix(&mut z1[..], &z0c[..]);   /* empty src */
+    if crz2.written != 0 { return 93; }
+    if crz2.required != 0 { return 94; }
+    if crz2.truncated { return 95; }
+    if z1[0] != 3 { return 96; }        /* dst untouched */
+
+    let z0d: [byte; 0] = [];
+    let z2: [byte; 2] = [1, 2];
+    let crz3: CopyReport = copy_prefix(&mut z0d[..], &z2[..]);   /* empty dst */
+    if crz3.written != 0 { return 97; }
+    if crz3.required != 2 { return 98; }
+    if crz3.truncated != true { return 99; }
+
+    return 0;
+}

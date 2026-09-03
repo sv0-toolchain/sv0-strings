@@ -10,7 +10,8 @@
 ///   SS-102  find / rfind / starts_with / ends_with -- IMPLEMENTED (this file)
 ///   SS-103  find_slice                           -- IMPLEMENTED (this file)
 ///   SS-104  span_in / span_not_in                 -- IMPLEMENTED (this file)
-///   SS-105+ copy / copy_prefix / move_within / .. -- unimplemented
+///   SS-105  copy / copy_prefix                     -- IMPLEMENTED (this file)
+///   SS-106+ move_within / fill / ...              -- unimplemented
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
@@ -18,6 +19,8 @@ module strings_bytes;
 
 use strings_types::Ordering;
 use strings_types::Option;
+use strings_types::CopyReport;
+use strings_types::CopyResult;
 
 /// BYTE-001 (F0): lexicographic unsigned-byte comparison. Returns
 /// `Ordering::Equal` iff both slices have the same length and every byte is
@@ -207,4 +210,57 @@ pub fn span_not_in(input: &[byte], rejected: &[byte]) -> usize {
         i = i + 1;
     }
     return n;
+}
+
+/// BYTE-003 / BYTE-005 (R0.1): copy the whole of `src` into the front of
+/// `dst`. On success returns `CopyResult::Copied(src.len())` and leaves
+/// `dst[src.len()..]` unchanged. If `dst` is shorter than `src`, `dst` is
+/// left entirely unmodified and `CopyResult::DestinationTooSmall(need, have)`
+/// is returned (failure atomicity).
+///
+/// Overlap (BYTE-004): `copy` is for non-overlapping ranges. `dst: &mut
+/// [byte]` and `src: &[byte]` viewing the same region is rejected by the
+/// borrow checker (E0323); views into different backing storage never
+/// overlap. Use `move_within` for an overlap-safe move. The write is
+/// element-wise assignment, never C `memcpy`.
+pub fn copy(dst: &mut [byte], src: &[byte]) -> CopyResult {
+    let slen: usize = slice_len(src);
+    let dlen: usize = slice_len(dst);
+    if dlen < slen {
+        return CopyResult::DestinationTooSmall(slen, dlen);
+    }
+    let mut i: usize = 0;
+    while i < slen
+        loop_invariant(i <= slen)
+        loop_invariant(slen <= dlen)
+    {
+        dst[i] = src[i];
+        i = i + 1;
+    }
+    return CopyResult::Copied(slen);
+}
+
+/// BYTE-006 (R0.1): copy `min(dst.len(), src.len())` bytes of `src` into the
+/// front of `dst` and report the outcome. `required` is the full `src.len()`;
+/// `truncated` is `dst.len() < src.len()`. `dst` beyond the written prefix is
+/// left unchanged. Never fails.
+pub fn copy_prefix(dst: &mut [byte], src: &[byte]) -> CopyReport {
+    let slen: usize = slice_len(src);
+    let dlen: usize = slice_len(dst);
+
+    let mut n: usize = slen;
+    if dlen < slen { n = dlen; }
+
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(n <= dlen)
+        loop_invariant(n <= slen)
+    {
+        dst[i] = src[i];
+        i = i + 1;
+    }
+
+    let trunc: bool = dlen < slen;
+    return CopyReport { written: n, required: slen, truncated: trunc };
 }

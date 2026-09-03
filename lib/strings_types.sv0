@@ -123,6 +123,24 @@ pub struct CopyReport {
     pub truncated: bool,
 }
 
+/* Result of `strings_bytes::copy` (SPEC Section 10, BYTE-003 / BYTE-005).
+ *
+ * DEVIATION (recorded per GOV-004; f0-deviations.md D-4 / slice SS-U06): the
+ * SPEC signature is `copy(...) -> Result<usize, BufferError>`. A structured
+ * `BufferError` in a generic `Result` Err slot does not lower on the C
+ * backend (deferred T0-2d monomorphization). `copy` therefore returns this
+ * concrete carrier with the error fields inline; the safe semantics are
+ * unchanged. Returns to `Result<usize, BufferError>` when sv0c predefines
+ * `Result` + lands T0-2d (M5 prerequisite).
+ *
+ *   Copied(n)                     -- Ok: n bytes written, n == src.len()
+ *   DestinationTooSmall(need, have) -- Err: dst was left unmodified
+ */
+pub enum CopyResult {
+    Copied(usize),
+    DestinationTooSmall(usize, usize),
+}
+
 /* Result of a `memccpy`-style stop-byte copy (SPEC Section 8.2, C23-005,
  * MODEL-017). `next_offset_present` + `next_offset` stand in for
  * `Option<usize>` until generic result payloads across modules are proven
