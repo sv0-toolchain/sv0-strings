@@ -15,3 +15,4 @@ test/property/bytes_fill.sv0	0	0	SS-107 BYTE-009; strings_bytes::fill (guard-byt
 test/property/bytes_move_within.sv0	0	0	SS-106 BYTE-007/008; strings_bytes::move_within (memmove semantics, 7-way overlap matrix vs temp-buffer model), C + VM
 test/property/ascii_case.sv0	0	0	SS-109 ASCII-001..006/008; strings_ascii (exhaustive 256-byte table), C + VM
 test/property/accel_selection.sv0	0	0	SS-110 UP-011/BACKEND-003/BL-037; pure/accelerated selection harness (pure-only at R0.1), C + VM
+test/property/utf8_validate.sv0	0	0	SS-121 TEXT-012/013/BL-039/040; strings_text::validate_utf8 (RFC 3629, exact valid_up_to; Utf8Check carrier), C + VM

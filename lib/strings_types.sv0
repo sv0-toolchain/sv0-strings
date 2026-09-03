@@ -141,6 +141,27 @@ pub enum CopyResult {
     DestinationTooSmall(usize, usize),
 }
 
+/* Result of `strings_text::validate_utf8` (SPEC Section 11, TEXT-012 /
+ * TEXT-013; slice SS-121). Same GOV-004 / D-4 deviation as `CopyResult` /
+ * `MoveResult`: the SPEC signature is `-> Result<(), TextError>`; a
+ * structured `TextError` in a generic `Result` Err slot does not lower on
+ * the C backend (deferred T0-2d monomorphization), so a concrete carrier is
+ * used. `validate_utf8` only ever reports an invalid encoding (never
+ * `NotScalarBoundary`, which belongs to `slice_bytes`), so two variants
+ * suffice.
+ *
+ *   Valid                          -- Ok: the whole slice is RFC 3629 UTF-8
+ *   Invalid(valid_up_to)           -- Err: byte length of the longest
+ *                                    complete, well-formed UTF-8 prefix; a
+ *                                    truncated final sequence reports the
+ *                                    offset at which that sequence begins
+ *                                    (TEXT-013)
+ */
+pub enum Utf8Check {
+    Valid,
+    Invalid(usize),
+}
+
 /* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
  * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
  * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a

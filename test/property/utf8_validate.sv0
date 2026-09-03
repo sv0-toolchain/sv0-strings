@@ -1,0 +1,197 @@
+/* SS-121 (SPEC TEXT-012, TEXT-013): strings_text::validate_utf8.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * RFC 3629 corpus, hand-derived. Every byte value is written in decimal
+ * (the sv0 lexer takes decimal integer literals); the hex is in the
+ * comment. `vut` returns -1 for Valid and the reported `valid_up_to`
+ * otherwise, so each assertion pins an exact offset.
+ *
+ * Categories exercised: 1/2/3/4-byte well-formed; stray continuation byte;
+ * overlong 2/3/4-byte; UTF-16 surrogate; above U+10FFFF; truncation at end
+ * of slice; and multi-scalar prefixes where valid_up_to > 0.
+ */
+use strings_text::validate_utf8;
+use strings_types::Utf8Check;
+
+fn vut(b: &[byte]) -> i32 {
+    return match validate_utf8(b) {
+        Utf8Check::Valid => { 0 - 1 },
+        Utf8Check::Invalid(k) => { k as i32 },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= valid ================= */
+
+    let empty: [byte; 0] = [];
+    if vut(&empty[..]) != 0 - 1 { return 1; }
+
+    let ascii: [byte; 3] = [65, 66, 67];              /* "ABC" */
+    if vut(&ascii[..]) != 0 - 1 { return 2; }
+
+    let nul: [byte; 3] = [65, 0, 66];                 /* embedded U+0000 */
+    if vut(&nul[..]) != 0 - 1 { return 3; }
+
+    let two: [byte; 2] = [195, 169];                  /* C3 A9  U+00E9 */
+    if vut(&two[..]) != 0 - 1 { return 4; }
+
+    let two_min: [byte; 2] = [194, 128];              /* C2 80  U+0080 */
+    if vut(&two_min[..]) != 0 - 1 { return 5; }
+
+    let two_max: [byte; 2] = [223, 191];              /* DF BF  U+07FF */
+    if vut(&two_max[..]) != 0 - 1 { return 6; }
+
+    let three: [byte; 3] = [230, 176, 180];           /* E6 B0 B4  U+6C34 */
+    if vut(&three[..]) != 0 - 1 { return 7; }
+
+    let three_min: [byte; 3] = [224, 160, 128];       /* E0 A0 80  U+0800 */
+    if vut(&three_min[..]) != 0 - 1 { return 8; }
+
+    let below_surrogate: [byte; 3] = [237, 159, 191]; /* ED 9F BF  U+D7FF */
+    if vut(&below_surrogate[..]) != 0 - 1 { return 9; }
+
+    let above_surrogate: [byte; 3] = [238, 128, 128]; /* EE 80 80  U+E000 */
+    if vut(&above_surrogate[..]) != 0 - 1 { return 10; }
+
+    let three_max: [byte; 3] = [239, 191, 191];       /* EF BF BF  U+FFFF */
+    if vut(&three_max[..]) != 0 - 1 { return 11; }
+
+    let four_min: [byte; 4] = [240, 144, 128, 128];   /* F0 90 80 80  U+10000 */
+    if vut(&four_min[..]) != 0 - 1 { return 12; }
+
+    let four: [byte; 4] = [240, 159, 152, 128];       /* F0 9F 98 80  U+1F600 */
+    if vut(&four[..]) != 0 - 1 { return 13; }
+
+    let four_max: [byte; 4] = [244, 143, 191, 191];   /* F4 8F BF BF  U+10FFFF */
+    if vut(&four_max[..]) != 0 - 1 { return 14; }
+
+    let mixed: [byte; 6] = [65, 195, 169, 230, 176, 180]; /* "Aé水" (SPEC 11.3) */
+    if vut(&mixed[..]) != 0 - 1 { return 15; }
+
+    /* ============ stray continuation byte ============ */
+
+    let stray0: [byte; 1] = [128];                    /* 80 */
+    if vut(&stray0[..]) != 0 { return 16; }
+
+    let stray1: [byte; 2] = [65, 128];               /* 41 80 */
+    if vut(&stray1[..]) != 1 { return 17; }
+
+    let stray_bf: [byte; 1] = [191];                  /* BF */
+    if vut(&stray_bf[..]) != 0 { return 18; }
+
+    /* ============ overlong 2-byte (C0 / C1) ============ */
+
+    let over2_a: [byte; 2] = [192, 128];              /* C0 80  overlong NUL */
+    if vut(&over2_a[..]) != 0 { return 19; }
+
+    let over2_b: [byte; 2] = [193, 191];              /* C1 BF */
+    if vut(&over2_b[..]) != 0 { return 20; }
+
+    /* ============ 2-byte truncation / bad continuation ============ */
+
+    let tr2_end: [byte; 1] = [195];                   /* C3, nothing after */
+    if vut(&tr2_end[..]) != 0 { return 21; }
+
+    let tr2_end_off: [byte; 2] = [65, 195];           /* 41 C3 */
+    if vut(&tr2_end_off[..]) != 1 { return 22; }
+
+    let tr2_badcont: [byte; 2] = [195, 65];           /* C3 41 */
+    if vut(&tr2_badcont[..]) != 0 { return 23; }
+
+    let tr2_leadlead: [byte; 3] = [195, 195, 169];    /* C3 C3 A9 */
+    if vut(&tr2_leadlead[..]) != 0 { return 24; }
+
+    /* ============ overlong 3-byte (E0 + 80..9F) ============ */
+
+    let over3_a: [byte; 3] = [224, 128, 128];         /* E0 80 80 */
+    if vut(&over3_a[..]) != 0 { return 25; }
+
+    let over3_b: [byte; 3] = [224, 159, 191];         /* E0 9F BF  -> U+07FF */
+    if vut(&over3_b[..]) != 0 { return 26; }
+
+    /* ============ UTF-16 surrogate (ED + A0..BF) ============ */
+
+    let surr_lo: [byte; 3] = [237, 160, 128];         /* ED A0 80  U+D800 */
+    if vut(&surr_lo[..]) != 0 { return 27; }
+
+    let surr_hi: [byte; 3] = [237, 191, 191];         /* ED BF BF  U+DFFF */
+    if vut(&surr_hi[..]) != 0 { return 28; }
+
+    /* ============ 3-byte truncation / bad continuation ============ */
+
+    let tr3_short: [byte; 2] = [230, 176];            /* E6 B0, one cont short */
+    if vut(&tr3_short[..]) != 0 { return 29; }
+
+    let tr3_lead: [byte; 1] = [230];                  /* E6 */
+    if vut(&tr3_lead[..]) != 0 { return 30; }
+
+    let tr3_off: [byte; 3] = [65, 230, 176];          /* 41 E6 B0 */
+    if vut(&tr3_off[..]) != 1 { return 31; }
+
+    let tr3_badc2: [byte; 3] = [230, 176, 65];        /* E6 B0 41 */
+    if vut(&tr3_badc2[..]) != 0 { return 32; }
+
+    let tr3_badc1: [byte; 3] = [230, 65, 180];        /* E6 41 B4 */
+    if vut(&tr3_badc1[..]) != 0 { return 33; }
+
+    /* ============ overlong 4-byte (F0 + 80..8F) ============ */
+
+    let over4_a: [byte; 4] = [240, 128, 128, 128];    /* F0 80 80 80 */
+    if vut(&over4_a[..]) != 0 { return 34; }
+
+    let over4_b: [byte; 4] = [240, 143, 191, 191];    /* F0 8F BF BF  -> U+FFFF */
+    if vut(&over4_b[..]) != 0 { return 35; }
+
+    /* ============ above U+10FFFF ============ */
+
+    let big_f4: [byte; 4] = [244, 144, 128, 128];     /* F4 90 80 80  U+110000 */
+    if vut(&big_f4[..]) != 0 { return 36; }
+
+    let big_f4_max: [byte; 4] = [244, 191, 191, 191]; /* F4 BF BF BF */
+    if vut(&big_f4_max[..]) != 0 { return 37; }
+
+    let big_f5: [byte; 4] = [245, 128, 128, 128];     /* F5 .. */
+    if vut(&big_f5[..]) != 0 { return 38; }
+
+    let ff: [byte; 1] = [255];                        /* FF */
+    if vut(&ff[..]) != 0 { return 39; }
+
+    let fe: [byte; 1] = [254];                        /* FE */
+    if vut(&fe[..]) != 0 { return 40; }
+
+    /* ============ 4-byte truncation / bad continuation ============ */
+
+    let tr4_3of4: [byte; 3] = [240, 159, 152];        /* F0 9F 98 */
+    if vut(&tr4_3of4[..]) != 0 { return 41; }
+
+    let tr4_2of4: [byte; 2] = [240, 159];             /* F0 9F */
+    if vut(&tr4_2of4[..]) != 0 { return 42; }
+
+    let tr4_lead: [byte; 1] = [240];                  /* F0 */
+    if vut(&tr4_lead[..]) != 0 { return 43; }
+
+    let tr4_off: [byte; 4] = [65, 240, 159, 152];     /* 41 F0 9F 98 */
+    if vut(&tr4_off[..]) != 1 { return 44; }
+
+    let tr4_badc3: [byte; 4] = [240, 159, 152, 65];   /* F0 9F 98 41 */
+    if vut(&tr4_badc3[..]) != 0 { return 45; }
+
+    /* ============ multi-scalar prefix, valid_up_to > 0 ============ */
+
+    let p2: [byte; 3] = [195, 169, 255];              /* é then FF */
+    if vut(&p2[..]) != 2 { return 46; }
+
+    let p3: [byte; 4] = [230, 176, 180, 128];         /* 水 then stray cont */
+    if vut(&p3[..]) != 3 { return 47; }
+
+    let p6: [byte; 8] = [65, 195, 169, 230, 176, 180, 192, 128]; /* Aé水 then C0 80 */
+    if vut(&p6[..]) != 6 { return 48; }
+
+    let p2b: [byte; 4] = [65, 66, 224, 128];          /* AB then E0-overlong lead */
+    if vut(&p2b[..]) != 2 { return 49; }
+
+    let p4: [byte; 7] = [244, 143, 191, 191, 237, 160, 128]; /* U+10FFFF then surrogate */
+    if vut(&p4[..]) != 4 { return 50; }
+
+    return 0;
+}
