@@ -16,3 +16,5 @@ test/property/bytes_move_within.sv0	0	0	SS-106 BYTE-007/008; strings_bytes::move
 test/property/ascii_case.sv0	0	0	SS-109 ASCII-001..006/008; strings_ascii (exhaustive 256-byte table), C + VM
 test/property/accel_selection.sv0	0	0	SS-110 UP-011/BACKEND-003/BL-037; pure/accelerated selection harness (pure-only at R0.1), C + VM
 test/property/utf8_validate.sv0	0	0	SS-121 TEXT-012/013/BL-039/040; strings_text::validate_utf8 (RFC 3629, exact valid_up_to; Utf8Check carrier), C + VM
+test/property/text_concat.sv0	0	0	SS-123 TEXT-005/006; strings_text::concat (ConcatResult carrier, checked_add pre-alloc), C + VM
+test/property/text_length_equality.sv0	0	0	SS-122 TEXT-001..004/016; strings_text::len_bytes/is_empty/equal/compare_bytes (owned string, no strlen/strcmp), C + VM

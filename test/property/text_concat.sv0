@@ -1,0 +1,75 @@
+/* SS-123 (SPEC TEXT-005, TEXT-006): strings_text::concat.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `concat` returns a newly owned `string` equal to `a` ++ `b` after a
+ * checked `len_bytes(a) + len_bytes(b)`. Content properties, embedded-NUL
+ * preservation across the seam, associativity, and inputs-unchanged are
+ * pinned here. The `usize`-overflow branch (`LengthOverflow`) delegates to
+ * `strings_checked::checked_add`, whose MAX-boundary behaviour is proven by
+ * `test/property/checked_overflow.sv0` (SS-006); it cannot be reached from
+ * two representable-length strings, so it is not exercised here.
+ */
+use strings_types::ConcatResult;
+use strings_text::concat;
+use strings_text::equal;
+use strings_text::len_bytes;
+
+/* the joined string, or "" on LengthOverflow (never expected here). */
+fn cat(a: string, b: string) -> string {
+    return match concat(a, b) {
+        ConcatResult::Joined(s) => { s },
+        ConcatResult::LengthOverflow => { "" },
+    };
+}
+
+/* concat(a,b) is Joined and byte-equals `want` (and has its exact length). */
+fn joined_eq(a: string, b: string, want: string) -> bool {
+    return match concat(a, b) {
+        ConcatResult::Joined(s) => {
+            if equal(s, want) { len_bytes(s) == len_bytes(want) } else { false }
+        },
+        ConcatResult::LengthOverflow => { false },
+    };
+}
+
+fn main() -> i32 {
+    /* ---- content (TEXT-005) ---- */
+    if joined_eq("ab", "cd", "abcd") != true { return 1; }
+    if joined_eq("", "x", "x") != true { return 2; }
+    if joined_eq("x", "", "x") != true { return 3; }
+    if joined_eq("", "", "") != true { return 4; }
+
+    /* ---- embedded U+0000 preserved on both sides of the seam ---- */
+    if joined_eq("a\0", "\0b", "a\0\0b") != true { return 5; }
+    if joined_eq("\xff\0", "\0\xff", "\xff\0\0\xff") != true { return 6; }
+
+    /* ---- multibyte seam: "Aé" ++ "水" ---- */
+    if joined_eq("A\xc3\xa9", "\xe6\xb0\xb4", "A\xc3\xa9\xe6\xb0\xb4") != true { return 7; }
+
+    /* ---- length is exactly the sum of the parts ---- */
+    let big: string = cat("0123456789", "abcdef");
+    if len_bytes(big) != 16 { return 8; }
+    if equal(big, "0123456789abcdef") != true { return 9; }
+
+    /* ---- associativity: (a++b)++c == a++(b++c) ---- */
+    let l: string = cat(cat("foo", "bar"), "baz");
+    let r: string = cat("foo", cat("bar", "baz"));
+    if equal(l, r) != true { return 10; }
+    if equal(l, "foobarbaz") != true { return 11; }
+
+    /* ---- identity: s ++ "" == "" ++ s == s ---- */
+    if equal(cat("payload", ""), "payload") != true { return 12; }
+    if equal(cat("", "payload"), "payload") != true { return 13; }
+
+    /* ---- inputs are left unchanged after a concat ---- */
+    let a: string = "hello";
+    let b: string = "world";
+    let joined: string = cat(a, b);
+    if equal(joined, "helloworld") != true { return 14; }
+    if len_bytes(a) != 5 { return 15; }
+    if equal(a, "hello") != true { return 16; }
+    if len_bytes(b) != 5 { return 17; }
+    if equal(b, "world") != true { return 18; }
+
+    return 0;
+}

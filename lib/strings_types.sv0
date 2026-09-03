@@ -162,6 +162,28 @@ pub enum Utf8Check {
     Invalid(usize),
 }
 
+/* Result of `strings_text::concat` (SPEC Section 11, TEXT-005 / TEXT-006;
+ * slice SS-123). Same GOV-004 / D-4 deviation as `CopyResult` / `MoveResult`
+ * / `Utf8Check`: the SPEC signature is `-> Result<string, BufferError>`; a
+ * structured `BufferError` in a generic `Result` Err slot does not lower on
+ * the C backend.
+ *
+ *   Joined(s)                      -- Ok: a newly owned `string` equal to
+ *                                    `a` followed by `b`
+ *   LengthOverflow                 -- Err: `len_bytes(a) + len_bytes(b)`
+ *                                    does not fit in `usize`; nothing was
+ *                                    allocated and both inputs are unchanged
+ *
+ * `BufferError::AllocationFailed` has no recoverable form here: the owned
+ * allocator fails closed with `sv0_panic` (SS-U02b/d, OQ-003), so a real
+ * allocation failure aborts rather than returning; the inputs are still
+ * never mutated.
+ */
+pub enum ConcatResult {
+    Joined(string),
+    LengthOverflow,
+}
+
 /* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
  * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
  * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a
