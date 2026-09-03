@@ -1,0 +1,64 @@
+/* SS-106 (SPEC BYTE-009): strings_bytes::fill. Exit 0 = pass; nonzero =
+ * first failing check.
+ *
+ * Guard-byte fixtures: `fill` a &mut view of the MIDDLE of a backing array
+ * and assert the bytes on either side of the view are untouched.
+ */
+use strings_bytes::fill;
+
+fn main() -> i32 {
+    /* guard bytes at [0] and [5]; fill a[1..5] */
+    let a: [byte; 6] = [11, 22, 33, 44, 55, 66];
+    let m: &mut [byte] = &mut a[1..5];
+    fill(m, 7);
+    if a[0] != 11 { return 10; }     /* leading guard */
+    if a[5] != 66 { return 11; }     /* trailing guard */
+    if a[1] != 7 { return 12; }
+    if a[2] != 7 { return 13; }
+    if a[3] != 7 { return 14; }
+    if a[4] != 7 { return 15; }
+
+    /* fill with 0x00 (embedded NUL is a value) */
+    let b: [byte; 3] = [9, 9, 9];
+    fill(&mut b[..], 0);
+    if b[0] != 0 { return 20; }
+    if b[1] != 0 { return 21; }
+    if b[2] != 0 { return 22; }
+
+    /* fill with 0xFF */
+    let c: [byte; 2] = [1, 2];
+    fill(&mut c[..], 255);
+    if c[0] != 255 { return 30; }
+    if c[1] != 255 { return 31; }
+
+    /* fill an empty view: no-op, no fault */
+    let d: [byte; 0] = [];
+    fill(&mut d[..], 5);
+
+    /* fill a whole array */
+    let e: [byte; 4] = [1, 2, 3, 4];
+    fill(&mut e[..], 42);
+    if e[0] != 42 { return 40; }
+    if e[1] != 42 { return 41; }
+    if e[2] != 42 { return 42; }
+    if e[3] != 42 { return 43; }
+
+    /* single-element view with a guard on each side */
+    let g: [byte; 3] = [1, 2, 3];
+    let mg: &mut [byte] = &mut g[1..2];
+    fill(mg, 99);
+    if g[0] != 1 { return 50; }      /* guard */
+    if g[1] != 99 { return 51; }
+    if g[2] != 3 { return 52; }      /* guard */
+
+    /* fill the tail only; head is the guard */
+    let h: [byte; 4] = [10, 20, 30, 40];
+    let mh: &mut [byte] = &mut h[2..4];
+    fill(mh, 0);
+    if h[0] != 10 { return 60; }
+    if h[1] != 20 { return 61; }
+    if h[2] != 0 { return 62; }
+    if h[3] != 0 { return 63; }
+
+    return 0;
+}

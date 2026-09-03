@@ -11,7 +11,8 @@
 ///   SS-103  find_slice                           -- IMPLEMENTED (this file)
 ///   SS-104  span_in / span_not_in                 -- IMPLEMENTED (this file)
 ///   SS-105  copy / copy_prefix                     -- IMPLEMENTED (this file)
-///   SS-106+ move_within / fill / ...              -- unimplemented
+///   SS-106  fill                                   -- IMPLEMENTED (this file)
+///   SS-107+ move_within / fill_explicit / ...     -- unimplemented
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
@@ -263,4 +264,21 @@ pub fn copy_prefix(dst: &mut [byte], src: &[byte]) -> CopyReport {
 
     let trunc: bool = dlen < slen;
     return CopyReport { written: n, required: slen, truncated: trunc };
+}
+
+/// BYTE-009 (R0.1): set every byte of `dst` to `value`, touching no adjacent
+/// storage. The write is bounded by `dst.len()` on every path (BYTE-017).
+///
+/// This is the plain fill. `fill_explicit` (BYTE-010) is the version with a
+/// backend-enforced guarantee that the stores are not elided; it is a
+/// separate function and MUST NOT be aliased to this one.
+pub fn fill(dst: &mut [byte], value: byte) -> () {
+    let n: usize = slice_len(dst);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        dst[i] = value;
+        i = i + 1;
+    }
 }
