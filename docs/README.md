@@ -18,6 +18,7 @@ in the `project-specs` repository:
 - `complexity.md` — per-operation worst-case time/space (PERF-001/002); the R1 `find_slice` replacement plan.
 - `fill-explicit-blocked.md` — SS-108 / BYTE-010: why `fill_explicit` stays Blocked (optimizer + VM-trace evidence) and the SS-U11 unblock path.
 - `f0-deviations.md` — the reviewed F0 deviation register (D-1..D-5).
+- `r0.1-gate-review.md` — SS-111 / SPEC §24.2: BYTE-* / ASCII-* / PERF-* requirement trace to green tests.
 
 ## Generated / authored later
 
