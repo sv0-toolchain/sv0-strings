@@ -1,0 +1,113 @@
+/* SS-106 (SPEC BYTE-007, BYTE-008): strings_bytes::move_within.
+ * Exit 0 = pass; nonzero = first failing check.
+ *
+ * Differential against the "snapshot the source, then write" model
+ * (SPEC Appendix C.4): every expected array is what a temp-buffer move
+ * would produce, computed by hand, not by the impl. Covers the 7-way
+ * overlap matrix (TEST-007) and the BYTE-008 range-rejection / atomicity
+ * cases.
+ */
+use strings_types::MoveResult;
+use strings_bytes::move_within;
+
+fn moved(r: MoveResult) -> bool {
+    return match r {
+        MoveResult::Moved => true,
+        MoveResult::RangeOutOfBounds(st, ln, av) => false,
+    };
+}
+fn oob(r: MoveResult, want_start: i32, want_len: i32, want_avail: i32) -> bool {
+    return match r {
+        MoveResult::Moved => false,
+        MoveResult::RangeOutOfBounds(st, ln, av) => {
+            if st != want_start { false }
+            else { if ln != want_len { false } else { av == want_avail } }
+        },
+    };
+}
+
+fn main() -> i32 {
+    /* ---- 1. disjoint: len=3, src=0 -> dst=5 in an 8-byte buf ---- */
+    let a: [byte; 8] = [10, 11, 12, 13, 14, 15, 16, 17];
+    if moved(move_within(&mut a[..], 0, 3, 5)) != true { return 10; }
+    /* model: src snapshot [10,11,12] written at [5,6,7] */
+    if a[0] != 10 { return 11; } if a[4] != 14 { return 12; }
+    if a[5] != 10 { return 13; } if a[6] != 11 { return 14; } if a[7] != 12 { return 15; }
+
+    /* ---- 2. identical: src == dst -> no change ---- */
+    let b: [byte; 4] = [1, 2, 3, 4];
+    if moved(move_within(&mut b[..], 1, 2, 1)) != true { return 20; }
+    if b[0] != 1 { return 21; } if b[1] != 2 { return 22; }
+    if b[2] != 3 { return 23; } if b[3] != 4 { return 24; }
+
+    /* ---- 3. adjacent (dst = src + len): len=2, src=0 -> dst=2 ---- */
+    let c: [byte; 5] = [1, 2, 3, 4, 5];
+    if moved(move_within(&mut c[..], 0, 2, 2)) != true { return 30; }
+    /* model: [1,2] written at [2,3]; [0,1] and [4] untouched */
+    if c[0] != 1 { return 31; } if c[1] != 2 { return 32; }
+    if c[2] != 1 { return 33; } if c[3] != 2 { return 34; } if c[4] != 5 { return 35; }
+
+    /* ---- 4. left-overlap (dst < src, partial): len=4, src=2 -> dst=0 ---- */
+    let d: [byte; 6] = [1, 2, 3, 4, 5, 6];
+    if moved(move_within(&mut d[..], 2, 4, 0)) != true { return 40; }
+    /* snapshot src [3,4,5,6] -> written at [0..4]; [4],[5] keep 5,6 */
+    if d[0] != 3 { return 41; } if d[1] != 4 { return 42; }
+    if d[2] != 5 { return 43; } if d[3] != 6 { return 44; }
+    if d[4] != 5 { return 45; } if d[5] != 6 { return 46; }
+
+    /* ---- 5. right-overlap (dst > src, partial): len=4, src=0 -> dst=2 ---- */
+    let e: [byte; 6] = [1, 2, 3, 4, 5, 6];
+    if moved(move_within(&mut e[..], 0, 4, 2)) != true { return 50; }
+    /* snapshot src [1,2,3,4] -> written at [2..6]; [0],[1] keep 1,2 */
+    if e[0] != 1 { return 51; } if e[1] != 2 { return 52; }
+    if e[2] != 1 { return 53; } if e[3] != 2 { return 54; }
+    if e[4] != 3 { return 55; } if e[5] != 4 { return 56; }
+
+    /* ---- 6. contained/full overlap minus one (dst = src + 1): len=4, src=0 -> dst=1 ---- */
+    let f: [byte; 6] = [1, 2, 3, 4, 5, 6];
+    if moved(move_within(&mut f[..], 0, 4, 1)) != true { return 60; }
+    /* snapshot src [1,2,3,4] -> written at [1..5]; [0] keeps 1, [5] keeps 6 */
+    if f[0] != 1 { return 61; } if f[1] != 1 { return 62; }
+    if f[2] != 2 { return 63; } if f[3] != 3 { return 64; }
+    if f[4] != 4 { return 65; } if f[5] != 6 { return 66; }
+
+    /* ---- 7. containing / full overlap minus one the other way (dst = src - 1): len=4, src=1 -> dst=0 ---- */
+    let g: [byte; 6] = [1, 2, 3, 4, 5, 6];
+    if moved(move_within(&mut g[..], 1, 4, 0)) != true { return 70; }
+    /* snapshot src [2,3,4,5] -> written at [0..4]; [4] keeps 5, [5] keeps 6 */
+    if g[0] != 2 { return 71; } if g[1] != 3 { return 72; }
+    if g[2] != 4 { return 73; } if g[3] != 5 { return 74; }
+    if g[4] != 5 { return 75; } if g[5] != 6 { return 76; }
+
+    /* ---- embedded 0x00 moves like any byte ---- */
+    let z: [byte; 5] = [9, 0, 0, 7, 9];
+    if moved(move_within(&mut z[..], 1, 3, 0)) != true { return 80; }
+    if z[0] != 0 { return 81; } if z[1] != 0 { return 82; } if z[2] != 7 { return 83; }
+    if z[3] != 7 { return 84; } if z[4] != 9 { return 85; }
+
+    /* ---- len == 0: Moved, no change (any in-range offsets) ---- */
+    let h: [byte; 3] = [1, 2, 3];
+    if moved(move_within(&mut h[..], 3, 0, 0)) != true { return 90; }
+    if h[0] != 1 { return 91; } if h[2] != 3 { return 92; }
+
+    /* ---- BYTE-008: src range past end -> RangeOutOfBounds, buf UNMODIFIED ---- */
+    let k: [byte; 4] = [1, 2, 3, 4];
+    if oob(move_within(&mut k[..], 2, 3, 0), 2, 3, 4) != true { return 100; }
+    if k[0] != 1 { return 101; } if k[1] != 2 { return 102; }
+    if k[2] != 3 { return 103; } if k[3] != 4 { return 104; }   /* atomicity */
+
+    /* ---- BYTE-008: dst range past end ---- */
+    let l: [byte; 4] = [5, 6, 7, 8];
+    if oob(move_within(&mut l[..], 0, 3, 2), 2, 3, 4) != true { return 110; }
+    if l[0] != 5 { return 111; } if l[3] != 8 { return 112; }
+
+    /* ---- BYTE-008: src_start itself past end ---- */
+    let mm: [byte; 3] = [1, 2, 3];
+    if oob(move_within(&mut mm[..], 5, 0, 0), 5, 0, 3) != true { return 120; }
+
+    /* ---- BYTE-008: len alone too big ---- */
+    let p: [byte; 3] = [1, 2, 3];
+    if oob(move_within(&mut p[..], 0, 9, 0), 0, 9, 3) != true { return 130; }
+
+    return 0;
+}

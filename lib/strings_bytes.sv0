@@ -11,8 +11,9 @@
 ///   SS-103  find_slice                           -- IMPLEMENTED (this file)
 ///   SS-104  span_in / span_not_in                 -- IMPLEMENTED (this file)
 ///   SS-105  copy / copy_prefix                     -- IMPLEMENTED (this file)
-///   SS-106  fill                                   -- IMPLEMENTED (this file)
-///   SS-107+ move_within / fill_explicit / ...     -- unimplemented
+///   SS-107  fill                                   -- IMPLEMENTED (this file)
+///   SS-106  move_within                            -- IMPLEMENTED (this file)
+///   SS-108+ fill_explicit / ...                    -- unimplemented (SS-108 Blocked)
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
@@ -22,6 +23,7 @@ use strings_types::Ordering;
 use strings_types::Option;
 use strings_types::CopyReport;
 use strings_types::CopyResult;
+use strings_types::MoveResult;
 
 /// BYTE-001 (F0): lexicographic unsigned-byte comparison. Returns
 /// `Ordering::Equal` iff both slices have the same length and every byte is
@@ -281,4 +283,55 @@ pub fn fill(dst: &mut [byte], value: byte) -> () {
         dst[i] = value;
         i = i + 1;
     }
+}
+
+/// BYTE-007 / BYTE-008 (R0.1): move `len` bytes within `buf` from
+/// `[src_start, src_start + len)` to `[dst_start, dst_start + len)`. The
+/// result is *as if* the source bytes were first copied to a temporary
+/// non-overlapping buffer: every disjoint / adjacent / left- / right- /
+/// full-overlap arrangement yields the same bytes a snapshot-then-write
+/// would (`memmove` semantics), with no allocation.
+///
+/// BYTE-008: if either range leaves `buf`, `buf` is left entirely unmodified
+/// and `MoveResult::RangeOutOfBounds(start, len, buf.len())` is returned
+/// (the checks are done as `start > n` / `len > n - start` so `start + len`
+/// never overflows).
+pub fn move_within(buf: &mut [byte], src_start: usize, len: usize,
+                   dst_start: usize) -> MoveResult {
+    let n: usize = slice_len(buf);
+
+    if src_start > n { return MoveResult::RangeOutOfBounds(src_start, len, n); }
+    if len > n - src_start { return MoveResult::RangeOutOfBounds(src_start, len, n); }
+    if dst_start > n { return MoveResult::RangeOutOfBounds(dst_start, len, n); }
+    if len > n - dst_start { return MoveResult::RangeOutOfBounds(dst_start, len, n); }
+
+    if len == 0 { return MoveResult::Moved; }
+    if src_start == dst_start { return MoveResult::Moved; }
+
+    if dst_start < src_start {
+        /* dst is behind src: a forward copy never overwrites an unread src
+           byte (dst_start + i < src_start + i for every i). */
+        let mut i: usize = 0;
+        while i < len
+            loop_invariant(i <= len)
+            loop_invariant(src_start + len <= n)
+            loop_invariant(dst_start + len <= n)
+        {
+            buf[dst_start + i] = buf[src_start + i];
+            i = i + 1;
+        }
+        return MoveResult::Moved;
+    }
+
+    /* dst is ahead of src: copy from the high end down. */
+    let mut j: usize = len;
+    while j > 0
+        loop_invariant(j <= len)
+        loop_invariant(src_start + len <= n)
+        loop_invariant(dst_start + len <= n)
+    {
+        j = j - 1;
+        buf[dst_start + j] = buf[src_start + j];
+    }
+    return MoveResult::Moved;
 }

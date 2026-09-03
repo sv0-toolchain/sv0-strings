@@ -141,6 +141,22 @@ pub enum CopyResult {
     DestinationTooSmall(usize, usize),
 }
 
+/* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
+ * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
+ * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a
+ * generic `Result` Err slot does not lower on the C backend, so a concrete
+ * carrier is used.
+ *
+ *   Moved                          -- Ok: the move completed
+ *   RangeOutOfBounds(start, len, available)
+ *                                  -- Err: a src or dst range left `buf`;
+ *                                     `buf` was not modified
+ */
+pub enum MoveResult {
+    Moved,
+    RangeOutOfBounds(usize, usize, usize),
+}
+
 /* Result of a `memccpy`-style stop-byte copy (SPEC Section 8.2, C23-005,
  * MODEL-017). `next_offset_present` + `next_offset` stand in for
  * `Option<usize>` until generic result payloads across modules are proven
