@@ -1,0 +1,101 @@
+/* SS-122 (SPEC TEXT-001..004, TEXT-016): strings_text::len_bytes /
+ * is_empty / equal / compare_bytes.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Whole-string semantics over the length-bearing owned `string`
+ * (SS-U02b/c): embedded U+0000 is content, comparison is unsigned-byte
+ * lexicographic, and nothing here depends on a NUL terminator. Expected
+ * orderings are hand-derived, never read from the impl (SPEC Appendix C.4).
+ * Every string is written with explicit `\0` / `\xNN` escapes so the byte
+ * content is unambiguous.
+ */
+use strings_types::Ordering;
+use strings_text::len_bytes;
+use strings_text::is_empty;
+use strings_text::equal;
+use strings_text::compare_bytes;
+
+fn is_eq(o: Ordering) -> bool {
+    return match o { Ordering::Equal => true, Ordering::Less => false, Ordering::Greater => false };
+}
+fn is_lt(o: Ordering) -> bool {
+    return match o { Ordering::Less => true, Ordering::Equal => false, Ordering::Greater => false };
+}
+fn is_gt(o: Ordering) -> bool {
+    return match o { Ordering::Greater => true, Ordering::Equal => false, Ordering::Less => false };
+}
+
+/* want: 0 = Equal, 1 = Less, 2 = Greater. Also asserts the TEXT-003 property
+ * equal(a,b) == (compare_bytes(a,b) == Equal). Returns `base`(+k) on failure. */
+fn chk(a: string, b: string, want: i32, base: i32) -> i32 {
+    let o: Ordering = compare_bytes(a, b);
+    if want == 0 { if is_eq(o) != true { return base; } }
+    if want == 1 { if is_lt(o) != true { return base + 1; } }
+    if want == 2 { if is_gt(o) != true { return base + 2; } }
+    let e: bool = equal(a, b);
+    if want == 0 { if e != true { return base + 3; } }
+    if want != 0 { if e != false { return base + 4; } }
+    return 0;
+}
+
+fn main() -> i32 {
+    /* ---------------- len_bytes (TEXT-001) ---------------- */
+    if len_bytes("") != 0 { return 1; }
+    if len_bytes("abc") != 3 { return 2; }
+    if len_bytes("a\0b") != 3 { return 3; }               /* embedded U+0000 */
+    if len_bytes("\0\0\0") != 3 { return 4; }
+    if len_bytes("\xc3\xa9") != 2 { return 5; }           /* é = C3 A9 */
+    if len_bytes("A\xc3\xa9\xe6\xb0\xb4") != 6 { return 6; } /* "Aé水" */
+    if len_bytes("\xff") != 1 { return 7; }
+
+    /* ---------------- is_empty (TEXT-002) ---------------- */
+    if is_empty("") != true { return 10; }
+    if is_empty("a") != false { return 11; }
+    if is_empty("\0") != false { return 12; }             /* one NUL byte, len 1 */
+    /* property: is_empty(s) == (len_bytes(s) == 0) */
+    if is_empty("A\xc3\xa9\xe6\xb0\xb4") != (len_bytes("A\xc3\xa9\xe6\xb0\xb4") == 0) { return 13; }
+    if is_empty("") != (len_bytes("") == 0) { return 14; }
+
+    /* ---------------- equal (TEXT-003) ---------------- */
+    if equal("a\0b", "a\0b") != true { return 20; }
+    if equal("a\0b", "a\0c") != false { return 21; }      /* differ AFTER the NUL */
+    if equal("a\0X", "a") != false { return 22; }         /* length 3 vs 1 */
+    if equal("", "") != true { return 23; }
+    if equal("abc", "abd") != false { return 24; }
+    if equal("abc", "abc") != true { return 25; }
+    if equal("abc", "ab") != false { return 26; }         /* prefix, not equal */
+    if equal("\xff", "\x7f") != false { return 27; }
+
+    /* ---------------- compare_bytes (TEXT-004) ---------------- */
+    let r: i32 = 0;
+
+    r = chk("", "", 0, 30);            if r != 0 { return r; }
+    r = chk("a", "a", 0, 35);         if r != 0 { return r; }
+    r = chk("abc", "abc", 0, 40);    if r != 0 { return r; }
+
+    r = chk("a", "b", 1, 45);        if r != 0 { return r; }   /* 0x61 < 0x62 */
+    r = chk("b", "a", 2, 50);        if r != 0 { return r; }
+
+    r = chk("a", "ab", 1, 55);      if r != 0 { return r; }   /* proper prefix -> Less */
+    r = chk("ab", "a", 2, 60);      if r != 0 { return r; }
+    r = chk("", "a", 1, 65);        if r != 0 { return r; }
+    r = chk("a", "", 2, 70);        if r != 0 { return r; }
+
+    /* embedded NUL is content: bytes after it still decide the order */
+    r = chk("a\0b", "a\0c", 1, 75);  if r != 0 { return r; }
+    r = chk("a\0c", "a\0b", 2, 80);  if r != 0 { return r; }
+    r = chk("a\0b", "a\0b", 0, 85);  if r != 0 { return r; }
+    r = chk("a\0", "a\0b", 1, 90);   if r != 0 { return r; }   /* prefix through the NUL */
+
+    /* unsigned-byte, not signed char: 0xFF = 255, 0x80 = 128 */
+    r = chk("\xff", "\x01", 2, 95);   if r != 0 { return r; }
+    r = chk("\x01", "\xff", 1, 100);  if r != 0 { return r; }
+    r = chk("\x80", "\x7f", 2, 105);  if r != 0 { return r; }  /* 128 > 127 boundary */
+    r = chk("\x7f", "\x80", 1, 110);  if r != 0 { return r; }
+
+    /* multibyte: "Aé" vs "Aê" differ only in the trailing byte A9 < AA */
+    r = chk("A\xc3\xa9", "A\xc3\xaa", 1, 115); if r != 0 { return r; }
+    r = chk("A\xc3\xaa", "A\xc3\xa9", 2, 120); if r != 0 { return r; }
+
+    return 0;
+}

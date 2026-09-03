@@ -25,6 +25,15 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 - **R0.1 byte + ASCII core implemented** (slices SS-101..SS-110). `strings_bytes`: `compare` / `equal` / `find` / `rfind` / `starts_with` / `ends_with` / `find_slice` / `span_in` / `span_not_in` / `copy` / `copy_prefix` / `move_within` / `fill`. `strings_ascii`: `to_lower` / `to_upper` / `equal_ignore_case` / `compare_ignore_case` / `compare_prefix_ignore_case`. `strings_types`: library-local `Option` / `Result`, `CopyResult` / `MoveResult` carriers, and the pure/accelerated selection harness (`accel_version` / `accel_available`). Every op runs on the native C and native VM paths; `scripts/test --backend=both` = 18/18.
 - **`fill_explicit` (BYTE-010) is Blocked** with recorded evidence (`docs/fill-explicit-blocked.md`); it is not exported and a compile-fail probe pins that.
 - **`docs/complexity.md`** (PERF-001 / PERF-002) and **`docs/r0.1-gate-review.md`** (SS-111 / SPEC §24.2 requirement trace) added.
+- **R0.2 opened.** `strings_text`: `validate_utf8` (SS-121, RFC 3629, exact
+  `valid_up_to`; `Utf8Check` carrier) and `len_bytes` / `is_empty` / `equal` /
+  `compare_bytes` (SS-122). Whole-string semantics run on the length-bearing
+  owned `string` (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed
+  toolchain slice **SS-U15** (collision-gated per-module symbol mangling in the
+  `--project` concat, so `strings_bytes::equal` and `strings_text::equal`
+  co-compile) plus its sv0vm `idxInt` follow-up. Deviation **D-6**: text APIs
+  take `string` by value (sv0 has no surface `&string`). `scripts/test
+  --backend=both` = 20/20.
 - **`strings_types`: library-local `Option<T>` / `Result<T, E>`** (SS-U06
   decision B). sv0c has no built-in `Option`/`Result`; a user-declared generic
   enum with scalar payloads monomorphizes on both backends. Structured error

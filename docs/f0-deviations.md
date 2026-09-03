@@ -134,6 +134,29 @@ overload-vs-new-name.
 
 ---
 
+## D-6 — text APIs take `string` by value, not `&string` (UP-001 area, SS-122)
+
+**SPEC.** Section 11 signatures are `len_bytes(value: &string)`,
+`equal(a: &string, b: &string)`, `compare_bytes(a: &string, b: &string)`,
+`concat(a: &string, b: &string)`, `as_bytes(value: &string) -> &[byte] borrows(value)`,
+etc.
+
+**What the toolchain does.** sv0 has no surface `&string` reference type. An
+owned `string` is already an indirection handle (`sv0_str` id after SS-U02b),
+so it is passed by value at near-zero cost; there is nothing to borrow at the
+language level. `&[byte]` slice borrows (SS-U03) are a real reference type and
+are unaffected.
+
+**What sv0-strings does.** `strings_text::len_bytes` / `is_empty` / `equal` /
+`compare_bytes` (SS-122), and the later text functions, take `string` by
+value. The callee never mutates or frees the handle, so the observable
+contract — no aliasing hazard, inputs unchanged — is identical to the `&string`
+form. `as_bytes` keeps a real `&[byte]` borrow.
+
+**Schedule.** Revisit if sv0 gains a first-class `&string` (or a move/borrow
+distinction for owned values). Not gate-blocking: no `BYTE-*` / `TEXT-*`
+result depends on the parameter mode.
+
 ## SPEC-deferred (not decisions — the SPEC's own ladder)
 
 - **SS-U11** (`fill_explicit` non-elision primitive, UP-014) — SPEC-deferred to

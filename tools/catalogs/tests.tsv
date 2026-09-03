@@ -13,3 +13,4 @@ T-COMPILEFAIL-NESTED-MODULE-001	test/compile_fail/nested_module.sv0	UP-019,ARCH-
 T-DOC-FENCE-LINT-001	tools/check_doc_fences.py	MODEL-016,GOV-011	c	safe		tool	done
 T-CI-WORKFLOW-001	.github/workflows/ci.yml	TEST-006,TEST-014,TEST-018	c,vm	safe	runtime	ci	wip
 T-UTF8-VALIDATE-001	test/property/utf8_validate.sv0	TEXT-012,TEXT-013,MODEL-004	c,vm	safe	runtime	property	done
+T-TEXT-LEN-EQ-001	test/property/text_length_equality.sv0	TEXT-001,TEXT-002,TEXT-003,TEXT-004,TEXT-016	c,vm	safe	runtime	property	done

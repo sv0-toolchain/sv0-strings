@@ -11,17 +11,78 @@
 ///           IMPLEMENTED (this file). Returns the `strings_types::Utf8Check`
 ///           concrete carrier (D-4 deviation; SPEC writes
 ///           `Result<(), TextError>`).
+///   SS-122  len_bytes / is_empty / equal / compare_bytes --
+///           IMPLEMENTED (this file). Whole-string semantics over the
+///           length-bearing owned `string` (SS-U02b/c); no `strlen` /
+///           `strcmp` (TEXT-016).
 ///
-/// The remaining Section 11 surface (len_bytes / equal / compare_bytes /
-/// concat / find* / slice_bytes / from_utf8 / as_bytes) is unimplemented;
-/// it needs the length-bearing owned `string` end to end (SS-U02*, landed)
-/// plus the R0.2 text slices SS-122..SS-125.
+/// The remaining Section 11 surface (concat / find* / slice_bytes /
+/// from_utf8 / as_bytes) is unimplemented -- R0.2 slices SS-123..SS-125.
+///
+/// DEVIATION (recorded per GOV-004; f0-deviations.md D-6): the SPEC signatures
+/// take `&string` (and `as_bytes` returns `&[byte] borrows(value)`). sv0 has
+/// no surface `&string` reference type -- `string` is already an indirection
+/// handle (`sv0_str` id; SS-U02b) -- so these functions take `string` by
+/// value. Ownership is unchanged: the callee neither mutates nor frees the
+/// handle. `&[byte]` borrows (SS-U03) are unaffected and keep the reference
+/// form.
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
 module strings_text;
 
+use strings_types::Ordering;
 use strings_types::Utf8Check;
+
+/// TEXT-001 (F0): number of UTF-8 code units. Embedded U+0000 counts as one
+/// byte. Reads the length field of the owned `string` (SS-U02b) -- never
+/// `strlen`.
+pub fn len_bytes(value: string) -> usize {
+    let n: usize = string_len(value);
+    return n;
+}
+
+/// TEXT-002 (F0): `is_empty(s)` is exactly `len_bytes(s) == 0`.
+pub fn is_empty(value: string) -> bool {
+    return string_len(value) == 0;
+}
+
+/// TEXT-003 (F0): compare the complete UTF-8 byte sequences, including every
+/// byte after an embedded U+0000. `string_eq` is length + `memcmp` on both
+/// backends (SS-U02b/c) -- never `strcmp`.
+pub fn equal(a: string, b: string) -> bool {
+    return string_eq(a, b);
+}
+
+/// TEXT-004 (R0.2): deterministic unsigned-byte lexicographic ordering, no
+/// ambient locale. `Equal` iff both lengths and every byte match; otherwise
+/// the first differing byte (as an unsigned 0..255 value from
+/// `string_char_at`) decides, and a proper prefix is `Less` than the longer
+/// string. Not constant-time.
+pub fn compare_bytes(a: string, b: string) -> Ordering {
+    let alen: usize = string_len(a);
+    let blen: usize = string_len(b);
+
+    let mut n: usize = alen;
+    if blen < alen { n = blen; }
+
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(n <= alen)
+        loop_invariant(n <= blen)
+    {
+        let av: usize = string_char_at(a, i);
+        let bv: usize = string_char_at(b, i);
+        if av < bv { return Ordering::Less; }
+        if av > bv { return Ordering::Greater; }
+        i = i + 1;
+    }
+
+    if alen < blen { return Ordering::Less; }
+    if alen > blen { return Ordering::Greater; }
+    return Ordering::Equal;
+}
 
 /// TEXT-012 (R0.2): accept exactly the RFC 3629 language -- shortest form
 /// only, no surrogate values (U+D800..U+DFFF), nothing above U+10FFFF.
