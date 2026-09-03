@@ -1,0 +1,62 @@
+/* SS-104 (SPEC BYTE-013, BYTE-014): strings_bytes::span_in / span_not_in.
+ * Exit 0 = pass; nonzero = first failing check.
+ *
+ * strspn / strcspn-derived table facts, hand-derived (SPEC Appendix C.4).
+ * Includes the empty-set edge cases and a first-byte complementarity
+ * property.
+ */
+use strings_bytes::span_in;
+use strings_bytes::span_not_in;
+
+fn main() -> i32 {
+    let v: [byte; 4] = [1, 2, 3, 4];
+    let empty: [byte; 0] = [];
+
+    /* ---- span_in (strspn), BYTE-013 ---- */
+    let s12: [byte; 2] = [1, 2];
+    if span_in(&v[..], &s12[..]) != 2 { return 10; }        /* 1,2 accepted; 3 stops */
+    let s1: [byte; 1] = [1];
+    let ones: [byte; 3] = [1, 1, 1];
+    if span_in(&ones[..], &s1[..]) != 3 { return 11; }      /* whole input */
+    let s45: [byte; 2] = [4, 5];
+    if span_in(&v[..], &s45[..]) != 0 { return 12; }        /* first byte not in set */
+    if span_in(&empty[..], &s12[..]) != 0 { return 13; }    /* empty input */
+    if span_in(&v[..], &empty[..]) != 0 { return 14; }      /* empty accepted -> 0 (BYTE-013) */
+    let s4321: [byte; 4] = [4, 3, 2, 1];
+    if span_in(&v[..], &s4321[..]) != 4 { return 15; }      /* set order irrelevant */
+    let z2: [byte; 3] = [0, 0, 1];
+    let s0: [byte; 1] = [0];
+    if span_in(&z2[..], &s0[..]) != 2 { return 16; }        /* embedded 0x00 as a member */
+    let fives: [byte; 3] = [5, 5, 5];
+    let s5555: [byte; 4] = [5, 5, 5, 5];
+    if span_in(&fives[..], &s5555[..]) != 3 { return 17; }  /* duplicate members ok */
+
+    /* ---- span_not_in (strcspn), BYTE-014 ---- */
+    let r39: [byte; 2] = [3, 9];
+    if span_not_in(&v[..], &r39[..]) != 2 { return 20; }    /* 1,2 not rejected; 3 stops */
+    let r1: [byte; 1] = [1];
+    if span_not_in(&v[..], &r1[..]) != 0 { return 21; }     /* first byte rejected */
+    let r98: [byte; 2] = [9, 8];
+    if span_not_in(&v[..], &r98[..]) != 4 { return 22; }    /* nothing rejected */
+    if span_not_in(&empty[..], &r1[..]) != 0 { return 23; } /* empty input */
+    if span_not_in(&v[..], &empty[..]) != 4 { return 24; }  /* empty rejected -> input.len() (BYTE-014) */
+    let z3: [byte; 3] = [1, 0, 0];
+    if span_not_in(&z3[..], &s0[..]) != 1 { return 25; }    /* stop at embedded 0x00 when rejected */
+    let ff3: [byte; 3] = [255, 1, 2];
+    if span_not_in(&ff3[..], &r1[..]) != 1 { return 26; }   /* 0xFF not rejected, then 1 is */
+
+    /* ---- property: first-byte complementarity (nonempty input, any set) ---- */
+    /* exactly one of span_in==0 / span_not_in==0 holds for a nonempty input */
+    let a_in0: bool = span_in(&v[..], &s12[..]) == 0;
+    let a_ni0: bool = span_not_in(&v[..], &s12[..]) == 0;
+    if a_in0 == a_ni0 { return 30; }
+    let b_in0: bool = span_in(&v[..], &s45[..]) == 0;
+    let b_ni0: bool = span_not_in(&v[..], &s45[..]) == 0;
+    if b_in0 == b_ni0 { return 31; }
+    /* with an empty set: span_in==0 and span_not_in==len>0 -> still complementary */
+    let c_in0: bool = span_in(&v[..], &empty[..]) == 0;
+    let c_ni0: bool = span_not_in(&v[..], &empty[..]) == 0;
+    if c_in0 == c_ni0 { return 32; }
+
+    return 0;
+}

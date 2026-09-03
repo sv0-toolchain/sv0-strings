@@ -9,7 +9,8 @@
 ///   SS-101  compare / equal                      -- IMPLEMENTED (this file)
 ///   SS-102  find / rfind / starts_with / ends_with -- IMPLEMENTED (this file)
 ///   SS-103  find_slice                           -- IMPLEMENTED (this file)
-///   SS-104+ span_* / copy / ...                  -- unimplemented
+///   SS-104  span_in / span_not_in                 -- IMPLEMENTED (this file)
+///   SS-105+ copy / copy_prefix / move_within / .. -- unimplemented
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
@@ -162,4 +163,48 @@ pub fn find_slice(haystack: &[byte], needle: &[byte]) -> Option<usize> {
         s = s + 1;
     }
     return Option::None;
+}
+
+/// True iff byte `b` appears anywhere in `set`. Linear scan (BYTE-016/017:
+/// bounded, no text decoding). A 256-bit membership table is an R0.2
+/// optimisation for repeatedly-queried separator sets (PERF-005).
+fn set_contains(set: &[byte], b: byte) -> bool {
+    let n: usize = slice_len(set);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if set[i] == b { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/// BYTE-013 (R0.1): length of the maximal prefix of `input` all of whose
+/// bytes are members of the `accepted` set. An empty `accepted` set yields 0.
+pub fn span_in(input: &[byte], accepted: &[byte]) -> usize {
+    let n: usize = slice_len(input);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if set_contains(accepted, input[i]) != true { return i; }
+        i = i + 1;
+    }
+    return n;
+}
+
+/// BYTE-014 (R0.1): length of the maximal prefix of `input` none of whose
+/// bytes are members of the `rejected` set. An empty `rejected` set yields
+/// `input.len()`.
+pub fn span_not_in(input: &[byte], rejected: &[byte]) -> usize {
+    let n: usize = slice_len(input);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if set_contains(rejected, input[i]) { return i; }
+        i = i + 1;
+    }
+    return n;
 }
