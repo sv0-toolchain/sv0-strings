@@ -22,6 +22,33 @@
  */
 module strings_types;
 
+/* Library-local `Option` / `Result` (SS-U06 decision B). sv0c has no built-in
+ * `Option`/`Result`; a user-declared generic enum with scalar payloads
+ * monomorphizes end to end on both backends (verified 2026-09-02, sv0c
+ * `e5fad7c` / sv0vm `4dc06a7`). Declaring them once here — the module every
+ * other file already imports shared value types from — lets the rest of the
+ * library and the C23/POSIX façades track the SPEC's literal
+ * `Option<usize>` / `Result<T, E>` signatures.
+ *
+ * DEVIATION (recorded per GOV-004): the SPEC assumes `Option`/`Result` are
+ * language-provided. sv0c predefining them is filed as an M5 prerequisite
+ * (`task/sv0-toolchain-milestone-5-llvm-crypto.Rmd`, before the LLVM backend
+ * / crypto API slices); until then the library owns the declarations. Any
+ * instantiation whose payload is a struct/slice (not a scalar) may hit the
+ * deferred lowering-side monomorphization gap (T0-2d,
+ * `sv0doc/compiler/bootstrap-generics-policy.md`) — such a case falls back to
+ * a concrete carrier + its own deviation note, never blocks a slice.
+ */
+pub enum Option<T> {
+    Some(T),
+    None,
+}
+
+pub enum Result<T, E> {
+    Ok(T),
+    Err(E),
+}
+
 /* Total order result of a comparison (SPEC MODEL-008). Native callers match
  * on this; they never depend on an arbitrary signed magnitude. A
  * C-compatible `-1 / 0 / 1` adapter lives in `strings_c23`.

@@ -1,0 +1,51 @@
+/* SS-U06 decision B: `strings_types` declares library-local `Option<T>` and
+ * `Result<T, E>` (sv0c has no built-in). Scalar payloads monomorphize on both
+ * backends. Exit 0 = pass; nonzero = first failing check (SPEC Section 21.1).
+ *
+ * Structured error payloads (`Result<_, BufferError>`) are NOT exercised here
+ * -- a struct/enum in a generic Err slot hits the deferred lowering-side
+ * monomorphization gap on the C backend (T0-2d); those call sites use a
+ * concrete carrier instead (see strings_types DEVIATION + M5 prereq).
+ */
+use strings_types::Option;
+use strings_types::Result;
+
+fn first_ge(a: usize, b: usize) -> Option<usize> {
+    if a >= b { return Option::Some(a); }
+    return Option::None;
+}
+
+fn add_checked(a: usize, b: usize) -> Result<usize, i32> {
+    let s: usize = a + b;
+    if s < a { return Result::Err(1); }   /* wrapped */
+    return Result::Ok(s);
+}
+
+fn main() -> i32 {
+    /* Option: Some / None both round-trip */
+    let s: Option<usize> = first_ge(9, 4);
+    match s {
+        Option::Some(v) => { if v != 9 { return 1; } },
+        Option::None => { return 2; },
+    }
+    let n: Option<usize> = first_ge(3, 8);
+    match n {
+        Option::Some(v) => { return 3; },
+        Option::None => {},
+    }
+
+    /* Result: Ok / Err both round-trip; error is a scalar discriminant */
+    let ok: Result<usize, i32> = add_checked(40, 2);
+    match ok {
+        Result::Ok(v) => { if v != 42 { return 4; } },
+        Result::Err(e) => { return 5; },
+    }
+    let max: usize = 18446744073709551615;
+    let bad: Result<usize, i32> = add_checked(max, 1);
+    match bad {
+        Result::Ok(v) => { return 6; },
+        Result::Err(e) => { if e != 1 { return 7; } },
+    }
+
+    return 0;
+}

@@ -5,3 +5,4 @@ test/fixtures/regressions/embedded_nul_len.sv0	0	0	SS-009 GREEN on C + VM (SS-U0
 test/fixtures/regressions/embedded_nul_eq.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
 test/fixtures/regressions/embedded_nul_concat.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
 test/fixtures/regressions/embedded_nul_substr.sv0	0	0	SS-009 GREEN on C + VM (SS-U02b/c, toolchain sv0c 7fde418+)
+test/cases/prelude_option_result.sv0	0	0	SS-U06 decision B; strings_types Option<T>/Result<T,E>, scalar payloads, C + VM
