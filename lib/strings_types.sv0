@@ -157,6 +157,35 @@ pub enum MoveResult {
     RangeOutOfBounds(usize, usize, usize),
 }
 
+/* Runtime-accelerator selection harness (SPEC UP-011 / BACKEND-003, §4.8
+ * Tier 2; slice SS-110). R0.1 is Tier-1 pure-only: `accel_available` is
+ * always `false` and `accel_version` is 0, so every accelerable operation
+ * selects its pure sv0 path with identical semantics -- UP-011: the absence
+ * of an accelerator selects pure, it never changes results. A future Tier-2
+ * build sets these from a versioned capability probe; the test harness then
+ * runs the same fixture/property suite with acceleration off and on to prove
+ * equivalence (BACKEND-003 / AC-020).
+ *
+ * DEVIATION (GOV-004): SPEC ARCH-001 fixes the 11 flat `strings_*` module
+ * names, so this shared capability shape lives in `strings_types` rather
+ * than a dedicated module -- same treatment as `Option` / `Result`.
+ */
+pub fn ACCEL_CAP_BYTE_SEARCH() -> i32 { return 1; }
+pub fn ACCEL_CAP_CASE_FOLD() -> i32 { return 2; }
+pub fn ACCEL_CAP_SUBSTRING() -> i32 { return 3; }
+
+/// Version of the enabled accelerator set. 0 == pure-only (no accelerators).
+pub fn accel_version() -> i32 {
+    return 0;
+}
+
+/// Is a Tier-2 accelerator for capability `cap` enabled? Always `false` at
+/// R0.1 (pure-only). A Tier-2 build derives this from a versioned probe; the
+/// harness forces it `false` to run the pure suite.
+pub fn accel_available(cap: i32) -> bool {
+    return false;
+}
+
 /* Result of a `memccpy`-style stop-byte copy (SPEC Section 8.2, C23-005,
  * MODEL-017). `next_offset_present` + `next_offset` stand in for
  * `Option<usize>` until generic result payloads across modules are proven

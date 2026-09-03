@@ -13,7 +13,10 @@
 ///   SS-105  copy / copy_prefix                     -- IMPLEMENTED (this file)
 ///   SS-107  fill                                   -- IMPLEMENTED (this file)
 ///   SS-106  move_within                            -- IMPLEMENTED (this file)
-///   SS-108+ fill_explicit / ...                    -- unimplemented (SS-108 Blocked)
+///   SS-108  fill_explicit                          -- Blocked (SS-U11 / R0.3)
+///
+/// SS-110: accelerable ops dispatch through `accel_available` (SPEC UP-011);
+/// no accelerator exists at R0.1 so the pure path is always selected.
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
@@ -24,6 +27,8 @@ use strings_types::Option;
 use strings_types::CopyReport;
 use strings_types::CopyResult;
 use strings_types::MoveResult;
+use strings_types::accel_available;
+use strings_types::ACCEL_CAP_BYTE_SEARCH;
 
 /// BYTE-001 (F0): lexicographic unsigned-byte comparison. Returns
 /// `Ordering::Equal` iff both slices have the same length and every byte is
@@ -67,9 +72,8 @@ pub fn equal(a: &[byte], b: &[byte]) -> bool {
     };
 }
 
-/// BYTE-011 (F0): index of the first byte in `haystack` equal to `needle`,
-/// or `Option::None`. An empty haystack yields `None`.
-pub fn find(haystack: &[byte], needle: byte) -> Option<usize> {
+/// Pure sv0 first-match byte search (the Tier-1 semantic reference).
+fn find_pure(haystack: &[byte], needle: byte) -> Option<usize> {
     let n: usize = slice_len(haystack);
     let mut i: usize = 0;
     while i < n
@@ -79,6 +83,19 @@ pub fn find(haystack: &[byte], needle: byte) -> Option<usize> {
         i = i + 1;
     }
     return Option::None;
+}
+
+/// BYTE-011 (F0): index of the first byte in `haystack` equal to `needle`,
+/// or `Option::None`. An empty haystack yields `None`.
+///
+/// SS-110: dispatches through the accelerator harness. No byte-search
+/// accelerator is registered at R0.1, so `find` == `find_pure` (UP-011).
+pub fn find(haystack: &[byte], needle: byte) -> Option<usize> {
+    if accel_available(ACCEL_CAP_BYTE_SEARCH()) != true {
+        return find_pure(haystack, needle);
+    }
+    /* Tier-2 accelerated byte search plugs in here; none at R0.1. */
+    return find_pure(haystack, needle);
 }
 
 /// BYTE-011 (F0): index of the last byte in `haystack` equal to `needle`,

@@ -1,0 +1,67 @@
+/* SS-110 (SPEC UP-011, BACKEND-003, BL-037): pure/accelerated selection
+ * harness, initially pure-only. Exit 0 = pass; nonzero = first failing check.
+ *
+ * At R0.1 no Tier-2 accelerator is registered: `accel_version()` is 0 and
+ * `accel_available(cap)` is `false` for every capability, so every
+ * accelerable operation selects its pure sv0 path (UP-011: absence selects
+ * pure, never changes semantics). This fixture pins that, and re-runs a
+ * slice of the byte-search / case-fold property suite through the gated
+ * entry points to show the same suite runs "under the harness" and yields
+ * the pure result.
+ */
+use strings_types::Option;
+use strings_types::Ordering;
+use strings_types::accel_version;
+use strings_types::accel_available;
+use strings_types::ACCEL_CAP_BYTE_SEARCH;
+use strings_types::ACCEL_CAP_CASE_FOLD;
+use strings_types::ACCEL_CAP_SUBSTRING;
+use strings_bytes::find;
+use strings_ascii::to_lower;
+use strings_ascii::to_upper;
+use strings_ascii::compare_ignore_case;
+
+fn opt_eq(o: Option<usize>, want: usize) -> bool {
+    return match o { Option::Some(v) => v == want, Option::None => false };
+}
+fn opt_none(o: Option<usize>) -> bool {
+    return match o { Option::Some(v) => false, Option::None => true };
+}
+fn is_lt(o: Ordering) -> bool { return match o { Ordering::Less => true, Ordering::Equal => false, Ordering::Greater => false }; }
+
+fn main() -> i32 {
+    /* ---- capability model reports pure-only ---- */
+    if accel_version() != 0 { return 10; }
+    if accel_available(ACCEL_CAP_BYTE_SEARCH()) != false { return 11; }
+    if accel_available(ACCEL_CAP_CASE_FOLD()) != false { return 12; }
+    if accel_available(ACCEL_CAP_SUBSTRING()) != false { return 13; }
+    /* an unknown capability id is also unavailable */
+    if accel_available(999) != false { return 14; }
+
+    /* ---- the byte-search suite runs through the gated `find` (== pure) ---- */
+    let v: [byte; 5] = [1, 2, 3, 2, 1];
+    let empty: [byte; 0] = [];
+    if opt_eq(find(&v[..], 2), 1) != true { return 20; }
+    if opt_none(find(&v[..], 9)) != true { return 21; }
+    if opt_none(find(&empty[..], 5)) != true { return 22; }
+    let nul: [byte; 3] = [0, 0, 5];
+    if opt_eq(find(&nul[..], 5), 2) != true { return 23; }
+
+    /* ---- the case-fold suite runs through the gated ops (== pure) ---- */
+    /* spot-check the exhaustive-table invariants via the gated entry points */
+    if (to_lower(65 as byte) as i32) != 97 { return 30; }   /* 'A' -> 'a' */
+    if (to_upper(122 as byte) as i32) != 90 { return 31; }  /* 'z' -> 'Z' */
+    if (to_lower(64 as byte) as i32) != 64 { return 32; }   /* '@' identity */
+    if (to_lower(200 as byte) as i32) != 200 { return 33; } /* non-ASCII identity */
+
+    let hi1: [byte; 5] = [72, 101, 108, 108, 111];   /* "Hello" */
+    let hi2: [byte; 5] = [104, 101, 108, 108, 111];  /* "hello" */
+    let hip: [byte; 5] = [72, 101, 108, 108, 112];   /* "Hellp" */
+    /* equal ignoring case -> not Less, not Greater is covered elsewhere; here
+       the ordering: "Hello" fold-< "Hellp" */
+    if is_lt(compare_ignore_case(&hi1[..], &hip[..])) != true { return 40; }
+    /* and folding makes "Hello" / "hello" compare Equal (not Less) */
+    if is_lt(compare_ignore_case(&hi1[..], &hi2[..])) != false { return 41; }
+
+    return 0;
+}

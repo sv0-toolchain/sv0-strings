@@ -12,24 +12,48 @@
 module strings_ascii;
 
 use strings_types::Ordering;
+use strings_types::accel_available;
+use strings_types::ACCEL_CAP_CASE_FOLD;
 
-/// ASCII-001 / ASCII-002 (R0.1): map `A`..`Z` (0x41..0x5A) to `a`..`z` by
-/// adding 0x20; return every other byte -- including all of 0x00..0x40,
-/// 0x5B..0x60, 0x7B..0xFF -- unchanged. Locale-independent.
-pub fn to_lower(value: byte) -> byte {
+/// Pure ASCII lower-case fold (the Tier-1 semantic reference).
+fn to_lower_pure(value: byte) -> byte {
     if value >= 65 {
         if value <= 90 { return value + 32; }
     }
     return value;
 }
 
-/// ASCII-001 / ASCII-002 (R0.1): map `a`..`z` (0x61..0x7A) to `A`..`Z` by
-/// subtracting 0x20; return every other byte unchanged. Locale-independent.
-pub fn to_upper(value: byte) -> byte {
+/// ASCII-001 / ASCII-002 (R0.1): map `A`..`Z` (0x41..0x5A) to `a`..`z` by
+/// adding 0x20; return every other byte -- including all of 0x00..0x40,
+/// 0x5B..0x60, 0x7B..0xFF -- unchanged. Locale-independent.
+///
+/// SS-110: dispatches through the accelerator harness; no case-fold
+/// accelerator is registered at R0.1, so this == `to_lower_pure` (UP-011).
+pub fn to_lower(value: byte) -> byte {
+    if accel_available(ACCEL_CAP_CASE_FOLD()) != true {
+        return to_lower_pure(value);
+    }
+    /* Tier-2 accelerated case fold plugs in here; none at R0.1. */
+    return to_lower_pure(value);
+}
+
+/// Pure ASCII upper-case fold (the Tier-1 semantic reference).
+fn to_upper_pure(value: byte) -> byte {
     if value >= 97 {
         if value <= 122 { return value - 32; }
     }
     return value;
+}
+
+/// ASCII-001 / ASCII-002 (R0.1): map `a`..`z` (0x61..0x7A) to `A`..`Z` by
+/// subtracting 0x20; return every other byte unchanged. Locale-independent.
+///
+/// SS-110: dispatches through the accelerator harness (see `to_lower`).
+pub fn to_upper(value: byte) -> byte {
+    if accel_available(ACCEL_CAP_CASE_FOLD()) != true {
+        return to_upper_pure(value);
+    }
+    return to_upper_pure(value);
 }
 
 /// ASCII-003 (R0.1): `true` iff `a` and `b` have the same length and every
@@ -43,7 +67,7 @@ pub fn equal_ignore_case(a: &[byte], b: &[byte]) -> bool {
         loop_invariant(i <= alen)
         loop_invariant(alen == blen)
     {
-        if to_lower(a[i]) != to_lower(b[i]) { return false; }
+        if to_lower_pure(a[i]) != to_lower_pure(b[i]) { return false; }
         i = i + 1;
     }
     return true;
@@ -65,8 +89,8 @@ pub fn compare_ignore_case(a: &[byte], b: &[byte]) -> Ordering {
         loop_invariant(n <= alen)
         loop_invariant(n <= blen)
     {
-        let av: byte = to_lower(a[i]);
-        let bv: byte = to_lower(b[i]);
+        let av: byte = to_lower_pure(a[i]);
+        let bv: byte = to_lower_pure(b[i]);
         if av < bv { return Ordering::Less; }
         if av > bv { return Ordering::Greater; }
         i = i + 1;
@@ -100,8 +124,8 @@ pub fn compare_prefix_ignore_case(a: &[byte], b: &[byte], n: usize) -> Ordering 
         loop_invariant(m <= alen)
         loop_invariant(m <= blen)
     {
-        let av: byte = to_lower(a[i]);
-        let bv: byte = to_lower(b[i]);
+        let av: byte = to_lower_pure(a[i]);
+        let bv: byte = to_lower_pure(b[i]);
         if av < bv { return Ordering::Less; }
         if av > bv { return Ordering::Greater; }
         i = i + 1;
