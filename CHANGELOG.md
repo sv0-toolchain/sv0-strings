@@ -163,6 +163,29 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   (`test/differential/c23_span_oracle.py`, 6 cases; the oracle gained
   `strspn`/`strcspn` ops). No new toolchain slice needed. `scripts/test
   --backend=both` = 34/34.
+- **`strings_c23::strtok`** (SS-147 / C23-013 / TOK-008 / TOK-009): the
+  C23-recognizable name for `strings_tokenize::next` over a `CStr` payload
+  and separator set. No hidden global/thread-local continuation state — the
+  caller threads `pos` explicitly, so independent tokenizations never
+  interfere (proven directly by interleaving two cursors in the fixture);
+  `s` / `separators` are immutable payload views, never mutated in place
+  (real `strtok` overwrites each consumed separator); the separator set may
+  differ on every call. A `CStr` value is by construction the NUL-free
+  payload up to its first `0x00` (D-7), so operating "only on bytes before
+  the terminator" (TOK-009) holds by the type, not a runtime scan — there is
+  no interior-NUL case to construct. Differential-checked against the host
+  libc for same-separator-set sequences (`test/differential/c23_strtok_oracle.py`,
+  5 cases; the oracle gained a `strtok` op that runs the FULL hidden-state
+  sequence in one process, the only op here that needs to). The
+  changing-separator-set fixture cases are hand-derived directly from
+  `strings_tokenize::next`'s documented algorithm rather than the oracle,
+  since real `strtok`'s internal saved pointer is one byte PAST a consumed
+  separator while this façade's `next_pos` points AT the not-yet-consumed
+  separator — an existing, documented adaptation (D-9) that only becomes
+  observable when the separator set changes between two calls landing
+  exactly on that boundary; the fixture keeps the new set a superset of the
+  old to stay unambiguous and matches real `strtok` there too. No new
+  toolchain slice needed. `scripts/test --backend=both` = 35/35.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

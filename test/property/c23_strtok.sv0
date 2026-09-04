@@ -1,0 +1,106 @@
+/* SS-147 (SPEC C23-013, TOK-008, TOK-009): strings_c23::strtok.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `strtok` threads its cursor as an explicit `pos: usize` -- no hidden
+ * global/thread-local state (TOK-008), so two independent tokenizations
+ * never interfere (checked directly here by interleaving them) and the
+ * separator set may change on every call (TOK-009). A `CStr` value is by
+ * construction the NUL-free payload up to its first `0x00` (D-7), so
+ * "operates only on bytes before the terminator" holds by the type, not a
+ * runtime scan -- there is no interior-NUL case to construct.
+ * Expected token boundaries are hand-derived C23 `strtok` facts
+ * (differential vs the C oracle is `test/differential/c23_strtok_oracle.py`).
+ */
+use strings_types::TokenStep;
+use strings_c23::strtok;
+
+/* -1 = Complete; encodes Emit(start,end,_) as start*1000 + end (inputs here
+   are all well under 1000 bytes) */
+fn step(r: TokenStep) -> i32 {
+    return match r {
+        TokenStep::Emit(start, end, _next_pos) => { (start * 1000 + end) as i32 },
+        TokenStep::Complete => { 0 - 1 },
+    };
+}
+
+fn next_pos(r: TokenStep) -> usize {
+    return match r {
+        TokenStep::Emit(_start, _end, next_pos) => { next_pos },
+        TokenStep::Complete => { 0 },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= basic sequence (TOK-002) ================= */
+    let s1: string = "  hello, world!  foo";
+    let sep1: string = " ,!";
+    let r1: TokenStep = strtok(s1, sep1, 0);
+    if step(r1) != 2007 { return 1; }              /* [2,7) "hello" */
+    let r2: TokenStep = strtok(s1, sep1, next_pos(r1));
+    if step(r2) != 9014 { return 2; }               /* [9,14) "world" */
+    let r3: TokenStep = strtok(s1, sep1, next_pos(r2));
+    if step(r3) != 17020 { return 3; }              /* [17,20) "foo" */
+    let r4: TokenStep = strtok(s1, sep1, next_pos(r3));
+    if step(r4) != 0 - 1 { return 4; }              /* Complete */
+
+    /* ================= empty separator run collapse ================= */
+    let s2: string = "a,b,,c";
+    let sep2: string = ",";
+    let q1: TokenStep = strtok(s2, sep2, 0);
+    if step(q1) != 1 { return 10; }                 /* [0,1) "a" */
+    let q2: TokenStep = strtok(s2, sep2, next_pos(q1));
+    if step(q2) != 2003 { return 11; }               /* [2,3) "b" */
+    let q3: TokenStep = strtok(s2, sep2, next_pos(q2));
+    if step(q3) != 5006 { return 12; }               /* [5,6) "c" (double sep skipped) */
+    let q4: TokenStep = strtok(s2, sep2, next_pos(q3));
+    if step(q4) != 0 - 1 { return 13; }
+
+    /* separator-only input -> Complete immediately (TOK-004) */
+    if step(strtok("   ", " ", 0)) != 0 - 1 { return 14; }
+
+    /* empty separator set -> whole string is one token (TOK-003) */
+    if step(strtok("one", "", 0)) != 3 { return 15; }  /* [0,3) */
+
+    /* ================= interleaving two independent cursors ==========
+     * (TOK-008: no hidden global state -- two tokenizations of DIFFERENT
+     * strings advance independently when interleaved, unlike real strtok
+     * where a second strtok(str2, ...) call would clobber the first's
+     * continuation.) */
+    let a: string = "aa bb cc";
+    let b: string = "xx-yy-zz";
+    let sepa: string = " ";
+    let sepb: string = "-";
+    let a1: TokenStep = strtok(a, sepa, 0);
+    if step(a1) != 2 { return 20; }                  /* [0,2) "aa" */
+    let b1: TokenStep = strtok(b, sepb, 0);
+    if step(b1) != 2 { return 21; }                  /* [0,2) "xx" */
+    let a2: TokenStep = strtok(a, sepa, next_pos(a1));
+    if step(a2) != 3005 { return 22; }               /* [3,5) "bb" -- unaffected by b1 */
+    let b2: TokenStep = strtok(b, sepb, next_pos(b1));
+    if step(b2) != 3005 { return 23; }               /* [3,5) "yy" -- unaffected by a2 */
+    let a3: TokenStep = strtok(a, sepa, next_pos(a2));
+    if step(a3) != 6008 { return 24; }               /* [6,8) "cc" */
+    let b3: TokenStep = strtok(b, sepb, next_pos(b2));
+    if step(b3) != 6008 { return 25; }               /* [6,8) "zz" */
+
+    /* ================= changing separators between calls (TOK-009) ===
+     * Same string, first call splits on ',', second+third calls (from
+     * `next_pos`) split the remainder on ',-' -- a superset of the first
+     * call's separator, so the byte `next_pos` landed on (the ',' that
+     * ended token 1) is ALSO a separator under the new set and gets
+     * skipped cleanly by the leading-separator scan, same as real `strtok`.
+     * (`next_pos` is the offset of the separator that ended the token,
+     * not-yet-consumed -- if the next call's separator set does NOT
+     * contain that byte, it is evaluated as ordinary content instead, per
+     * `strings_tokenize::next`'s documented algorithm; this fixture keeps
+     * the new set a superset of the old to stay unambiguous.) */
+    let c: string = "aa,bb-cc";
+    let c1: TokenStep = strtok(c, ",", 0);
+    if step(c1) != 2 { return 30; }                  /* [0,2) "aa" */
+    let c2: TokenStep = strtok(c, ",-", next_pos(c1));
+    if step(c2) != 3005 { return 31; }               /* [3,5) "bb" */
+    let c3: TokenStep = strtok(c, ",-", next_pos(c2));
+    if step(c3) != 6008 { return 32; }               /* [6,8) "cc" */
+
+    return 0;
+}

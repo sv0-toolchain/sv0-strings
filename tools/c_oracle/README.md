@@ -87,6 +87,7 @@ dispatch table in `oracle.c`:
 | `strndup` | fresh allocation, bounded by `n`; `src` need not contain a NUL within `n` |
 | `strspn` | bounded read → length; `cstr=` s, `a=` accept set (both NUL-in-window) |
 | `strcspn` | bounded read → length; `cstr=` s, `a=` reject set (both NUL-in-window) |
+| `strtok` | runs the FULL hidden-state sequence in one process (`cstr=` input, `a=` separators, both NUL-in-window); `ntokens=<n>`, `tok<i>=start:end` |
 
 `value=` also carries the stop byte for `memccpy` and the search byte for
 `strchr` / `strrchr`.
@@ -101,4 +102,6 @@ sv0 property fixtures against this oracle (real host libc). Run by
 `strncmp` (SS-143); `c23_strcpy_family_oracle.py` covers `strcpy` /
 `strncpy` / `strcat` / `strncat` (SS-144); `c23_strdup_family_oracle.py`
 covers `strdup` / `strndup` (SS-145); `c23_span_oracle.py` covers `strspn` /
-`strcspn` (SS-146).
+`strcspn` (SS-146); `c23_strtok_oracle.py` covers `strtok` (SS-147) --
+note `strtok` is the one op whose SEQUENCE (not a single call) is what's
+under test, since its hidden state is only meaningful within one process.

@@ -52,6 +52,8 @@
  *   strndup  fresh allocation, bounded by n; src need not contain a NUL within n
  *   strspn   bounded read -> length; cstr= s, a= accept set (both NUL-in-window)
  *   strcspn  bounded read -> length; cstr= s, a= reject set (both NUL-in-window)
+ *   strtok   runs the FULL hidden-state sequence in one process (cstr= input,
+ *            a= separators, both NUL-in-window); ntokens=<n>, tok<i>=start:end
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too. */
@@ -649,6 +651,38 @@ static int op_strcspn(const struct req *r) {
     return 0;
 }
 
+/* Runs the FULL strtok hidden-state sequence in this one process (real
+   strtok's continuation state is thread-local and only meaningful within a
+   single process/thread, so a single-request oracle call is the natural
+   unit for it -- unlike every other op here). strtok mutates its argument
+   in place (writes 0x00 over each consumed separator), so this works on a
+   private copy; ORACLE_MAXBYTES bounds both the copy and the token count. */
+static int op_strtok(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->a_n < 0)    return fail_pre("a-missing");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window:cstr");
+    if (find_nul(r->a, r->a_n) < 0)       return fail_pre("no-nul-in-window:a");
+
+    static char buf[ORACLE_MAXBYTES + 1];
+    memcpy(buf, r->cstr, (size_t)r->cstr_n);
+    buf[r->cstr_n] = 0;
+
+    printf("precondition=ok\n");
+    long count = 0;
+    errno = 0;
+    char *tok = strtok(buf, (const char *)r->a);
+    while (tok && count < ORACLE_MAXBYTES) {
+        long start = (long)(tok - buf);
+        long len = (long)strlen(tok);
+        printf("tok%ld=%ld:%ld\n", count, start, start + len);
+        count++;
+        tok = strtok(NULL, (const char *)r->a);
+    }
+    printf("ntokens=%ld\n", count);
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
 static int op_strlen(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     /* Bounded window: the argument must contain a NUL within the bytes given,
@@ -693,6 +727,7 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strndup") == 0) return op_strndup(r);
     if (strcmp(r->fn, "strspn") == 0)  return op_strspn(r);
     if (strcmp(r->fn, "strcspn") == 0) return op_strcspn(r);
+    if (strcmp(r->fn, "strtok") == 0)  return op_strtok(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }

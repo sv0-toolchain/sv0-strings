@@ -19,6 +19,7 @@
 ///           file). C23-008 / C23-009 / C23-010.
 ///   SS-145  strdup / strndup -- IMPLEMENTED (this file). C23-011.
 ///   SS-146  strspn / strcspn -- IMPLEMENTED (this file). C23-012.
+///   SS-147  strtok -- IMPLEMENTED (this file). C23-013.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -27,6 +28,7 @@ use strings_types::MemccpyReport;
 use strings_types::Ordering;
 use strings_types::Option;
 use strings_types::ConcatResult;
+use strings_types::TokenStep;
 use strings_bytes::copy;
 use strings_bytes::move_within;
 use strings_bytes::find;
@@ -39,6 +41,7 @@ use strings_cstr::as_bytes;
 use strings_cstr::clone_owned;
 use strings_checked::checked_add;
 use strings_checked::CheckedUsize;
+use strings_tokenize::next;
 
 /// C23-004 (Adapted). Copy `n` bytes of `src` into `dst`. Overlap is a
 /// compile-time borrow exclusion: two distinct safe slice arguments cannot
@@ -497,4 +500,23 @@ pub fn strspn(s: string, accept: string) -> usize {
 /// bytes.
 pub fn strcspn(s: string, reject: string) -> usize {
     return span_not_in(as_bytes(s), as_bytes(reject));
+}
+
+/// C23-013 (Adapted). The C23-recognizable name for
+/// `strings_tokenize::next` over a `CStr` payload and separator set:
+/// `TokenStep::Emit(start, end, next_pos)` gives the next token as
+/// `input[start..end]` (`input = as_bytes(s)`); call again with `pos =
+/// next_pos` to resume. `TokenStep::Complete` means no more tokens.
+///
+/// DEVIATION from C `strtok` (C23-013): no hidden global/thread-local
+/// continuation state (TOK-008) -- the caller threads `pos` explicitly, so
+/// two independent tokenizations never interfere, unlike real `strtok`.
+/// `s` and `separators` are immutable `CStr` payload VIEWS, never mutated
+/// in place (real `strtok` overwrites each separator with `0x00`); the
+/// separator set MAY differ on every call (TOK-009), and since a `CStr`
+/// value is by construction the NUL-free payload up to its first `0x00`
+/// (D-7), this operates only on bytes before that terminator -- trivially,
+/// not by a runtime scan.
+pub fn strtok(s: string, separators: string, pos: usize) -> TokenStep {
+    return next(as_bytes(s), as_bytes(separators), pos);
 }
