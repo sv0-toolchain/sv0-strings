@@ -1,0 +1,148 @@
+/* SS-126 (SPEC CSTR-001..007, CSTR-017, AC-008): strings_cstr `CStr` /
+ * `CString` constructors and views.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `CStr` value == validated NUL-free payload; `CString` value ==
+ * <payload><0x00> (deviation D-7). Byte values decimal; hex in comments.
+ */
+use strings_types::CStrResult;
+use strings_types::CStringResult;
+use strings_types::FromUtf8Result;
+use strings_cstr::from_bytes_with_nul;
+use strings_cstr::from_bytes_until_nul;
+use strings_cstr::from_text;
+use strings_cstr::from_bytes;
+use strings_cstr::borrow;
+use strings_cstr::len;
+use strings_cstr::as_bytes;
+use strings_cstr::as_bytes_with_nul;
+use strings_cstr::to_text;
+use strings_text::equal;
+
+/* from_bytes_with_nul: -1 NoTerminator, -2 View==want, -3 View!=want, k InteriorAt(k) */
+fn wn(b: &[byte], want: string) -> i32 {
+    return match from_bytes_with_nul(b) {
+        CStrResult::View(s) => { if equal(s, want) { 0 - 2 } else { 0 - 3 } },
+        CStrResult::NoTerminator => { 0 - 1 },
+        CStrResult::InteriorAt(k) => { k as i32 },
+    };
+}
+
+/* from_bytes_until_nul: -1 NoTerminator, -2 View==want, -3 View!=want */
+fn un(b: &[byte], want: string) -> i32 {
+    return match from_bytes_until_nul(b) {
+        CStrResult::View(s) => { if equal(s, want) { 0 - 2 } else { 0 - 3 } },
+        CStrResult::NoTerminator => { 0 - 1 },
+        CStrResult::InteriorAt(_k) => { 0 - 9 },
+    };
+}
+
+/* from_text / from_bytes -> CStringResult: -2 Owned==<want><0>, -3 mismatch, k InteriorAt(k) */
+fn ownck(r: CStringResult, want_with_nul: string) -> i32 {
+    return match r {
+        CStringResult::Owned(s) => { if equal(s, want_with_nul) { 0 - 2 } else { 0 - 3 } },
+        CStringResult::InteriorAt(k) => { k as i32 },
+    };
+}
+
+fn view_of(r: CStrResult) -> string {
+    return match r {
+        CStrResult::View(s) => { s },
+        CStrResult::NoTerminator => { "" },
+        CStrResult::InteriorAt(_k) => { "" },
+    };
+}
+
+fn main() -> i32 {
+    /* ---- from_bytes_with_nul (CSTR-001) ---- */
+    let hi_nul: [byte; 3] = [72, 105, 0];              /* "Hi\0" */
+    if wn(&hi_nul[..], "Hi") != 0 - 2 { return 1; }
+    let just_nul: [byte; 1] = [0];
+    if wn(&just_nul[..], "") != 0 - 2 { return 2; }
+    let no_term: [byte; 2] = [72, 105];
+    if wn(&no_term[..], "") != 0 - 1 { return 3; }
+    let empty: [byte; 0] = [];
+    if wn(&empty[..], "") != 0 - 1 { return 4; }
+    let interior1: [byte; 4] = [72, 0, 105, 0];        /* interior 0 at index 1 */
+    if wn(&interior1[..], "") != 1 { return 5; }
+    let interior0: [byte; 2] = [0, 0];
+    if wn(&interior0[..], "") != 0 { return 6; }
+    let interior2: [byte; 4] = [72, 105, 0, 0];        /* interior 0 at index 2 */
+    if wn(&interior2[..], "") != 2 { return 7; }
+    let raw_nul: [byte; 3] = [200, 201, 0];            /* non-UTF-8 payload OK */
+    if wn(&raw_nul[..], "\xc8\xc9") != 0 - 2 { return 8; }
+
+    /* ---- from_bytes_until_nul (CSTR-002) ---- */
+    let hi_more: [byte; 5] = [72, 105, 0, 88, 89];     /* "Hi\0XY" -> "Hi" */
+    if un(&hi_more[..], "Hi") != 0 - 2 { return 10; }
+    let lead_nul: [byte; 3] = [0, 65, 66];             /* "" then junk */
+    if un(&lead_nul[..], "") != 0 - 2 { return 11; }
+    if un(&no_term[..], "") != 0 - 1 { return 12; }
+    if un(&empty[..], "") != 0 - 1 { return 13; }
+    if un(&hi_nul[..], "Hi") != 0 - 2 { return 14; }
+
+    /* ---- from_text (CSTR-005) ---- */
+    if ownck(from_text("sv0"), "sv0\0") != 0 - 2 { return 20; }
+    if ownck(from_text("a\0b"), "") != 1 { return 21; }        /* interior U+0000 at 1 */
+    if ownck(from_text(""), "\0") != 0 - 2 { return 22; }
+    if ownck(from_text("A\xc3\xa9"), "A\xc3\xa9\0") != 0 - 2 { return 23; }  /* "Aé" */
+
+    /* ---- from_bytes (CSTR-006) ---- */
+    let raw3: [byte; 3] = [200, 201, 202];             /* non-UTF-8, no interior 0 */
+    if ownck(from_bytes(&raw3[..]), "\xc8\xc9\xca\0") != 0 - 2 { return 30; }
+    let raw_interior: [byte; 3] = [72, 0, 105];
+    if ownck(from_bytes(&raw_interior[..]), "") != 1 { return 31; }
+    if ownck(from_bytes(&empty[..]), "\0") != 0 - 2 { return 32; }
+
+    /* ---- borrow (CSTR-017): CString payload, no rescan ---- */
+    let owned: string = match from_text("sv0") {
+        CStringResult::Owned(s) => { s },
+        CStringResult::InteriorAt(_k) => { "" },
+    };
+    if string_len(owned) != 4 { return 40; }
+    let b: string = borrow(owned);
+    if equal(b, "sv0") != true { return 41; }
+    if len(b) != 3 { return 42; }
+
+    /* ---- len / as_bytes / as_bytes_with_nul (CSTR-003 / CSTR-004) ---- */
+    let cs: string = view_of(from_bytes_with_nul(&hi_nul[..]));      /* "Hi" */
+    if len(cs) != 2 { return 50; }
+    let ab: &[byte] = as_bytes(cs);
+    if slice_len(ab) != 2 { return 51; }
+    if ab[0] != 72 { return 52; }
+    if ab[1] != 105 { return 53; }
+    let abn: &[byte] = as_bytes_with_nul(cs);
+    if slice_len(abn) != 3 { return 54; }
+    if abn[2] != 0 { return 55; }                       /* exactly one terminator */
+
+    let rawcs: string = view_of(from_bytes_with_nul(&raw_nul[..]));  /* [200,201] */
+    let rb: &[byte] = as_bytes(rawcs);
+    if slice_len(rb) != 2 { return 56; }
+    if rb[0] != 200 { return 57; }
+
+    /* ---- to_text (CSTR-007) + AC-008 round-trip ---- */
+    let t1: FromUtf8Result = to_text(view_of(from_bytes_with_nul(&hi_nul[..])));
+    let t1_ok: bool = match t1 {
+        FromUtf8Result::Text(s) => { equal(s, "Hi") },
+        FromUtf8Result::Invalid(_k) => { false },
+    };
+    if t1_ok != true { return 60; }
+
+    /* non-UTF-8 CString: as_bytes round-trips exactly, to_text is Invalid */
+    let owned_raw: string = match from_bytes(&raw3[..]) {
+        CStringResult::Owned(s) => { s },
+        CStringResult::InteriorAt(_k) => { "" },
+    };
+    let payload: string = borrow(owned_raw);            /* [200,201,202] */
+    let pv: &[byte] = as_bytes(payload);
+    if slice_len(pv) != 3 { return 61; }
+    if pv[0] != 200 { return 62; }
+    if pv[2] != 202 { return 63; }
+    let t2_invalid: bool = match to_text(payload) {
+        FromUtf8Result::Text(_s) => { false },
+        FromUtf8Result::Invalid(_k) => { true },
+    };
+    if t2_invalid != true { return 64; }
+
+    return 0;
+}

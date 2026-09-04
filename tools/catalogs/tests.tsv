@@ -17,3 +17,4 @@ T-TEXT-LEN-EQ-001	test/property/text_length_equality.sv0	TEXT-001,TEXT-002,TEXT-
 T-TEXT-CONCAT-001	test/property/text_concat.sv0	TEXT-005,TEXT-006	c,vm	safe	runtime	property	done
 T-TEXT-SEARCH-SLICE-001	test/property/text_search_slice.sv0	TEXT-007,TEXT-008,TEXT-009,TEXT-010,TEXT-011	c,vm	safe	runtime	property	done
 T-TEXT-FROM-UTF8-001	test/property/text_from_utf8.sv0	TEXT-014,TEXT-015	c,vm	safe	runtime	property	done
+T-CSTR-CONSTRUCT-001	test/property/cstr_construct.sv0	CSTR-001,CSTR-002,CSTR-003,CSTR-004,CSTR-005,CSTR-006,CSTR-007,CSTR-017	c,vm	safe	runtime	property	done

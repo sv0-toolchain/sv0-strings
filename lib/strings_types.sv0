@@ -225,6 +225,43 @@ pub enum FromUtf8Result {
     Invalid(usize),
 }
 
+/* Results of the `strings_cstr` constructors (SPEC Section 13, CSTR-001/002
+ * for `CStrResult`; CSTR-005/006 for `CStringResult`; slice SS-126). Same
+ * GOV-004 / D-4 deviation as the carriers above -- the SPEC signatures are
+ * `Result<CStr, CStrError>` / `Result<CString, CStrError>`.
+ *
+ * DEVIATION D-7 (recorded per GOV-004; see docs/f0-deviations.md): `CStr`
+ * and `CString` have no distinct sv0 type. An enum variant carrying a
+ * struct payload does not lower on the C backend (the R0.3 struct-in-enum
+ * limit / KC-006 zone; a wrapper-struct prototype self-host-compiled to
+ * `vec: index out of bounds`). So both are represented as an owned
+ * `string`: a `CStr` value is the validated NUL-free payload; a `CString`
+ * value is `<payload><one 0x00>`. The `borrows(...)` relations become
+ * advisory -- the source bytes are copied at construction, so no dangling
+ * view is possible and the "no rescan after construction" invariants
+ * (CSTR-003 / CSTR-017) hold because the payload length travels with the
+ * value.
+ *
+ *   CStrResult:
+ *     View(payload)        -- Ok: NUL-free payload bytes
+ *     NoTerminator         -- Err (CStrError::MissingTerminator)
+ *     InteriorAt(offset)   -- Err (CStrError::InteriorNul), first interior 0
+ *
+ *   CStringResult:
+ *     Owned(bytes_with_nul) -- Ok: <payload><0x00>
+ *     InteriorAt(offset)    -- Err (CStrError::InteriorNul)
+ */
+pub enum CStrResult {
+    View(string),
+    NoTerminator,
+    InteriorAt(usize),
+}
+
+pub enum CStringResult {
+    Owned(string),
+    InteriorAt(usize),
+}
+
 /* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
  * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
  * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a

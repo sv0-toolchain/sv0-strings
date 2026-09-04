@@ -157,6 +157,40 @@ form. `as_bytes` keeps a real `&[byte]` borrow.
 distinction for owned values). Not gate-blocking: no `BYTE-*` / `TEXT-*`
 result depends on the parameter mode.
 
+## D-7 — `CStr` / `CString` have no distinct type; both are an owned `string` (SS-126)
+
+**SPEC.** Section 8.2 / 13: `CStr borrows(bytes) { bytes: &[byte] }`,
+`CString { bytes_with_nul: Vec<byte> }`; the constructors return
+`Result<CStr, CStrError>` / `Result<CString, CStrError>` and several views
+carry a `borrows(...)` relation.
+
+**What the toolchain does.** An enum variant carrying a **struct** payload
+does not lower on the C backend (the R0.3 struct-in-enum limit; a
+wrapper-`struct` `CStr` prototype self-host-compiled to `vec: index out of
+bounds`, the KC-006 zone). sv0 also has no surface `&string` / borrow
+tracking (D-6).
+
+**What sv0-strings does.** Both `CStr` and `CString` are represented as an
+owned `string`: a `CStr` value **is** the validated NUL-free payload; a
+`CString` value **is** `<payload><one 0x00>`. Constructors return the
+concrete carriers `strings_types::CStrResult` / `CStringResult`. Bytes are
+**copied** at construction (SS-U16 `string_from_bytes`), so:
+
+- no view can dangle — the `borrows(...)` relations are advisory, not
+  enforced;
+- CSTR-003 / CSTR-017 ("no rescan / no re-alloc after validated
+  construction") still hold: the payload length travels with the `string`
+  value, so `len` / `borrow` / `require_cstr` read a stored length and never
+  re-walk for the terminator;
+- the `CStr` vs `CString` type distinction is lost — a caller can pass one
+  where the other is expected. CSTR-014 (no raw pointer, no uninitialised
+  capacity) is unaffected.
+
+**Schedule.** Revisit when sv0c lands struct-in-enum-payload lowering (the
+T0-2d monomorphization neighbourhood) **and** a `&string` / borrow model.
+Not gate-blocking: every CSTR-* behavioural requirement in scope is met and
+cross-backend tested.
+
 ## SPEC-deferred (not decisions — the SPEC's own ladder)
 
 - **SS-U11** (`fill_explicit` non-elision primitive, UP-014) — SPEC-deferred to

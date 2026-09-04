@@ -1,13 +1,119 @@
-/// strings_cstr -- validated borrowed `CStr`, owned `CString`, and bounded
-/// mutable `CBuffer`.
+/// strings_cstr -- validated borrowed `CStr`, owned `CString`, and (SS-128)
+/// bounded mutable `CBuffer`.
 ///
-/// SPEC.md Section 13: from_bytes_with_nul, from_bytes_until_nul, from_text,
-/// from_bytes, borrow, as_bytes, as_bytes_with_nul, len, to_text,
-/// clone_owned, concat, copy_into, append_into, buffer_from_storage,
-/// empty_buffer, require_cstr. Invariants: exactly one terminating zero, no
-/// interior zero in a payload, capacity carried by the slice length.
+/// SPEC.md Section 13. This slice (SS-126) lands the `CStr` / `CString`
+/// constructors and views: from_bytes_with_nul, from_bytes_until_nul,
+/// from_text, from_bytes, borrow, as_bytes, as_bytes_with_nul, len, to_text.
+/// `clone_owned` / `concat` are SS-127; the `CBuffer` family is SS-128.
 ///
-/// Status: unimplemented (pre-F0). Blocked on owned-allocation failure and
-/// deterministic `Drop` for user libraries (SPEC UP-007 / UP-013, OQ-003).
-/// Implementation begins at BL-049 (R0.2).
+/// DEVIATION D-7 (docs/f0-deviations.md): `CStr` and `CString` are both an
+/// owned `string` -- an enum variant carrying a struct payload does not lower
+/// on the C backend (R0.3 struct-in-enum limit). A `CStr` value is the
+/// validated NUL-free payload; a `CString` value is `<payload><0x00>`. The
+/// SPEC `borrows(...)` relations are advisory: the bytes are copied at
+/// construction (SS-U16 `string_from_bytes`), so no view can dangle, and the
+/// "no rescan / no re-alloc after validated construction" invariants
+/// (CSTR-003 / CSTR-017) hold because the payload length travels with the
+/// value.
 module strings_cstr;
+
+use strings_types::CStrResult;
+use strings_types::CStringResult;
+use strings_types::FromUtf8Result;
+use strings_text::from_utf8;
+
+/// CSTR-001 (R0.2): accept only a slice whose final byte is `0x00` and whose
+/// preceding bytes contain no `0x00`. An empty slice has no terminator.
+pub fn from_bytes_with_nul(bytes: &[byte]) -> CStrResult {
+    let n: usize = slice_len(bytes);
+    if n == 0 { return CStrResult::NoTerminator; }
+    if bytes[n - 1] != 0 { return CStrResult::NoTerminator; }
+    let mut i: usize = 0;
+    while i + 1 < n
+        loop_invariant(i <= n)
+    {
+        if bytes[i] == 0 { return CStrResult::InteriorAt(i); }
+        i = i + 1;
+    }
+    return CStrResult::View(string_from_bytes(&bytes[0..n - 1]));
+}
+
+/// CSTR-002 (R0.2): view the payload up to (excluding) the FIRST `0x00`;
+/// bytes after it are outside the resulting `CStr`. Absence of `0x00`
+/// returns `NoTerminator` (`CStrError::MissingTerminator`).
+pub fn from_bytes_until_nul(bytes: &[byte]) -> CStrResult {
+    let n: usize = slice_len(bytes);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if bytes[i] == 0 {
+            return CStrResult::View(string_from_bytes(&bytes[0..i]));
+        }
+        i = i + 1;
+    }
+    return CStrResult::NoTerminator;
+}
+
+/// CSTR-005 (R0.2): reject an embedded U+0000; otherwise preserve the exact
+/// UTF-8 payload and append one terminator.
+pub fn from_text(value: string) -> CStringResult {
+    let n: usize = string_len(value);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if string_char_at(value, i) == 0 { return CStringResult::InteriorAt(i); }
+        i = i + 1;
+    }
+    return CStringResult::Owned(string_concat(value, "\0"));
+}
+
+/// CSTR-006 (R0.2): permit non-UTF-8 payload bytes, reject an interior
+/// `0x00`, append one terminator, return owned storage.
+pub fn from_bytes(bytes: &[byte]) -> CStringResult {
+    let n: usize = slice_len(bytes);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if bytes[i] == 0 { return CStringResult::InteriorAt(i); }
+        i = i + 1;
+    }
+    return CStringResult::Owned(string_concat(string_from_bytes(bytes), "\0"));
+}
+
+/// CSTR-017 (R0.2): borrow a `CString` as a `CStr` -- the payload without
+/// the trailing terminator. The first-NUL invariant is already established
+/// (a `CString` value carries exactly one trailing `0x00`), so this does
+/// not rescan for a terminator; it performs a single bounded substring.
+pub fn borrow(value: string) -> string {
+    let n: usize = string_len(value);
+    if n == 0 { return value; }
+    return string_substr(value, 0, n - 1);
+}
+
+/// CSTR-003 (R0.2): payload byte count, terminator excluded. A `CStr` value
+/// carries only its NUL-free payload, so this is a stored length -- no
+/// rescan.
+pub fn len(value: string) -> usize {
+    return string_len(value);
+}
+
+/// CSTR-004 (R0.2): `as_bytes` excludes the terminator. A `CStr` value is
+/// already NUL-free, so this is the whole view.
+pub fn as_bytes(value: string) -> &[byte] {
+    return string_byte_view(value);
+}
+
+/// CSTR-004 (R0.2): `as_bytes_with_nul` includes exactly one terminator.
+pub fn as_bytes_with_nul(value: string) -> &[byte] {
+    return string_byte_view(string_concat(value, "\0"));
+}
+
+/// CSTR-007 (R0.2): validate the payload as UTF-8; invalid bytes return a
+/// `TextError` (`FromUtf8Result::Invalid`) with no lossy replacement. The
+/// `Ok` string is a fresh owned copy of the payload.
+pub fn to_text(value: string) -> FromUtf8Result {
+    return from_utf8(string_byte_view(value));
+}

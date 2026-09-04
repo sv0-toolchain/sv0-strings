@@ -33,8 +33,18 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   (SS-124, byte-level UTF-8 search + scalar-boundary-checked slicing;
   `SliceResult` carrier), and `from_utf8` / `as_bytes` (SS-125, owned-copy
   conversion + borrowed `&[byte]` view; `FromUtf8Result` carrier). This
-  completes the SPEC Section 11 text surface. Whole-string semantics run on
-  the length-bearing
+  completes the SPEC Section 11 text surface.
+- **`strings_cstr` `CStr` / `CString` constructors and views** (SS-126,
+  CSTR-001..007 / CSTR-017): `from_bytes_with_nul`, `from_bytes_until_nul`,
+  `from_text`, `from_bytes`, `borrow`, `as_bytes`, `as_bytes_with_nul`,
+  `len`, `to_text`. Deviation **D-7**: `CStr` and `CString` have no distinct
+  sv0 type (an enum variant carrying a struct payload does not lower on the C
+  backend), so both are an owned `string` — a `CStr` value is the NUL-free
+  payload, a `CString` value is `<payload><0x00>`; the `borrows(...)`
+  relations are advisory (bytes are copied at construction) while the
+  no-rescan invariants hold via the stored length. `clone_owned` / `concat`
+  are SS-127; the `CBuffer` family is SS-128.
+- Whole-string semantics run on the length-bearing
   owned `string` (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed
   toolchain slice **SS-U15** (collision-gated per-module symbol mangling in
   the `--project` concat, so `strings_bytes` and `strings_text` can each
