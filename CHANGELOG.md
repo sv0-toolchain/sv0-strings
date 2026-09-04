@@ -142,6 +142,20 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   (`test/differential/c23_strcpy_family_oracle.py`, 9 cases; the oracle
   gained `strcpy`/`strncpy`/`strcat`/`strncat` ops). No new toolchain slice
   needed. `scripts/test --backend=both` = 32/32.
+- **`strings_c23::strdup` / `strndup`** (SS-145 / C23-011): `strdup` is the
+  C23-recognizable name for `strings_cstr::clone_owned` (SPEC Appendix A.5
+  maps it directly there); `strndup(src, n)` builds a fresh owned `CString`
+  from a bounded, possibly non-terminated byte source — copies through the
+  first `0x00` within `[0, min(n, src.len()))` (or the whole window when
+  none exists) then appends exactly one terminator, never reading past
+  `src`'s own bound even when it is shorter than `n` with no `0x00` inside
+  it. Both return `ConcatResult` (`Joined`/`LengthOverflow`, the same shape
+  as `clone_owned`/`concat`); a genuine allocation failure still fails
+  closed via the owned allocator, same as every other owned-string
+  constructor. Differential-checked against the host libc
+  (`test/differential/c23_strdup_family_oracle.py`, 6 cases; the oracle
+  gained `strdup`/`strndup` ops). No new toolchain slice needed.
+  `scripts/test --backend=both` = 33/33.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

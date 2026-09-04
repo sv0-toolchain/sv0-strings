@@ -48,6 +48,8 @@
  *   strncpy  guarded write, exact zero-padding; src= bounded (need not be NUL-terminated)
  *   strcat   guarded write; src= dst's initial content (NUL-in-window), cstr= string to append
  *   strncat  same as strcat, bounded by n; cstr need not contain a NUL within n
+ *   strdup   fresh allocation; cstr= source C string (NUL-in-window); ret=ptr:nonnull, out=, term=
+ *   strndup  fresh allocation, bounded by n; src need not contain a NUL within n
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too. */
@@ -566,6 +568,57 @@ static int op_strncat(const struct req *r) {
     return 0;
 }
 
+static int op_strdup(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    long k = find_nul(r->cstr, r->cstr_n);
+    if (k < 0) return fail_pre("no-nul-in-window");
+
+    errno = 0;
+    char *ret = strdup((const char *)r->cstr);
+    if (!ret) {
+        printf("precondition=ok\n");
+        printf("ret=ptr:null\n");
+        printf("errno=%s\n", errno_name(errno));
+        return 0;
+    }
+    printf("precondition=ok\n");
+    printf("ret=ptr:nonnull\n");
+    emit_hex("out", (const unsigned char *)ret, k);
+    printf("outlen=%ld\n", k);
+    printf("term=%s\n", ret[k] == 0 ? "ok" : "MISSING");
+    printf("errno=%s\n", errno_name(errno));
+    free(ret);
+    return 0;
+}
+
+static int op_strndup(const struct req *r) {
+    if (r->src_n < 0) return fail_pre("src-missing");
+    if (r->n < 0)      return fail_pre("n-missing");
+    {
+        long scan = r->n < r->src_n ? r->n : r->src_n;
+        long nul_at = find_nul(r->src, scan);
+        if (nul_at < 0 && r->n > r->src_n) return fail_pre("no-nul-and-n-gt-src");
+    }
+
+    errno = 0;
+    char *ret = strndup((const char *)r->src, (size_t)r->n);
+    if (!ret) {
+        printf("precondition=ok\n");
+        printf("ret=ptr:null\n");
+        printf("errno=%s\n", errno_name(errno));
+        return 0;
+    }
+    long len = (long)strlen(ret);
+    printf("precondition=ok\n");
+    printf("ret=ptr:nonnull\n");
+    emit_hex("out", (const unsigned char *)ret, len);
+    printf("outlen=%ld\n", len);
+    printf("term=%s\n", ret[len] == 0 ? "ok" : "MISSING");
+    printf("errno=%s\n", errno_name(errno));
+    free(ret);
+    return 0;
+}
+
 static int op_strlen(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     /* Bounded window: the argument must contain a NUL within the bytes given,
@@ -606,6 +659,8 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strncpy") == 0) return op_strncpy(r);
     if (strcmp(r->fn, "strcat") == 0)  return op_strcat(r);
     if (strcmp(r->fn, "strncat") == 0) return op_strncat(r);
+    if (strcmp(r->fn, "strdup") == 0)  return op_strdup(r);
+    if (strcmp(r->fn, "strndup") == 0) return op_strndup(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }

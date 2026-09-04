@@ -17,6 +17,7 @@
 ///           file). C23-006 / C23-007.
 ///   SS-144  strcpy / strncpy / strcat / strncat -- IMPLEMENTED (this
 ///           file). C23-008 / C23-009 / C23-010.
+///   SS-145  strdup / strndup -- IMPLEMENTED (this file). C23-011.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -24,6 +25,7 @@ use strings_types::MoveResult;
 use strings_types::MemccpyReport;
 use strings_types::Ordering;
 use strings_types::Option;
+use strings_types::ConcatResult;
 use strings_bytes::copy;
 use strings_bytes::move_within;
 use strings_bytes::find;
@@ -32,6 +34,7 @@ use strings_bytes::find_slice;
 use strings_bytes::span_not_in;
 use strings_bytes::compare;
 use strings_cstr::as_bytes;
+use strings_cstr::clone_owned;
 use strings_checked::checked_add;
 use strings_checked::CheckedUsize;
 
@@ -431,4 +434,48 @@ pub fn strncat(dst: &mut [byte], src: &[byte], n: usize) -> CopyResult {
     }
     dst[f + m] = 0;
     return CopyResult::Copied(m);
+}
+
+/// C23-011 (Adapted). A fresh owned `CString` copy of the `CStr` payload
+/// `value`, plus one terminator -- the C23-recognizable name for
+/// `strings_cstr::clone_owned` (SPEC Appendix A.5: `strdup` maps directly to
+/// it). `len(value) + 1` is checked for `usize` overflow before any
+/// allocation (`ConcatResult::LengthOverflow`, `value` unchanged); a genuine
+/// allocation failure is not recoverable here -- the owned allocator fails
+/// closed (`sv0_panic`, D-7 / SS-U02b/d) -- typed allocation failure ends at
+/// the overflow check, same as every other owned-string constructor in this
+/// library.
+pub fn strdup(value: string) -> ConcatResult {
+    return clone_owned(value);
+}
+
+/// C23-011 (Adapted). A fresh owned `CString` from a BOUNDED, possibly
+/// non-terminated byte source: copies through the first `0x00` within
+/// `[0, min(n, src.len()))` (or through the whole window when none exists --
+/// `src` need not contain a `0x00` within its first `n` bytes), then appends
+/// exactly one terminator. `stop + 1` is checked for `usize` overflow before
+/// any allocation (`LengthOverflow`); the underlying owned allocator still
+/// fails closed on a genuine allocation failure, matching `strdup` above and
+/// every other owned-string constructor.
+///
+/// DEVIATION from C `strndup` (C23-011): never reads past `src`'s own
+/// bound even when `src.len() < n` and no `0x00` is found -- real `strndup`
+/// requires the caller to guarantee `n` valid bytes or an earlier
+/// terminator (undefined otherwise); the safe façade instead defines it by
+/// stopping at the slice's own length.
+pub fn strndup(src: &[byte], n: usize) -> ConcatResult {
+    let avail: usize = slice_len(src);
+    let mut lim: usize = n;
+    if lim > avail { lim = avail; }
+    let stop: usize = bound_to_nul(src, lim);
+
+    let total: CheckedUsize = checked_add(stop, 1);
+    let over: bool = match total {
+        CheckedUsize::Ok(_n) => { false },
+        CheckedUsize::Overflow => { true },
+    };
+    if over {
+        return ConcatResult::LengthOverflow;
+    }
+    return ConcatResult::Joined(string_concat(string_from_bytes(&src[0..stop]), "\0"));
 }

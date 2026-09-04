@@ -1,0 +1,69 @@
+/* SS-145 (SPEC C23-011): strings_c23::strdup / strndup.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `CStr` values are NUL-free `string`s (D-7). Results are owned `CString`s:
+ * <payload><exactly one 0x00>, same shape as `strings_cstr::clone_owned` /
+ * `concat` (SS-127). Expected results are hand-derived C23 facts
+ * (differential vs the C oracle is
+ * `test/differential/c23_strdup_family_oracle.py`).
+ */
+use strings_types::ConcatResult;
+use strings_c23::strdup;
+use strings_c23::strndup;
+use strings_cstr::borrow;
+use strings_cstr::as_bytes;
+use strings_text::equal;
+
+fn joined(r: ConcatResult) -> string {
+    return match r {
+        ConcatResult::Joined(s) => { s },
+        ConcatResult::LengthOverflow => { "" },
+    };
+}
+
+/* true iff `owned` is <want><exactly one 0x00> and has no interior 0x00. */
+fn owned_is(owned: string, want: string) -> bool {
+    let n: usize = string_len(owned);
+    if n == 0 { return false; }
+    if string_char_at(owned, n - 1) != 0 { return false; }
+    let payload: string = borrow(owned);
+    if equal(payload, want) != true { return false; }
+    let pv: &[byte] = as_bytes(payload);
+    let m: usize = slice_len(pv);
+    let mut i: usize = 0;
+    while i < m
+        loop_invariant(i <= m)
+    {
+        if pv[i] == 0 { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn main() -> i32 {
+    /* ================= strdup (C23-011) ================= */
+    if owned_is(joined(strdup("hello")), "hello") != true { return 1; }
+    if owned_is(joined(strdup("")), "") != true { return 2; }
+
+    /* ================= strndup (C23-011) ================= */
+    /* bounded, no NUL within n -> exactly n payload bytes */
+    let s1: [byte; 4] = [65, 66, 67, 68];   /* "ABCD" */
+    if owned_is(joined(strndup(&s1[..], 2)), "AB") != true { return 10; }
+
+    /* NUL found before n -> stops there */
+    let s2: [byte; 5] = [65, 66, 0, 88, 89];   /* "AB\0XY" */
+    if owned_is(joined(strndup(&s2[..], 5)), "AB") != true { return 11; }
+
+    /* n larger than a NUL-terminated src -> stops at the NUL, never reads
+       past the slice's own bound */
+    let s3: [byte; 3] = [65, 66, 0];   /* "AB\0" */
+    if owned_is(joined(strndup(&s3[..], 9)), "AB") != true { return 12; }
+
+    /* n == 0 -> empty result */
+    if owned_is(joined(strndup(&s1[..], 0)), "") != true { return 13; }
+
+    /* full slice, no NUL anywhere -> whole slice as payload */
+    if owned_is(joined(strndup(&s1[..], 4)), "ABCD") != true { return 14; }
+
+    return 0;
+}

@@ -83,6 +83,8 @@ dispatch table in `oracle.c`:
 | `strncpy` | guarded write, exact zero-padding; `src=` bounded (need NOT be NUL-terminated within `n`) |
 | `strcat` | guarded write; `src=` dst's INITIAL content (must already hold a NUL), `cstr=` string to append |
 | `strncat` | same as `strcat`, bounded by `n`; `cstr` need not contain a NUL within `n` |
+| `strdup` | fresh allocation; `cstr=` source C string (NUL-in-window); `ret=ptr:nonnull`, `out=`, `term=` |
+| `strndup` | fresh allocation, bounded by `n`; `src` need not contain a NUL within `n` |
 
 `value=` also carries the stop byte for `memccpy` and the search byte for
 `strchr` / `strrchr`.
@@ -95,4 +97,5 @@ sv0 property fixtures against this oracle (real host libc). Run by
 `memccpy` (SS-142); `c23_search_compare_oracle.py` covers `memchr` /
 `strchr` / `strrchr` / `strpbrk` / `strstr` / `memcmp` / `strcmp` /
 `strncmp` (SS-143); `c23_strcpy_family_oracle.py` covers `strcpy` /
-`strncpy` / `strcat` / `strncat` (SS-144).
+`strncpy` / `strcat` / `strncat` (SS-144); `c23_strdup_family_oracle.py`
+covers `strdup` / `strndup` (SS-145).
