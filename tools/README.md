@@ -1,7 +1,20 @@
 # sv0-strings tools
 
 Dependency-free (stdlib Python 3) support scripts. They run before any sv0
-toolchain is built, so CI can validate traceability on a bare checkout.
+toolchain is built, so CI can validate traceability on a bare checkout. The
+one exception is `c_oracle/`, which needs a host C compiler (not the sv0
+toolchain).
+
+## `c_oracle/` (SS-141 / SPEC §21.4)
+
+The independent C23 differential oracle: `oracle.c` computes the
+C23-defined result of a `<string.h>` operation on inputs whose C
+preconditions it has validated (so it never invokes C UB), with guard bytes
+around mutable buffers and semantic-value serialization. `run_oracle.py`
+builds it (cached), exposes `query(...)` for the R0.3 differential fixtures
+(SS-142+), and `--selftest` (wired into `scripts/check`) builds it under
+`-Werror` + ASan/UBSan and checks the guard / precondition / serialization
+contract. See `c_oracle/README.md`.
 
 ## catalogs (`catalogs/*.tsv`)
 

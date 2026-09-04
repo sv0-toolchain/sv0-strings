@@ -88,6 +88,21 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   backends (`docs/ownership-drop-parity.md`, SS-130). `scripts/test
   --backend=both` = 28/28. R0.2 deviations D-4 / D-6 / D-7 / D-8 / D-9 are
   registered and change no behavioural result.
+
+### R0.3 (in progress)
+
+- **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
+  `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
+  `<string.h>` operation on inputs whose C preconditions it has validated
+  (non-null, capacity, no-overlap, NUL-in-window), so it never invokes C UB;
+  mutable destinations carry `0xA5` guard bytes verified after the call;
+  results serialize as semantic values (lengths, normalized `-1/0/1`
+  orderings, guarded buffer contents, `errno` names) — never a raw pointer or
+  comparison magnitude. `build.sh` records the C standard (`-std=c23`, falling
+  back to c17) + warnings-as-errors; `run_oracle.py --selftest` also builds
+  under ASan/UBSan and is wired into `scripts/check`. The dispatch table wires
+  the four operation shapes (`memcpy` / `memset` / `memcmp` / `strlen`); SS-142
+  onward extend it.
 - **`strings_types`: library-local `Option<T>` / `Result<T, E>`** (SS-U06
   decision B). sv0c has no built-in `Option`/`Result`; a user-declared generic
   enum with scalar payloads monomorphizes on both backends. Structured error

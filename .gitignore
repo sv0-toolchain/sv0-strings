@@ -4,6 +4,9 @@
 *.o
 *.out
 
+# compiled C23 differential oracle (SS-141); source is tools/c_oracle/oracle.c
+/tools/c_oracle/oracle
+
 # generated C (from sv0c --emit=c / --keep-c)
 *.gen.c
 /staged/
