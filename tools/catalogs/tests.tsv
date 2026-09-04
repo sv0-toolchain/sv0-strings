@@ -24,3 +24,4 @@ T-TOKENIZE-CURSOR-001	test/property/tokenize_cursor.sv0	TOK-001,TOK-002,TOK-003,
 T-OWNED-LIFECYCLE-001	test/property/owned_lifecycle.sv0	UP-013,SEC-008,BACKEND-004	c,vm	safe	runtime	property	done
 T-C-ORACLE-001	tools/c_oracle/run_oracle.py	TEST-012,TEST-013	c	safe		tool	done
 T-C23-MEMCPY-FAMILY-001	test/property/c23_memcpy_family.sv0	C23-004,C23-005,C23-018	c,vm	safe	runtime	property	done
+T-C23-SEARCH-COMPARE-001	test/property/c23_search_compare.sv0	C23-006,C23-007	c,vm	safe	runtime	property	done

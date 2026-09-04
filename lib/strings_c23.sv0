@@ -12,13 +12,24 @@
 /// R0.3 progress:
 ///   SS-142  memcpy / memmove / memmove_within / memccpy -- IMPLEMENTED
 ///           (this file). C23-004 / C23-005.
+///   SS-143  memchr / strchr / strrchr / strpbrk / strstr (search) and
+///           memcmp / strcmp / strncmp (comparison) -- IMPLEMENTED (this
+///           file). C23-006 / C23-007.
 module strings_c23;
 
 use strings_types::CopyResult;
 use strings_types::MoveResult;
 use strings_types::MemccpyReport;
+use strings_types::Ordering;
+use strings_types::Option;
 use strings_bytes::copy;
 use strings_bytes::move_within;
+use strings_bytes::find;
+use strings_bytes::rfind;
+use strings_bytes::find_slice;
+use strings_bytes::span_not_in;
+use strings_bytes::compare;
+use strings_cstr::as_bytes;
 
 /// C23-004 (Adapted). Copy `n` bytes of `src` into `dst`. Overlap is a
 /// compile-time borrow exclusion: two distinct safe slice arguments cannot
@@ -116,4 +127,126 @@ pub fn memccpy(dst: &mut [byte], src: &[byte], stop: byte, n: usize) -> MemccpyR
         return MemccpyReport { written: i, next_offset_present: true, next_offset: i };
     }
     return MemccpyReport { written: i, next_offset_present: false, next_offset: 0 };
+}
+
+/// C23-006 (Adapted). Index of the first byte in `haystack` equal to
+/// `needle`, scanning only `[0, min(n, haystack.len()))` -- the safe façade
+/// never reads past the slice bound even when the caller passes an `n`
+/// larger than what is actually available (C `memchr` requires the caller
+/// to guarantee `n` valid bytes; there is no such requirement here).
+///
+/// DEVIATION from C `memchr` (C23-006): returns `Option<usize>`, never a
+/// dangling pointer.
+pub fn memchr(haystack: &[byte], needle: byte, n: usize) -> Option<usize> {
+    let avail: usize = slice_len(haystack);
+    let mut limit: usize = n;
+    if limit > avail { limit = avail; }
+    return find(&haystack[0..limit], needle);
+}
+
+/// C23-006 / C23-020 (Adapted). Index of the first byte of the `CStr`
+/// payload `s` equal to `c`. The terminator itself is out of scope for this
+/// slice (C23-021, `strchr(s, 0)`, lands with SS-151); `c` is compared
+/// against payload bytes only.
+///
+/// DEVIATION from C `strchr`: returns `Option<usize>`, an offset into the
+/// payload -- never an interior pointer, so it cannot dangle past `s`'s
+/// lifetime.
+pub fn strchr(s: string, c: byte) -> Option<usize> {
+    return find(as_bytes(s), c);
+}
+
+/// C23-006 / C23-020 (Adapted). Index of the LAST byte of the `CStr`
+/// payload `s` equal to `c`. Same terminator scope note as `strchr`.
+pub fn strrchr(s: string, c: byte) -> Option<usize> {
+    return rfind(as_bytes(s), c);
+}
+
+/// C23-006 (Adapted). Index of the first byte of the `CStr` payload `s`
+/// that is a member of the `CStr` payload `accept`. Delegates to
+/// `strings_bytes::span_not_in`: the first index NOT in the maximal prefix
+/// containing no `accept` member is exactly the first membership hit.
+pub fn strpbrk(s: string, accept: string) -> Option<usize> {
+    let sb: &[byte] = as_bytes(s);
+    let n: usize = slice_len(sb);
+    let idx: usize = span_not_in(sb, as_bytes(accept));
+    if idx < n { return Option::Some(idx); }
+    return Option::None;
+}
+
+/// C23-006 (Adapted). Index of the first occurrence of the `CStr` payload
+/// `needle` within the `CStr` payload `haystack`; `Option::Some(0)` for an
+/// empty needle (C23-023).
+pub fn strstr(haystack: string, needle: string) -> Option<usize> {
+    return find_slice(as_bytes(haystack), as_bytes(needle));
+}
+
+/// C23-007 (Adapted). Bounded unsigned-byte comparison of the first
+/// `min(n, a.len(), b.len())` bytes of `a` and `b` -- never reads past
+/// either slice's bound, so an `n` larger than what is actually available
+/// on either side is simply clamped rather than being the caller's
+/// obligation (as raw C `memcmp` requires).
+///
+/// DEVIATION from C `memcmp` (C23-007): returns `Ordering`, not an
+/// arbitrary signed magnitude. `ordering_to_c_int` below recovers the
+/// `-1 / 0 / 1` shape when a C-compatible integer is needed.
+pub fn memcmp(a: &[byte], b: &[byte], n: usize) -> Ordering {
+    let alen: usize = slice_len(a);
+    let blen: usize = slice_len(b);
+    let mut lim: usize = n;
+    if lim > alen { lim = alen; }
+    if lim > blen { lim = blen; }
+    return compare(&a[0..lim], &b[0..lim]);
+}
+
+/// C23-007 (Adapted). Unsigned-byte comparison of the `CStr` payloads of
+/// `a` and `b`. Payload bytes exclude the terminator (D-7), so this is
+/// exactly `strings_bytes::compare` over the two payload views -- no
+/// terminator byte ever enters the comparison, matching `strcmp`'s value
+/// semantics without depending on a NUL sentinel to find the end.
+pub fn strcmp(a: string, b: string) -> Ordering {
+    return compare(as_bytes(a), as_bytes(b));
+}
+
+/// Length of the maximal prefix of `buf` (bounded by `limit`) that contains
+/// no `0x00` byte -- the effective end of a possibly-non-terminated,
+/// `n`-bounded C-string source (C23-027).
+fn bound_to_nul(buf: &[byte], limit: usize) -> usize {
+    let mut i: usize = 0;
+    while i < limit
+        loop_invariant(i <= limit)
+    {
+        if buf[i] == 0 { return i; }
+        i = i + 1;
+    }
+    return limit;
+}
+
+/// C23-007 / C23-027 (Adapted). Compare `a` and `b` over at most `n` bytes
+/// each, stopping at the first `0x00` within that bound or at `n`,
+/// whichever comes first -- `a` / `b` need NOT contain a `0x00` within `n`
+/// (a bounded initialized byte source, not necessarily a validated `CStr`).
+/// Never reads past `n` or either slice's own bound.
+pub fn strncmp(a: &[byte], b: &[byte], n: usize) -> Ordering {
+    let acap: usize = slice_len(a);
+    let bcap: usize = slice_len(b);
+    let mut abound: usize = n;
+    if abound > acap { abound = acap; }
+    let mut bbound: usize = n;
+    if bbound > bcap { bbound = bcap; }
+    let ac: usize = bound_to_nul(a, abound);
+    let bc: usize = bound_to_nul(b, bbound);
+    return compare(&a[0..ac], &b[0..bc]);
+}
+
+/// SPEC Appendix B.1 (worked example): the canonical `Ordering` ->
+/// C-integer adapter. `ensures` pins the C-compatible three-value range.
+pub fn ordering_to_c_int(ordering: Ordering) -> i32
+    ensures(result == -1 || result == 0 || result == 1)
+{
+    return match ordering {
+        Ordering::Less => -1,
+        Ordering::Equal => 0,
+        Ordering::Greater => 1,
+    };
 }

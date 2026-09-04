@@ -37,6 +37,13 @@
  *   memset   guarded write
  *   memcmp   normalized ordering
  *   strlen   bounded read -> length
+ *   memchr   ret=idx:<n>|idx:none (bounded by n <= src_n)
+ *   strchr   ret=idx:<n>|idx:none (cstr must contain a NUL in-window; value= is the byte)
+ *   strrchr  same shape as strchr, last match
+ *   strpbrk  ret=idx:<n>|idx:none (cstr= haystack, a= accept set, both NUL-in-window)
+ *   strstr   ret=idx:<n>|idx:none (cstr= haystack, a= needle, both NUL-in-window)
+ *   strcmp   normalized ordering (a, b both NUL-in-window)
+ *   strncmp  normalized ordering, bounded by n (a, b need NOT contain a NUL)
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too. */
@@ -336,6 +343,118 @@ static int op_memcmp(const struct req *r) {
     return 0;
 }
 
+/* -1 if no NUL within [0, n); else the offset of the first one. */
+static long find_nul(const unsigned char *buf, long n) {
+    for (long i = 0; i < n; i++)
+        if (buf[i] == 0) return i;
+    return -1;
+}
+
+static int op_memchr(const struct req *r) {
+    if (r->src_n < 0) return fail_pre("src-missing");
+    if (r->value < 0) return fail_pre("value-missing");
+    if (r->n < 0)      return fail_pre("n-missing");
+    if (r->value > 255) return fail_pre("value-range");
+    if (r->n > r->src_n) return fail_pre("n-gt-src");
+
+    errno = 0;
+    void *ret = memchr(r->src, (int)r->value, (size_t)r->n);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - r->src));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strchr(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->value < 0)  return fail_pre("value-missing");
+    if (r->value > 255) return fail_pre("value-range");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window");
+
+    errno = 0;
+    char *ret = strchr((const char *)r->cstr, (int)r->value);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - r->cstr));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strrchr(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->value < 0)  return fail_pre("value-missing");
+    if (r->value > 255) return fail_pre("value-range");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window");
+
+    errno = 0;
+    char *ret = strrchr((const char *)r->cstr, (int)r->value);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - r->cstr));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strpbrk(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->a_n < 0)    return fail_pre("a-missing");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window:cstr");
+    if (find_nul(r->a, r->a_n) < 0)       return fail_pre("no-nul-in-window:a");
+
+    errno = 0;
+    char *ret = strpbrk((const char *)r->cstr, (const char *)r->a);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - r->cstr));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strstr(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->a_n < 0)    return fail_pre("a-missing");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window:cstr");
+    if (find_nul(r->a, r->a_n) < 0)       return fail_pre("no-nul-in-window:a");
+
+    errno = 0;
+    char *ret = strstr((const char *)r->cstr, (const char *)r->a);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - r->cstr));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strcmp(const struct req *r) {
+    if (r->a_n < 0) return fail_pre("a-missing");
+    if (r->b_n < 0) return fail_pre("b-missing");
+    if (find_nul(r->a, r->a_n) < 0) return fail_pre("no-nul-in-window:a");
+    if (find_nul(r->b, r->b_n) < 0) return fail_pre("no-nul-in-window:b");
+
+    errno = 0;
+    int c = strcmp((const char *)r->a, (const char *)r->b);
+    printf("precondition=ok\n");
+    printf("ret=ord:%d\n", norm_ord(c));
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strncmp(const struct req *r) {
+    if (r->a_n < 0) return fail_pre("a-missing");
+    if (r->b_n < 0) return fail_pre("b-missing");
+    if (r->n < 0)   return fail_pre("n-missing");
+    if (r->n > r->a_n) return fail_pre("n-gt-a");
+    if (r->n > r->b_n) return fail_pre("n-gt-b");
+
+    errno = 0;
+    int c = strncmp((const char *)r->a, (const char *)r->b, (size_t)r->n);
+    printf("precondition=ok\n");
+    printf("ret=ord:%d\n", norm_ord(c));
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
 static int op_strlen(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     /* Bounded window: the argument must contain a NUL within the bytes given,
@@ -365,6 +484,13 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "memset") == 0)  return op_memset(r);
     if (strcmp(r->fn, "memcmp") == 0)  return op_memcmp(r);
     if (strcmp(r->fn, "strlen") == 0)  return op_strlen(r);
+    if (strcmp(r->fn, "memchr") == 0)  return op_memchr(r);
+    if (strcmp(r->fn, "strchr") == 0)  return op_strchr(r);
+    if (strcmp(r->fn, "strrchr") == 0) return op_strrchr(r);
+    if (strcmp(r->fn, "strpbrk") == 0) return op_strpbrk(r);
+    if (strcmp(r->fn, "strstr") == 0)  return op_strstr(r);
+    if (strcmp(r->fn, "strcmp") == 0)  return op_strcmp(r);
+    if (strcmp(r->fn, "strncmp") == 0) return op_strncmp(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }

@@ -106,6 +106,23 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   toolchain slice **SS-U18** (a `fn memcpy` clashes with libc in the
   `--project` translation unit → module-prefixed like a cross-module
   collision). `scripts/test --backend=both` = 30/30.
+- **`strings_c23::memchr` / `strchr` / `strrchr` / `strpbrk` / `strstr`
+  (search) and `memcmp` / `strcmp` / `strncmp` (comparison)** (SS-143 /
+  C23-006 / C23-007): the first C23 search + comparison adapters. Search
+  functions delegate to the existing `strings_bytes` primitives
+  (`find`/`rfind`/`find_slice`/`span_not_in`) and return `Option<usize>` —
+  never a dangling pointer; `memchr` clamps its scan window to
+  `min(n, haystack.len())` rather than trusting the caller's `n` (C `memchr`
+  requires the caller to guarantee `n` valid bytes). Comparison functions
+  return `Ordering`; `memcmp`/`strncmp` clamp their bound to what is actually
+  available on each side rather than reading past a slice (`strncmp` also
+  stops at the first `0x00` within the bound, matching C23-027's "bounded
+  initialized source that need not contain a NUL within `n`"). Added the
+  worked `ordering_to_c_int` adapter (SPEC Appendix B.1). Differential-checked
+  against the host libc (`test/differential/c23_search_compare_oracle.py`,
+  15 cases; the oracle gained `memchr`/`strchr`/`strrchr`/`strpbrk`/`strstr`/
+  `strcmp`/`strncmp` ops). No new toolchain slice needed. `scripts/test
+  --backend=both` = 31/31.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

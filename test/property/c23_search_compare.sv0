@@ -1,0 +1,97 @@
+/* SS-143 (SPEC C23-006, C23-007): strings_c23::memchr / strchr / strrchr /
+ * strpbrk / strstr (search) and memcmp / strcmp / strncmp (comparison), plus
+ * ordering_to_c_int (SPEC Appendix B.1).
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Expected results are hand-derived C23 facts (differential vs the C oracle
+ * is `test/differential/c23_search_compare_oracle.py`). `CStr` values are
+ * NUL-free `string`s (D-7), so a string literal without a `\0` is a valid
+ * `CStr` argument. Byte values decimal.
+ */
+use strings_types::Option;
+use strings_types::Ordering;
+use strings_c23::memchr;
+use strings_c23::strchr;
+use strings_c23::strrchr;
+use strings_c23::strpbrk;
+use strings_c23::strstr;
+use strings_c23::memcmp;
+use strings_c23::strcmp;
+use strings_c23::strncmp;
+use strings_c23::ordering_to_c_int;
+
+/* -1 = None; k = Some(k) */
+fn oi(o: Option<usize>) -> i32 {
+    return match o {
+        Option::Some(k) => { k as i32 },
+        Option::None => { 0 - 1 },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= memchr (C23-006) ================= */
+    let hay: [byte; 4] = [0, 1, 2, 3];
+    if oi(memchr(&hay[..], 2, 4)) != 2 { return 1; }
+    if oi(memchr(&hay[..], 3, 2)) != 0 - 1 { return 2; }   /* bounded before match */
+    if oi(memchr(&hay[..], 9, 4)) != 0 - 1 { return 3; }   /* absent entirely */
+    if oi(memchr(&hay[..], 0, 4)) != 0 { return 4; }       /* first byte */
+
+    /* n larger than the slice never reads past it (clamped, no UB) */
+    if oi(memchr(&hay[..], 3, 999)) != 3 { return 5; }
+
+    /* ================= strchr / strrchr (C23-006 / C23-020) =========== */
+    if oi(strchr("banana", 97)) != 1 { return 10; }        /* 'a' */
+    if oi(strchr("banana", 122)) != 0 - 1 { return 11; }    /* 'z' absent */
+    if oi(strrchr("banana", 97)) != 5 { return 12; }        /* last 'a' */
+    if oi(strrchr("banana", 98)) != 0 { return 13; }        /* 'b' unique */
+
+    /* ================= strpbrk (C23-006) ================= */
+    if oi(strpbrk("hello world", " ,")) != 5 { return 20; }
+    if oi(strpbrk("hello", "xyz")) != 0 - 1 { return 21; }
+    if oi(strpbrk("hello", "")) != 0 - 1 { return 22; }     /* empty accept set */
+
+    /* ================= strstr (C23-006 / C23-023) ================= */
+    if oi(strstr("hello world", "world")) != 6 { return 30; }
+    if oi(strstr("hello world", "xyz")) != 0 - 1 { return 31; }
+    if oi(strstr("hello", "")) != 0 { return 32; }          /* empty needle -> 0 */
+
+    /* ================= memcmp (C23-007) ================= */
+    let a1: [byte; 3] = [1, 2, 3];
+    let b1: [byte; 3] = [1, 5, 3];
+    if ordering_to_c_int(memcmp(&a1[..], &b1[..], 3)) != 0 - 1 { return 40; }
+    let a2: [byte; 3] = [97, 98, 99];
+    let b2: [byte; 3] = [97, 98, 99];
+    if ordering_to_c_int(memcmp(&a2[..], &b2[..], 3)) != 0 { return 41; }
+    if ordering_to_c_int(memcmp(&b1[..], &a1[..], 3)) != 1 { return 42; }
+    /* n clamped to the shorter slice, no UB (a3[0]=9 > a1[0]=1 -> Greater) */
+    let a3: [byte; 2] = [9, 9];
+    if ordering_to_c_int(memcmp(&a3[..], &a1[..], 99)) != 1 { return 43; }
+
+    /* ================= strcmp (C23-007) ================= */
+    if ordering_to_c_int(strcmp("ab", "abc")) != 0 - 1 { return 50; }  /* prefix -> shorter Less */
+    if ordering_to_c_int(strcmp("same", "same")) != 0 { return 51; }
+    if ordering_to_c_int(strcmp("abd", "abc")) != 1 { return 52; }
+
+    /* ================= strncmp (C23-007 / C23-027) ================= */
+    let x1: [byte; 5] = [97, 98, 99, 88, 88];   /* "abcXX" */
+    let x2: [byte; 5] = [97, 98, 99, 89, 89];   /* "abcYY" */
+    if ordering_to_c_int(strncmp(&x1[..], &x2[..], 3)) != 0 { return 60; }  /* bounded equal */
+    let x3: [byte; 5] = [97, 98, 100, 89, 89];  /* "abdYY" */
+    if ordering_to_c_int(strncmp(&x1[..], &x3[..], 3)) != 0 - 1 { return 61; }
+
+    /* source need not contain a NUL within n (C23-027) -- no embedded 0x00
+       anywhere in x1/x2/x3, and the comparison still stayed within n. */
+    if ordering_to_c_int(strncmp(&x1[..], &x2[..], 5)) != 0 - 1 { return 62; }  /* full bound: X < Y */
+
+    /* an embedded NUL within the bound stops the comparison there */
+    let y1: [byte; 4] = [97, 98, 0, 88];
+    let y2: [byte; 4] = [97, 98, 0, 89];
+    if ordering_to_c_int(strncmp(&y1[..], &y2[..], 4)) != 0 { return 63; }
+
+    /* ================= ordering_to_c_int (SPEC Appendix B.1) ========== */
+    if ordering_to_c_int(Ordering::Less) != 0 - 1 { return 70; }
+    if ordering_to_c_int(Ordering::Equal) != 0 { return 71; }
+    if ordering_to_c_int(Ordering::Greater) != 1 { return 72; }
+
+    return 0;
+}

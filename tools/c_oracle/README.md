@@ -70,14 +70,24 @@ dispatch table in `oracle.c`:
 | `memmove` | guarded write, overlap allowed |
 | `memccpy` | guarded write up to a stop byte; `ret=idx:<past-stop>` / `idx:none`, `written=` |
 | `memset` | guarded write |
-| `memcmp` | normalized ordering |
-| `strlen` | bounded read → length |
+| `memcmp` | normalized ordering (`a`, `b`, `n` — bounded, no NUL required) |
+| `strlen` | bounded read → length (`cstr` must contain a NUL in-window) |
+| `memchr` | `ret=idx:<n>` / `idx:none`, bounded by `n <= src_n` |
+| `strchr` | `ret=idx:<n>` / `idx:none`; `cstr` must contain a NUL in-window; `value=` is the search byte |
+| `strrchr` | same shape as `strchr`, last match |
+| `strpbrk` | `ret=idx:<n>` / `idx:none`; `cstr=` haystack, `a=` accept set, both NUL-in-window |
+| `strstr` | `ret=idx:<n>` / `idx:none`; `cstr=` haystack, `a=` needle, both NUL-in-window |
+| `strcmp` | normalized ordering; `a`, `b` both NUL-in-window |
+| `strncmp` | normalized ordering, bounded by `n`; `a`, `b` need NOT contain a NUL |
 
-`value=` also carries the stop byte for `memccpy`.
+`value=` also carries the stop byte for `memccpy` and the search byte for
+`strchr` / `strrchr`.
 
 ## Differential drivers
 
 `test/differential/*.py` cross-check the C23 result values asserted by the
 sv0 property fixtures against this oracle (real host libc). Run by
 `scripts/check`. `c23_memcpy_oracle.py` covers `memcpy` / `memmove` /
-`memccpy` (SS-142).
+`memccpy` (SS-142); `c23_search_compare_oracle.py` covers `memchr` /
+`strchr` / `strrchr` / `strpbrk` / `strstr` / `memcmp` / `strcmp` /
+`strncmp` (SS-143).
