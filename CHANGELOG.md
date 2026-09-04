@@ -79,7 +79,15 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `string_byte_view` compiler builtins) for `from_utf8` / `as_bytes` —
   `as_bytes` keeps its exact SPEC `-> &[byte]` signature, no deviation.
   Deviation **D-6**: text APIs take `string` by value (sv0 has no surface
-  `&string`). `scripts/test --backend=both` = 23/23.
+  `&string`). **SS-U17** adds the VM `SV0_STR_FAIL_AT` allocation-fault
+  injection so BACKEND-004 holds on both backends.
+- **R0.2 gate: PASS** (`docs/r0.2-gate-review.md`, SS-131 / SPEC §24.3).
+  Every in-scope `TEXT-*` / `CSTR-*` / `TOK-*` requirement traces to a green
+  fixture; UTF-8 corpus, borrow compile-fail, allocation-failure (C + VM),
+  and CBuffer model tests pass; owned strings / `CString`s release on both
+  backends (`docs/ownership-drop-parity.md`, SS-130). `scripts/test
+  --backend=both` = 28/28. R0.2 deviations D-4 / D-6 / D-7 / D-8 / D-9 are
+  registered and change no behavioural result.
 - **`strings_types`: library-local `Option<T>` / `Result<T, E>`** (SS-U06
   decision B). sv0c has no built-in `Option`/`Result`; a user-declared generic
   enum with scalar payloads monomorphizes on both backends. Structured error

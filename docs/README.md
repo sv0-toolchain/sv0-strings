@@ -17,8 +17,10 @@ in the `project-specs` repository:
 
 - `complexity.md` — per-operation worst-case time/space (PERF-001/002); the R1 `find_slice` replacement plan.
 - `fill-explicit-blocked.md` — SS-108 / BYTE-010: why `fill_explicit` stays Blocked (optimizer + VM-trace evidence) and the SS-U11 unblock path.
-- `f0-deviations.md` — the reviewed F0 deviation register (D-1..D-5).
+- `f0-deviations.md` — the reviewed deviation register (D-1..D-9): F0 + the R0.2 library-implementation deviations.
 - `r0.1-gate-review.md` — SS-111 / SPEC §24.2: BYTE-* / ASCII-* / PERF-* requirement trace to green tests.
+- `r0.2-gate-review.md` — SS-131 / SPEC §24.3: TEXT-* / CSTR-* / TOK-* requirement trace to green tests; the §24.3 checklist.
+- `ownership-drop-parity.md` — SS-130 / BL-057: arena release model, checked leak-free `LengthOverflow`, C+VM allocation-failure injection (BACKEND-004), R1 deferrals.
 
 ## Generated / authored later
 
