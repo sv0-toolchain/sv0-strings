@@ -27,3 +27,4 @@ T-C23-MEMCPY-FAMILY-001	test/property/c23_memcpy_family.sv0	C23-004,C23-005,C23-
 T-C23-SEARCH-COMPARE-001	test/property/c23_search_compare.sv0	C23-006,C23-007	c,vm	safe	runtime	property	done
 T-C23-STRCPY-FAMILY-001	test/property/c23_strcpy_family.sv0	C23-008,C23-009,C23-010	c,vm	safe	runtime	property	done
 T-C23-STRDUP-FAMILY-001	test/property/c23_strdup_family.sv0	C23-011	c,vm	safe	runtime	property	done
+T-C23-SPAN-001	test/property/c23_span.sv0	C23-012	c,vm	safe	runtime	property	done

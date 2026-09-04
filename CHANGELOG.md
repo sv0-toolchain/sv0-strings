@@ -156,6 +156,13 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   (`test/differential/c23_strdup_family_oracle.py`, 6 cases; the oracle
   gained `strdup`/`strndup` ops). No new toolchain slice needed.
   `scripts/test --backend=both` = 33/33.
+- **`strings_c23::strspn` / `strcspn`** (SS-146 / C23-012): `strspn(s, accept)`
+  / `strcspn(s, reject)` delegate directly to `strings_bytes::span_in` /
+  `span_not_in` over the `CStr` payload bytes — no new algorithm, per SPEC
+  ARCH-003. Differential-checked against the host libc
+  (`test/differential/c23_span_oracle.py`, 6 cases; the oracle gained
+  `strspn`/`strcspn` ops). No new toolchain slice needed. `scripts/test
+  --backend=both` = 34/34.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

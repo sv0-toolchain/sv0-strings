@@ -18,6 +18,7 @@
 ///   SS-144  strcpy / strncpy / strcat / strncat -- IMPLEMENTED (this
 ///           file). C23-008 / C23-009 / C23-010.
 ///   SS-145  strdup / strndup -- IMPLEMENTED (this file). C23-011.
+///   SS-146  strspn / strcspn -- IMPLEMENTED (this file). C23-012.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -31,6 +32,7 @@ use strings_bytes::move_within;
 use strings_bytes::find;
 use strings_bytes::rfind;
 use strings_bytes::find_slice;
+use strings_bytes::span_in;
 use strings_bytes::span_not_in;
 use strings_bytes::compare;
 use strings_cstr::as_bytes;
@@ -478,4 +480,21 @@ pub fn strndup(src: &[byte], n: usize) -> ConcatResult {
         return ConcatResult::LengthOverflow;
     }
     return ConcatResult::Joined(string_concat(string_from_bytes(&src[0..stop]), "\0"));
+}
+
+/// C23-012 (Adapted). Length of the maximal prefix of the `CStr` payload
+/// `s` all of whose bytes are members of the `CStr` payload `accept`.
+/// Delegates directly to `strings_bytes::span_in` over the payload bytes
+/// (SPEC ARCH-003: adapt the shared safe implementation, never duplicate
+/// the algorithm).
+pub fn strspn(s: string, accept: string) -> usize {
+    return span_in(as_bytes(s), as_bytes(accept));
+}
+
+/// C23-012 (Adapted). Length of the maximal prefix of the `CStr` payload
+/// `s` none of whose bytes are members of the `CStr` payload `reject`.
+/// Delegates directly to `strings_bytes::span_not_in` over the payload
+/// bytes.
+pub fn strcspn(s: string, reject: string) -> usize {
+    return span_not_in(as_bytes(s), as_bytes(reject));
 }

@@ -50,6 +50,8 @@
  *   strncat  same as strcat, bounded by n; cstr need not contain a NUL within n
  *   strdup   fresh allocation; cstr= source C string (NUL-in-window); ret=ptr:nonnull, out=, term=
  *   strndup  fresh allocation, bounded by n; src need not contain a NUL within n
+ *   strspn   bounded read -> length; cstr= s, a= accept set (both NUL-in-window)
+ *   strcspn  bounded read -> length; cstr= s, a= reject set (both NUL-in-window)
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too. */
@@ -619,6 +621,34 @@ static int op_strndup(const struct req *r) {
     return 0;
 }
 
+static int op_strspn(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->a_n < 0)    return fail_pre("a-missing");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window:cstr");
+    if (find_nul(r->a, r->a_n) < 0)       return fail_pre("no-nul-in-window:a");
+
+    errno = 0;
+    size_t len = strspn((const char *)r->cstr, (const char *)r->a);
+    printf("precondition=ok\n");
+    printf("ret=i:%zu\n", len);
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strcspn(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->a_n < 0)    return fail_pre("a-missing");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window:cstr");
+    if (find_nul(r->a, r->a_n) < 0)       return fail_pre("no-nul-in-window:a");
+
+    errno = 0;
+    size_t len = strcspn((const char *)r->cstr, (const char *)r->a);
+    printf("precondition=ok\n");
+    printf("ret=i:%zu\n", len);
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
 static int op_strlen(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     /* Bounded window: the argument must contain a NUL within the bytes given,
@@ -661,6 +691,8 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strncat") == 0) return op_strncat(r);
     if (strcmp(r->fn, "strdup") == 0)  return op_strdup(r);
     if (strcmp(r->fn, "strndup") == 0) return op_strndup(r);
+    if (strcmp(r->fn, "strspn") == 0)  return op_strspn(r);
+    if (strcmp(r->fn, "strcspn") == 0) return op_strcspn(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }

@@ -85,6 +85,8 @@ dispatch table in `oracle.c`:
 | `strncat` | same as `strcat`, bounded by `n`; `cstr` need not contain a NUL within `n` |
 | `strdup` | fresh allocation; `cstr=` source C string (NUL-in-window); `ret=ptr:nonnull`, `out=`, `term=` |
 | `strndup` | fresh allocation, bounded by `n`; `src` need not contain a NUL within `n` |
+| `strspn` | bounded read → length; `cstr=` s, `a=` accept set (both NUL-in-window) |
+| `strcspn` | bounded read → length; `cstr=` s, `a=` reject set (both NUL-in-window) |
 
 `value=` also carries the stop byte for `memccpy` and the search byte for
 `strchr` / `strrchr`.
@@ -98,4 +100,5 @@ sv0 property fixtures against this oracle (real host libc). Run by
 `strchr` / `strrchr` / `strpbrk` / `strstr` / `memcmp` / `strcmp` /
 `strncmp` (SS-143); `c23_strcpy_family_oracle.py` covers `strcpy` /
 `strncpy` / `strcat` / `strncat` (SS-144); `c23_strdup_family_oracle.py`
-covers `strdup` / `strndup` (SS-145).
+covers `strdup` / `strndup` (SS-145); `c23_span_oracle.py` covers `strspn` /
+`strcspn` (SS-146).

@@ -1,0 +1,29 @@
+/* SS-146 (SPEC C23-012): strings_c23::strspn / strcspn.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `CStr` values are NUL-free `string`s (D-7), so a string literal without a
+ * `\0` is a valid `CStr` argument. Both functions delegate directly to
+ * `strings_bytes::span_in` / `span_not_in` (SPEC ARCH-003). Expected results
+ * are hand-derived C23 facts (differential vs the C oracle is
+ * `test/differential/c23_span_oracle.py`).
+ */
+use strings_c23::strspn;
+use strings_c23::strcspn;
+
+fn main() -> i32 {
+    /* ================= strspn (C23-012) ================= */
+    if strspn("123abc", "123") != 3 { return 1; }
+    if strspn("abc", "xyz") != 0 { return 2; }
+    if strspn("aaa", "a") != 3 { return 3; }
+    if strspn("abc", "") != 0 { return 4; }      /* empty accept set */
+    if strspn("", "abc") != 0 { return 5; }      /* empty s */
+
+    /* ================= strcspn (C23-012) ================= */
+    if strcspn("abcdefg", "de") != 3 { return 10; }
+    if strcspn("abc", "xyz") != 3 { return 11; }  /* no member -> whole s */
+    if strcspn("abc", "a") != 0 { return 12; }    /* first byte is a member */
+    if strcspn("abc", "") != 3 { return 13; }     /* empty reject set -> whole s */
+    if strcspn("", "abc") != 0 { return 14; }     /* empty s */
+
+    return 0;
+}
