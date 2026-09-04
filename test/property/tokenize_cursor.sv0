@@ -1,0 +1,192 @@
+/* SS-129 (SPEC TOK-001..007): strings_tokenize::next + TokenCursor.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Explicit scalar cursor (D-9): `next` takes the cursor position as a plain
+ * `usize` and returns `TokenStep::Emit(start, end, next_pos)` / `Complete`;
+ * the caller threads `next_pos` into its `TokenCursor.pos`. Byte values
+ * decimal; hex/ASCII in comments.
+ */
+use strings_types::TokenCursor;
+use strings_types::TokenStep;
+use strings_tokenize::next;
+use strings_tokenize::cursor_start;
+
+fn step_is_emit(st: TokenStep) -> bool {
+    return match st {
+        TokenStep::Emit(_a, _b, _c) => { true },
+        TokenStep::Complete => { false },
+    };
+}
+fn step_s(st: TokenStep) -> usize {
+    return match st {
+        TokenStep::Emit(x, _b, _c) => { x },
+        TokenStep::Complete => { 0 },
+    };
+}
+fn step_e(st: TokenStep) -> usize {
+    return match st {
+        TokenStep::Emit(_a, x, _c) => { x },
+        TokenStep::Complete => { 0 },
+    };
+}
+fn step_np(st: TokenStep) -> usize {
+    return match st {
+        TokenStep::Emit(_a, _b, x) => { x },
+        TokenStep::Complete => { 0 },
+    };
+}
+
+/* input[s..e] byte-equals `want`. */
+fn seg_eq(input: &[byte], s: usize, e: usize, want: string) -> bool {
+    if e - s != string_len(want) { return false; }
+    let mut i: usize = s;
+    let mut j: usize = 0;
+    while i < e
+        loop_invariant(i <= e)
+    {
+        if input[i] != string_char_at(want, j) { return false; }
+        i = i + 1;
+        j = j + 1;
+    }
+    return true;
+}
+
+/* Drive the tokenizer over `input`/`seps` with a threaded scalar cursor and
+ * compare each token in turn to `want0..want3`. Enforces TOK-005
+ * (`start <= end <= len`) and that the cursor strictly advances. Returns 0
+ * on a full match of exactly `count` tokens, else a non-zero code. */
+fn check(input: &[byte], seps: &[byte], want0: string, want1: string, want2: string,
+         want3: string, count: i32) -> i32 {
+    let n: usize = slice_len(input);
+    let mut cur: TokenCursor = cursor_start();
+    let mut idx: i32 = 0;
+    let mut guard: i32 = 0;
+    while guard < 90000
+        loop_invariant(guard <= 90000)
+    {
+        guard = guard + 1;
+        let st: TokenStep = next(input, seps, cur.pos);
+        if step_is_emit(st) != true {
+            break;
+        }
+        let s: usize = step_s(st);
+        let e: usize = step_e(st);
+        let np: usize = step_np(st);
+        if s > e { return 40; }
+        if e > n { return 41; }
+        if np <= cur.pos { return 42; }          /* must advance */
+        if idx >= 4 { return 43; }               /* more tokens than the harness checks */
+        let mut want: string = "";
+        if idx == 0 { want = want0; }
+        if idx == 1 { want = want1; }
+        if idx == 2 { want = want2; }
+        if idx == 3 { want = want3; }
+        if seg_eq(input, s, e, want) != true { return 10 + idx; }
+        cur = TokenCursor { pos: np, complete: false };
+        idx = idx + 1;
+    }
+    if idx != count { return 60 + idx; }
+    return 0;
+}
+
+fn main() -> i32 {
+    let comma: [byte; 1] = [44];       /* "," */
+    let empty_sep: [byte; 0] = [];
+
+    /* ---- TOK-002: basic + leading / trailing / doubled separators ---- */
+    let s1: [byte; 6] = [97, 44, 98, 98, 44, 99];       /* "a,bb,c" */
+    let r1: i32 = check(&s1[..], &comma[..], "a", "bb", "c", "", 3);
+    if r1 != 0 { return 10 + r1; }
+
+    let s2: [byte; 6] = [44, 97, 44, 44, 98, 44];       /* ",a,,b," */
+    let r2: i32 = check(&s2[..], &comma[..], "a", "b", "", "", 2);
+    if r2 != 0 { return 20 + r2; }
+
+    /* ---- TOK-004: empty / separator-only input ---- */
+    let s3: [byte; 0] = [];
+    let r3: i32 = check(&s3[..], &comma[..], "", "", "", "", 0);
+    if r3 != 0 { return 30 + r3; }
+
+    let s4: [byte; 3] = [44, 44, 44];                   /* ",,," */
+    let r4: i32 = check(&s4[..], &comma[..], "", "", "", "", 0);
+    if r4 != 0 { return 40 + r4; }
+
+    /* ---- TOK-003: empty separator set -> whole input as one token ---- */
+    let s5: [byte; 5] = [104, 101, 108, 108, 111];      /* "hello" */
+    let r5: i32 = check(&s5[..], &empty_sep[..], "hello", "", "", "", 1);
+    if r5 != 0 { return 50 + r5; }
+
+    let r6: i32 = check(&s3[..], &empty_sep[..], "", "", "", "", 0);   /* empty input, empty sep */
+    if r6 != 0 { return 60 + r6; }
+
+    /* ---- multi-byte separator set + whitespace ---- */
+    let sp: [byte; 1] = [32];                           /* " " */
+    let s7: [byte; 9] = [32, 32, 97, 32, 98, 32, 32, 99, 32];   /* "  a b  c " */
+    let r7: i32 = check(&s7[..], &sp[..], "a", "b", "c", "", 3);
+    if r7 != 0 { return 70 + r7; }
+
+    let dashund: [byte; 2] = [45, 95];                  /* "-_" */
+    let s8: [byte; 7] = [97, 45, 98, 95, 99, 45, 100];  /* "a-b_c-d" */
+    let r8: i32 = check(&s8[..], &dashund[..], "a", "b", "c", "d", 4);
+    if r8 != 0 { return 80 + r8; }
+
+    /* ---- 0x00 is a perfectly ordinary separator byte ---- */
+    let nul: [byte; 1] = [0];
+    let s9: [byte; 5] = [97, 0, 98, 0, 99];             /* "a\0b\0c" */
+    let r9: i32 = check(&s9[..], &nul[..], "a", "b", "c", "", 3);
+    if r9 != 0 { return 90 + r9; }
+
+    /* ================= TOK-006: idempotent after completion ================= */
+    let ab: [byte; 3] = [65, 44, 66];                   /* "A,B" */
+    let c0: TokenCursor = cursor_start();
+    let t1: TokenStep = next(&ab[..], &comma[..], c0.pos);          /* Emit(0,1,1) "A" */
+    if step_is_emit(t1) != true { return 100; }
+    if seg_eq(&ab[..], step_s(t1), step_e(t1), "A") != true { return 101; }
+    let c1: TokenCursor = TokenCursor { pos: step_np(t1), complete: false };
+    let t2: TokenStep = next(&ab[..], &comma[..], c1.pos);          /* Emit(2,3,3) "B" */
+    if seg_eq(&ab[..], step_s(t2), step_e(t2), "B") != true { return 102; }
+    let c2: TokenCursor = TokenCursor { pos: step_np(t2), complete: false };
+    let t3: TokenStep = next(&ab[..], &comma[..], c2.pos);          /* Complete */
+    if step_is_emit(t3) != false { return 103; }
+    /* caller marks the cursor complete; further calls are deterministically Complete */
+    let cdone: TokenCursor = TokenCursor { pos: c2.pos, complete: true };
+    let t4: TokenStep = next(&ab[..], &comma[..], cdone.pos);
+    if step_is_emit(t4) != false { return 104; }
+    let t5: TokenStep = next(&ab[..], &comma[..], cdone.pos);       /* same cursor, same answer */
+    if step_is_emit(t5) != false { return 105; }
+    /* and an exhausted (not-yet-marked) cursor is also Complete */
+    let t6: TokenStep = next(&ab[..], &comma[..], c2.pos);
+    if step_is_emit(t6) != false { return 106; }
+
+    /* ================= TOK-007: two cursors advance independently ========== */
+    let xs: [byte; 5] = [97, 44, 98, 44, 99];           /* "a,b,c" */
+    let ys: [byte; 3] = [88, 44, 89];                   /* "X,Y" */
+
+    /* different inputs */
+    let ca: TokenCursor = cursor_start();
+    let cb: TokenCursor = cursor_start();
+    let a1: TokenStep = next(&xs[..], &comma[..], ca.pos);          /* "a" */
+    let b1: TokenStep = next(&ys[..], &comma[..], cb.pos);          /* "X" */
+    if seg_eq(&xs[..], step_s(a1), step_e(a1), "a") != true { return 110; }
+    if seg_eq(&ys[..], step_s(b1), step_e(b1), "X") != true { return 111; }
+    let ca2: TokenCursor = TokenCursor { pos: step_np(a1), complete: false };
+    let a2: TokenStep = next(&xs[..], &comma[..], ca2.pos);         /* "b" -- cb untouched */
+    if seg_eq(&xs[..], step_s(a2), step_e(a2), "b") != true { return 112; }
+    let b2: TokenStep = next(&ys[..], &comma[..], cb.pos);          /* still "X": cb never advanced */
+    if seg_eq(&ys[..], step_s(b2), step_e(b2), "X") != true { return 113; }
+
+    /* same input, interleaved */
+    let cp: TokenCursor = cursor_start();
+    let cq: TokenCursor = cursor_start();
+    let p1: TokenStep = next(&xs[..], &comma[..], cp.pos);          /* "a" */
+    let q1: TokenStep = next(&xs[..], &comma[..], cq.pos);          /* "a" -- independent */
+    if seg_eq(&xs[..], step_s(p1), step_e(p1), "a") != true { return 120; }
+    if seg_eq(&xs[..], step_s(q1), step_e(q1), "a") != true { return 121; }
+    let cp2: TokenCursor = TokenCursor { pos: step_np(p1), complete: false };
+    let p2: TokenStep = next(&xs[..], &comma[..], cp2.pos);         /* "b" */
+    let q_again: TokenStep = next(&xs[..], &comma[..], cq.pos);     /* still "a" */
+    if seg_eq(&xs[..], step_s(p2), step_e(p2), "b") != true { return 122; }
+    if seg_eq(&xs[..], step_s(q_again), step_e(q_again), "a") != true { return 123; }
+
+    return 0;
+}

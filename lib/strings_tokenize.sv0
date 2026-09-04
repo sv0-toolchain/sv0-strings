@@ -1,10 +1,93 @@
 /// strings_tokenize -- explicit-state, reentrant tokenization.
 ///
-/// SPEC.md Section 14: `Token borrows(input)` and
-/// `next(input, separators, cursor: &mut TokenCursor) -> Option<Token>`.
-/// The cursor is caller-owned; there is no module-global or thread-local
-/// continuation state, and the input is never mutated (unlike C `strtok`).
+/// SPEC.md Section 14. The tokenizer state is entirely in the caller's
+/// `TokenCursor`; there is no module-global or thread-local continuation
+/// state (TOK-001), and the input is never mutated (unlike C `strtok`).
 ///
-/// Status: unimplemented (pre-F0). Depends on byte-slice support
-/// (SPEC UP-004 / UP-005). Implementation begins at BL-055 (R0.2).
+/// DEVIATION D-9 (docs/f0-deviations.md): the SPEC shape
+/// `next(input, separators, cursor: &mut TokenCursor) -> Option<Token>`
+/// with `Token borrows(input) { bytes: &[byte], start, end }` uses four
+/// language features that do not lower on the C backend -- a `&mut <struct>`
+/// parameter, a `&[byte]` struct field, a struct payload inside an enum
+/// variant, and a *cross-module* struct-by-value parameter (a
+/// `use`d-from-another-module struct in fn-param position crashes the
+/// compiler). `next` instead takes the cursor position as a plain `usize`
+/// and returns `strings_types::TokenStep` (`Emit(start, end, next_pos)` /
+/// `Complete`); a token is the offset pair `[start, end)` and the caller
+/// forms `&input[start..end]`. `strings_types::TokenCursor` remains the unit
+/// of caller-held state (`cursor_start` seeds it; the caller threads
+/// `next_pos` into its `pos` and sets `complete` on `Complete`).
 module strings_tokenize;
+
+use strings_types::TokenCursor;
+use strings_types::TokenStep;
+
+/// True iff byte `b` is in the separator set. Bounded linear scan (a 256-bit
+/// table is a later PERF optimisation, PERF-005).
+fn tok_sep_has(separators: &[byte], b: byte) -> bool {
+    let n: usize = slice_len(separators);
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if separators[i] == b { return true; }
+        i = i + 1;
+    }
+    return false;
+}
+
+/// A fresh cursor positioned at the start of the input.
+pub fn cursor_start() -> TokenCursor {
+    return TokenCursor { pos: 0, complete: false };
+}
+
+/// SPEC Section 14 / TOK-002..006: the next token of `input`, scanning from
+/// byte offset `pos` (the caller's `TokenCursor.pos`).
+///
+/// - Leading separators are skipped; the token is the maximal run of
+///   non-separator bytes that follows (TOK-002). `TokenStep::Emit(start,
+///   end, next_pos)` gives `input[start..end]` with `start <= end <=
+///   slice_len(input)` (TOK-005), and `next_pos` is where the following
+///   call resumes.
+/// - An empty separator set returns the whole remaining input as one token,
+///   then `Complete` (TOK-003).
+/// - Empty input, separator-only input, or an exhausted cursor (`pos >=
+///   slice_len(input)`) returns `Complete` (TOK-004); calling again with the
+///   same or a larger `pos` is deterministically `Complete` with no side
+///   effects -- `next` is a pure function of its arguments (TOK-006).
+///
+/// Two callers threading their own `pos` advance independently (TOK-007):
+/// `next` reads and writes no global state.
+pub fn next(input: &[byte], separators: &[byte], pos: usize) -> TokenStep {
+    let n: usize = slice_len(input);
+    let from: usize = pos;
+    if from >= n {
+        return TokenStep::Complete;
+    }
+
+    if slice_len(separators) == 0 {
+        /* TOK-003: no separators -> the rest of the input is one token. */
+        return TokenStep::Emit(from, n, n);
+    }
+
+    let mut i: usize = from;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if tok_sep_has(separators, input[i]) != true { break; }
+        i = i + 1;
+    }
+    if i >= n {
+        /* only separators remained (TOK-004). */
+        return TokenStep::Complete;
+    }
+
+    let start: usize = i;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        if tok_sep_has(separators, input[i]) { break; }
+        i = i + 1;
+    }
+    return TokenStep::Emit(start, i, i);
+}

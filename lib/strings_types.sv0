@@ -282,6 +282,36 @@ pub enum AppendResult {
     LengthOverflow,
 }
 
+/* Explicit tokenization state (SPEC Section 14, TOK-001; slice SS-129).
+ * Caller-owned; there is no module-global continuation state. `pos` is the
+ * next byte offset `strings_tokenize::next` will scan from; `complete` is
+ * set by the caller once `next` reports `TokenStep::Complete`.
+ */
+pub struct TokenCursor {
+    pub pos: usize,
+    pub complete: bool,
+}
+
+/* Result of `strings_tokenize::next` (SPEC Section 14; slice SS-129).
+ *
+ * DEVIATION D-9 (recorded per GOV-004; see docs/f0-deviations.md): the SPEC
+ * shape is `next(..., cursor: &mut TokenCursor) -> Option<Token>` where
+ * `Token borrows(input) { bytes: &[byte], start, end }`. sv0 has no working
+ * `&mut <struct>` parameter, and neither a `&[byte]` struct field nor a
+ * struct payload inside an enum variant lowers on the C backend. So `next`
+ * threads the cursor position by value and returns this scalar carrier; a
+ * token is the offset pair `[start, end)` into `input` (the caller forms
+ * `&input[start..end]`), and `next_pos` is the position to resume from.
+ *
+ *   Emit(start, end, next_pos)  -- a non-empty token `input[start..end]`;
+ *                                  call `next` again with `pos = next_pos`
+ *   Complete                    -- no more tokens; the cursor is done
+ */
+pub enum TokenStep {
+    Emit(usize, usize, usize),
+    Complete,
+}
+
 /* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
  * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
  * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a

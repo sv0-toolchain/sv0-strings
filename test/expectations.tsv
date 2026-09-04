@@ -23,3 +23,4 @@ test/property/text_from_utf8.sv0	0	0	SS-125 TEXT-014/015; strings_text::from_utf
 test/property/cstr_construct.sv0	0	0	SS-126 CSTR-001..007/017; strings_cstr CStr/CString constructors + views (D-7: both are string), C + VM
 test/property/cstr_owned.sv0	0	0	SS-127 CSTR-008/009; strings_cstr::clone_owned/concat (ConcatResult carrier, checked_add pre-alloc, one terminator), C + VM
 test/property/cbuffer_ops.sv0	0	0	SS-128 CSTR-010..013/017/018; strings_cstr CBuffer strlcpy/strlcat state matrix (D-8: CBuffer = &mut [byte], first-NUL recomputed), C + VM
+test/property/tokenize_cursor.sv0	0	0	SS-129 TOK-001..007; strings_tokenize::next explicit scalar cursor (D-9: pos threaded, TokenStep carrier), C + VM

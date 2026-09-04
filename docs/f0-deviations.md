@@ -220,6 +220,38 @@ rather than `O(1)` — a PERF item, not a correctness one, and every
 **Schedule.** Revisit alongside D-7 when sv0c lands struct-with-slice-field
 lowering; a cached `first_nul` then becomes a pure optimisation.
 
+## D-9 — the tokenizer uses an explicit scalar cursor, not `&mut TokenCursor` / `Option<Token>` (SS-129)
+
+**SPEC.** Section 14: `pub struct Token borrows(input) { pub bytes: &[byte],
+pub start: usize, pub end: usize }` and
+`pub fn next(input: &[byte], separators: &[byte], cursor: &mut TokenCursor)
+-> Option<Token> borrows(input)`.
+
+**What the toolchain does.** Four features in that shape do not lower on the
+C backend: a `&mut <struct>` parameter (the emitter passes a `Cur *` to an
+`int` parameter), a `&[byte]` struct field (D-7 / D-8), a struct payload
+inside an enum variant (D-7), and a **cross-module struct-by-value
+parameter** — a `use`d-from-another-module struct in fn-parameter position
+crashes the compiler with `vec: index out of bounds` (cross-module struct
+*return* and *construction* are fine; only the parameter position fails).
+
+**What sv0-strings does.** `strings_tokenize::next(input, separators, pos:
+usize) -> strings_types::TokenStep` — the cursor position is a plain `usize`
+argument and the result is the scalar carrier `TokenStep::Emit(start, end,
+next_pos)` / `Complete`. A token is the offset pair `[start, end)`; the
+caller forms `&input[start..end]`. `strings_types::TokenCursor { pos,
+complete }` remains the unit of caller-held state (`cursor_start` seeds it;
+the caller threads `next_pos` into `pos` and sets `complete` when it sees
+`Complete`).
+
+**Why sound.** `next` is a pure function of its arguments, so TOK-001 (no
+module-global state) and TOK-006 (deterministic `Complete` after the end,
+no side effects) hold by construction, and TOK-007 (independent cursors) is
+automatic. TOK-002/003/004/005 are behavioural and pass cross-backend.
+
+**Schedule.** Revisit with D-7 / D-8 (struct lowering) and the post-M5
+multi-module linker (cross-module struct-param resolution).
+
 ## SPEC-deferred (not decisions — the SPEC's own ladder)
 
 - **SS-U11** (`fill_explicit` non-elision primitive, UP-014) — SPEC-deferred to

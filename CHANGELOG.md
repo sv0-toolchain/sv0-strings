@@ -59,6 +59,17 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `&mut [byte]` storage (a struct with a slice field crashes the C emitter);
   the first-NUL state is recomputed by a bounded scan rather than cached, so
   it can never go stale.
+- **`strings_tokenize::next` explicit-cursor tokenizer** (SS-129,
+  TOK-001..007): leading-separator skipping + maximal non-separator runs
+  (`strtok` boundaries, no input mutation), empty separator set → whole input
+  as one token, empty / separator-only input → `Complete`. Deviation **D-9**:
+  a `&mut TokenCursor` parameter, a `&[byte]` `Token` field, a struct-in-enum
+  payload, and a cross-module struct-by-value parameter all fail to lower on
+  the C backend, so `next(input, separators, pos: usize) -> TokenStep`
+  threads the cursor position as a `usize` and returns `Emit(start, end,
+  next_pos)` / `Complete`; `TokenCursor { pos, complete }` stays the unit of
+  caller-held state. `next` is pure, so no-global-state / post-completion
+  idempotence / cursor independence hold by construction.
 - Whole-string semantics run on the length-bearing
   owned `string` (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed
   toolchain slice **SS-U15** (collision-gated per-module symbol mangling in
