@@ -1,0 +1,60 @@
+/* SS-150 (SPEC C23-016, C23-017): strings_c23::strcoll / strxfrm / strerror
+ * capability stubs.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * All three fail closed to `HostCapability::Unsupported` today (no
+ * `strings_locale` service exists until R0.4, no host-call primitive
+ * exists at all until `strings_unsafe_abi` lands). This fixture proves the
+ * fail-closed behavior directly:
+ *   - `strcoll`/`strxfrm` never fall back to byte comparison/copy, even on
+ *     inputs where that fallback would "look right" (so a regression that
+ *     silently aliased them to `strings_bytes::compare`/`copy` would be
+ *     caught the moment it stopped returning `Unsupported`).
+ *   - `strxfrm`'s `dst` is provably untouched.
+ *   - `strerror` returns `Unsupported` uniformly across the FULL `i32`
+ *     range, including 0, a POSIX-shaped small positive, a large positive,
+ *     and the very edges of the type -- no branch on `errnum` exists to
+ *     misbehave at a boundary.
+ */
+use strings_types::HostCapability;
+use strings_c23::strcoll;
+use strings_c23::strxfrm;
+use strings_c23::strerror;
+
+fn is_unsupported(r: HostCapability) -> bool {
+    return match r {
+        HostCapability::Unsupported => { true },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= strcoll (C23-016) ================= */
+    /* identical strings: a bytewise comparator would say Equal; the stub
+       must still say Unsupported, not silently compute a real answer. */
+    if is_unsupported(strcoll("abc", "abc")) != true { return 1; }
+    /* different strings: a bytewise comparator would say Less/Greater. */
+    if is_unsupported(strcoll("abc", "abd")) != true { return 2; }
+    if is_unsupported(strcoll("zzz", "aaa")) != true { return 3; }
+    if is_unsupported(strcoll("", "")) != true { return 4; }
+
+    /* ================= strxfrm (C23-016) ================= */
+    let dst: [byte; 8] = [9, 9, 9, 9, 9, 9, 9, 9];
+    if is_unsupported(strxfrm(&mut dst[..], "hello")) != true { return 10; }
+    /* dst is provably untouched -- no partial/synthesized transform. */
+    if dst[0] != 9 { return 11; }
+    if dst[7] != 9 { return 12; }
+
+    let empty_dst: [byte; 0] = [];
+    if is_unsupported(strxfrm(&mut empty_dst[..], "x")) != true { return 13; }
+
+    /* ================= strerror (C23-017) ================= */
+    if is_unsupported(strerror(0)) != true { return 20; }
+    if is_unsupported(strerror(1)) != true { return 21; }        /* EPERM-shaped */
+    if is_unsupported(strerror(22)) != true { return 22; }       /* EINVAL-shaped */
+    if is_unsupported(strerror(999999)) != true { return 23; }   /* far out of any real errno range */
+    if is_unsupported(strerror(0 - 1)) != true { return 24; }    /* negative */
+    if is_unsupported(strerror(2147483647)) != true { return 25; }         /* i32::MAX */
+    if is_unsupported(strerror(0 - 2147483647 - 1)) != true { return 26; } /* i32::MIN */
+
+    return 0;
+}

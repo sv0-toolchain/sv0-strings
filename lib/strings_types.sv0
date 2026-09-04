@@ -368,3 +368,21 @@ pub struct MemccpyReport {
     pub next_offset_present: bool,
     pub next_offset: usize,
 }
+
+/* Shared "Host-dependent" capability outcome for `strcoll` / `strxfrm` /
+ * `strerror` (SPEC C23-016/017, slice SS-150). No cross-backend host-locale
+ * or host-error service is wired at R0.3: `strings_locale` (SPEC Section
+ * 17) stays fully unimplemented until R0.4 (BL-080), and the raw host-call
+ * primitive `strings_locale`/`strerror` would eventually need lives in
+ * `strings_unsafe_abi`, itself Future work (BL-103/104). So every C23
+ * host-dependent adapter fails closed to `Unsupported` for now -- NEVER a
+ * silent bytewise/ASCII collation substitute (C23-016 explicitly forbids
+ * this) and NEVER an approximated or synthesized message/identity
+ * (C23-017). This is a capability STUB, not a `Blocked` non-export
+ * (BYTE-010's treatment): the C23-recognizable functions exist and are
+ * callable, they are simply honest that the underlying host capability
+ * does not exist yet.
+ */
+pub enum HostCapability {
+    Unsupported,
+}

@@ -210,6 +210,26 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   NUL-terminated payloads (`test/differential/c23_strlen_oracle.py`, 4
   cases, reusing the `strlen` op the oracle already wired for SS-141). No
   new toolchain slice needed. `scripts/test --backend=both` = 38/38.
+- **`strings_c23::strcoll` / `strxfrm` / `strerror` capability stubs**
+  (SS-150 / C23-016 / C23-017): all three exist and are callable, but every
+  call returns `strings_types::HostCapability::Unsupported` today —
+  `strings_locale` (SPEC Section 17) stays fully unimplemented until R0.4
+  (BL-080), and `strings_unsafe_abi`'s host-call primitive is Future work
+  (BL-103/104), so there is nothing to delegate to yet. Deliberately
+  **not** `Blocked`/unexported like `fill_explicit`/`memset_explicit`: a
+  stub that fails closed with a typed, inspectable result is safer here
+  than omitting the symbol, and carries zero risk of silent incorrectness
+  (the enum has exactly one variant). `strcoll`/`strxfrm` never read their
+  string arguments at all — **no bytewise-comparison fallback**
+  (C23-016), proven on inputs a fallback would handle "plausibly" (equal
+  strings, differing strings), with `strxfrm`'s `dst` provably untouched.
+  `strerror` branches on nothing — the same `Unsupported` answer for `0`,
+  small/large/negative values, and both `i32` extremes, satisfying
+  C23-017's "structured error identity, never universal message bytes" by
+  never producing bytes at all yet. Evidence + unblocking path recorded in
+  `docs/host-capability-stubs.md`. No differential driver (nothing to
+  compare against real libc for a deliberate stub). No new toolchain slice
+  needed. `scripts/test --backend=both` = 39/39.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

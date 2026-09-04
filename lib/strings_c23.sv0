@@ -25,6 +25,9 @@
 ///           `strings_bytes::fill_explicit` -- NOT exported here either.
 ///           C23-014.
 ///   SS-149  strlen -- IMPLEMENTED (this file). C23-015.
+///   SS-150  strcoll / strxfrm / strerror -- capability STUBS (this file):
+///           always Unsupported, fail closed, no bytewise/synthesized
+///           substitute. C23-016 / C23-017.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -34,6 +37,7 @@ use strings_types::Ordering;
 use strings_types::Option;
 use strings_types::ConcatResult;
 use strings_types::TokenStep;
+use strings_types::HostCapability;
 use strings_bytes::copy;
 use strings_bytes::move_within;
 use strings_bytes::find;
@@ -563,4 +567,46 @@ pub fn memset(dst: &mut [byte], value: byte) -> () {
 /// present.
 pub fn strlen(value: string) -> usize {
     return len(value);
+}
+
+/// C23-016 (Host-dependent, capability STUB). Locale-sensitive collation
+/// order of `a` and `b`. **Always `HostCapability::Unsupported` today** --
+/// `strings_locale` (SPEC Section 17) stays fully unimplemented until R0.4
+/// (BL-080), and there is no cross-backend host-locale service to delegate
+/// to. `a` and `b` are never inspected or compared; there is deliberately
+/// **no bytewise-comparison fallback** (C23-016 explicitly forbids
+/// approximating collation with plain byte order -- that is a different,
+/// well-defined operation `strcmp`/`strings_bytes::compare` already
+/// provide, and confusing the two is exactly the failure mode this stub
+/// exists to prevent). Once `strings_locale::compare` lands, this becomes a
+/// thin delegating wrapper the same way every other adapter in this file
+/// is.
+pub fn strcoll(a: string, b: string) -> HostCapability {
+    return HostCapability::Unsupported;
+}
+
+/// C23-016 (Host-dependent, capability STUB). Locale-sensitive transform of
+/// `src` into `dst` for later bytewise comparison. **Always
+/// `HostCapability::Unsupported` today**, for the same reason as `strcoll`
+/// above; `dst` is never written to (no partial or synthesized transform is
+/// ever observable). Once `strings_locale::transform` lands (R0.4), this
+/// becomes a thin delegating wrapper.
+pub fn strxfrm(dst: &mut [byte], src: string) -> HostCapability {
+    return HostCapability::Unsupported;
+}
+
+/// C23-017 (Host-dependent, capability STUB). An owned host error message
+/// for `errnum`. **Always `HostCapability::Unsupported` today** -- sv0 has
+/// no host-call primitive yet (`strings_unsafe_abi` is Future work,
+/// BL-103/104), so there is no host error-message service to query.
+/// Accepts every `i32` value uniformly (no range check, no branch on
+/// `errnum` at all): C23-017 requires stable tests to compare *structured
+/// error identity*, never universal message bytes, and the honest
+/// R0.3 answer for EVERY error number is simply "not available yet" -- an
+/// unknown error number is not itself an invalid argument (that
+/// distinction matters once C23-030 lands, SS-151). Once an owned
+/// host-error adapter is wired, this becomes a real implementation
+/// returning message text, not this stub.
+pub fn strerror(errnum: i32) -> HostCapability {
+    return HostCapability::Unsupported;
 }
