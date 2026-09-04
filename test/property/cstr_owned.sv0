@@ -1,0 +1,96 @@
+/* SS-127 (SPEC CSTR-008, CSTR-009): strings_cstr::clone_owned / concat.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `CStr` values are NUL-free `string`s (D-7), so a string literal without a
+ * `\0` is a valid `CStr`. Results are owned `CString`s: <payload><one 0x00>.
+ * The `usize`-overflow branch delegates to `strings_checked::checked_add`
+ * (MAX behaviour proven by `checked_overflow.sv0`, SS-006) and is not
+ * reachable from representable-length inputs. Byte values decimal; hex in
+ * comments.
+ */
+use strings_types::ConcatResult;
+use strings_cstr::clone_owned;
+use strings_cstr::concat;
+use strings_cstr::borrow;
+use strings_cstr::len;
+use strings_cstr::as_bytes;
+use strings_text::equal;
+
+fn joined(r: ConcatResult) -> string {
+    return match r {
+        ConcatResult::Joined(s) => { s },
+        ConcatResult::LengthOverflow => { "" },
+    };
+}
+
+/* true iff `owned` is <want><exactly one 0x00> and has no interior 0x00. */
+fn owned_is(owned: string, want: string) -> bool {
+    let n: usize = string_len(owned);
+    if n == 0 { return false; }
+    if string_char_at(owned, n - 1) != 0 { return false; }
+    let payload: string = borrow(owned);
+    if equal(payload, want) != true { return false; }
+    let pv: &[byte] = as_bytes(payload);
+    let m: usize = slice_len(pv);
+    let mut i: usize = 0;
+    while i < m
+        loop_invariant(i <= m)
+    {
+        if pv[i] == 0 { return false; }
+        i = i + 1;
+    }
+    return true;
+}
+
+fn main() -> i32 {
+    /* ---- clone_owned (CSTR-008) ---- */
+    if owned_is(joined(clone_owned("sv0")), "sv0") != true { return 1; }
+    if len(borrow(joined(clone_owned("sv0")))) != 3 { return 2; }
+
+    let ce: string = joined(clone_owned(""));
+    if string_len(ce) != 1 { return 3; }                  /* just the terminator */
+    if string_char_at(ce, 0) != 0 { return 4; }
+
+    if owned_is(joined(clone_owned("\xc8\xc9")), "\xc8\xc9") != true { return 5; }  /* non-UTF-8 */
+
+    /* ---- concat (CSTR-009) ---- */
+    if owned_is(joined(concat("foo", "bar")), "foobar") != true { return 10; }
+    if string_len(joined(concat("foo", "bar"))) != 7 { return 11; }   /* 6 + terminator */
+
+    if owned_is(joined(concat("", "x")), "x") != true { return 12; }
+    if owned_is(joined(concat("x", "")), "x") != true { return 13; }
+
+    let jee: string = joined(concat("", ""));
+    if string_len(jee) != 1 { return 14; }                /* just the terminator */
+    if string_char_at(jee, 0) != 0 { return 15; }
+
+    /* multibyte payloads: "Aé" ++ "水" */
+    if owned_is(joined(concat("A\xc3\xa9", "\xe6\xb0\xb4")), "A\xc3\xa9\xe6\xb0\xb4") != true { return 16; }
+    if string_len(joined(concat("A\xc3\xa9", "\xe6\xb0\xb4"))) != 7 { return 17; }
+
+    /* exactly one terminator, payload length is the sum */
+    let jt: string = joined(concat("abcd", "ef"));
+    if len(borrow(jt)) != 6 { return 18; }
+    if string_len(jt) != 7 { return 19; }
+
+    /* ---- inputs unchanged after concat (immutable handles) ---- */
+    let a: string = "keep";
+    let b: string = "safe";
+    let held: string = joined(concat(a, b));
+    if equal(borrow(held), "keepsafe") != true { return 20; }
+    if equal(a, "keep") != true { return 21; }
+    if equal(b, "safe") != true { return 22; }
+    if string_len(a) != 4 { return 23; }
+
+    /* ---- payload associativity: (a ++ b) ++ c == a ++ (b ++ c) ---- */
+    let ab_c: string = borrow(joined(concat(borrow(joined(concat("x", "y"))), "z")));
+    let a_bc: string = borrow(joined(concat("x", borrow(joined(concat("y", "z"))))));
+    if equal(ab_c, a_bc) != true { return 30; }
+    if equal(ab_c, "xyz") != true { return 31; }
+
+    /* ---- clone_owned then borrow is identity on the payload ---- */
+    let orig: string = "round\xfftrip";                   /* NUL-free, has a high byte */
+    if equal(borrow(joined(clone_owned(orig))), orig) != true { return 40; }
+
+    return 0;
+}

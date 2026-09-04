@@ -1,10 +1,11 @@
 /// strings_cstr -- validated borrowed `CStr`, owned `CString`, and (SS-128)
 /// bounded mutable `CBuffer`.
 ///
-/// SPEC.md Section 13. This slice (SS-126) lands the `CStr` / `CString`
-/// constructors and views: from_bytes_with_nul, from_bytes_until_nul,
-/// from_text, from_bytes, borrow, as_bytes, as_bytes_with_nul, len, to_text.
-/// `clone_owned` / `concat` are SS-127; the `CBuffer` family is SS-128.
+/// SPEC.md Section 13. SS-126 landed the `CStr` / `CString` constructors and
+/// views: from_bytes_with_nul, from_bytes_until_nul, from_text, from_bytes,
+/// borrow, as_bytes, as_bytes_with_nul, len, to_text. SS-127 adds
+/// `clone_owned` / `concat` (checked owned construction). The `CBuffer`
+/// family is SS-128.
 ///
 /// DEVIATION D-7 (docs/f0-deviations.md): `CStr` and `CString` are both an
 /// owned `string` -- an enum variant carrying a struct payload does not lower
@@ -19,8 +20,11 @@ module strings_cstr;
 
 use strings_types::CStrResult;
 use strings_types::CStringResult;
+use strings_types::ConcatResult;
 use strings_types::FromUtf8Result;
 use strings_text::from_utf8;
+use strings_checked::checked_add;
+use strings_checked::CheckedUsize;
 
 /// CSTR-001 (R0.2): accept only a slice whose final byte is `0x00` and whose
 /// preceding bytes contain no `0x00`. An empty slice has no terminator.
@@ -116,4 +120,56 @@ pub fn as_bytes_with_nul(value: string) -> &[byte] {
 /// `Ok` string is a fresh owned copy of the payload.
 pub fn to_text(value: string) -> FromUtf8Result {
     return from_utf8(string_byte_view(value));
+}
+
+/// CSTR-008 (R0.2): a fresh owned `CString` copy of `value` (a `CStr`
+/// payload) with one appended terminator. `len(value) + 1` is checked for
+/// `usize` overflow before allocation; on `ConcatResult::LengthOverflow`
+/// nothing is allocated and `value` is unchanged. A genuine allocation
+/// failure is not recoverable here -- the owned allocator fails closed
+/// (`sv0_panic`, D-7 / SS-U02b/d) -- and still leaves `value` unchanged.
+///
+/// Returned via `strings_types::ConcatResult` (`Joined` / `LengthOverflow`);
+/// the SPEC `Result<CString, BufferError>` form hits the D-4 gap.
+pub fn clone_owned(value: string) -> ConcatResult {
+    let total: CheckedUsize = checked_add(string_len(value), 1);
+    let over: bool = match total {
+        CheckedUsize::Overflow => { true },
+        CheckedUsize::Ok(_n) => { false },
+    };
+    if over {
+        return ConcatResult::LengthOverflow;
+    }
+    return ConcatResult::Joined(string_concat(value, "\0"));
+}
+
+/// CSTR-009 (R0.2): a new owned `CString` equal to the payload of `a`,
+/// followed by the payload of `b`, followed by exactly one terminator.
+/// `len(a) + len(b)` and then `+ 1` for the terminator are checked for
+/// `usize` overflow BEFORE any allocation; on `LengthOverflow` nothing is
+/// allocated and both inputs are unchanged (they are immutable handles). One
+/// `string_concat` chain builds the result.
+pub fn concat(a: string, b: string) -> ConcatResult {
+    let sum: CheckedUsize = checked_add(string_len(a), string_len(b));
+    let payload_len: usize = match sum {
+        CheckedUsize::Ok(n) => { n },
+        CheckedUsize::Overflow => { 0 },
+    };
+    let sum_over: bool = match sum {
+        CheckedUsize::Ok(_n) => { false },
+        CheckedUsize::Overflow => { true },
+    };
+    if sum_over {
+        return ConcatResult::LengthOverflow;
+    }
+    let withterm: CheckedUsize = checked_add(payload_len, 1);
+    let term_over: bool = match withterm {
+        CheckedUsize::Ok(_n) => { false },
+        CheckedUsize::Overflow => { true },
+    };
+    if term_over {
+        return ConcatResult::LengthOverflow;
+    }
+    let joined: string = string_concat(a, b);
+    return ConcatResult::Joined(string_concat(joined, "\0"));
 }

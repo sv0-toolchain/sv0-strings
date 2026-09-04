@@ -42,8 +42,14 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   backend), so both are an owned `string` — a `CStr` value is the NUL-free
   payload, a `CString` value is `<payload><0x00>`; the `borrows(...)`
   relations are advisory (bytes are copied at construction) while the
-  no-rescan invariants hold via the stored length. `clone_owned` / `concat`
-  are SS-127; the `CBuffer` family is SS-128.
+  no-rescan invariants hold via the stored length.
+- **`strings_cstr::clone_owned` / `concat`** (SS-127, CSTR-008 / CSTR-009):
+  checked owned `CString` construction — `clone_owned` appends one terminator
+  to a `CStr` payload; `concat` builds `payload(a) ++ payload(b) ++ 0x00`.
+  `len(a) + len(b)` and the `+ 1` for the terminator are checked for `usize`
+  overflow (`strings_checked::checked_add`) before any allocation; result via
+  `strings_types::ConcatResult` (`Joined` / `LengthOverflow`). The `CBuffer`
+  family is SS-128.
 - Whole-string semantics run on the length-bearing
   owned `string` (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed
   toolchain slice **SS-U15** (collision-gated per-module symbol mangling in
