@@ -1,0 +1,109 @@
+/* SS-144 (SPEC C23-008, C23-009, C23-010): strings_c23::strcpy / strncpy /
+ * strcat / strncat.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Expected results are hand-derived C23 facts (differential vs the C oracle
+ * is `test/differential/c23_strcpy_family_oracle.py`). `CStr` values are
+ * NUL-free `string`s (D-7), so a string literal without a `\0` is a valid
+ * `CStr` argument. Byte values decimal.
+ */
+use strings_types::CopyResult;
+use strings_c23::strcpy;
+use strings_c23::strncpy;
+use strings_c23::strcat;
+use strings_c23::strncat;
+
+/* -1 = Copied(n); k = DestinationTooSmall(need=?, have=k) */
+fn cr(r: CopyResult) -> i32 {
+    return match r {
+        CopyResult::Copied(_n) => { 0 - 1 },
+        CopyResult::DestinationTooSmall(_need, have) => { have as i32 },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= strcpy (C23-008) ================= */
+    let mut d1: [byte; 6] = [9, 9, 9, 9, 9, 9];
+    if cr(strcpy(&mut d1[..], "ABC")) != 0 - 1 { return 1; }
+    if d1[0] != 65 { return 2; }
+    if d1[2] != 67 { return 3; }
+    if d1[3] != 0 { return 4; }      /* terminator */
+    if d1[4] != 9 { return 5; }      /* untouched past the write */
+
+    /* exact fit: cap == payload.len() + 1 */
+    let mut d2: [byte; 3] = [0, 0, 0];
+    if cr(strcpy(&mut d2[..], "AB")) != 0 - 1 { return 6; }
+    if d2[2] != 0 { return 7; }
+
+    /* cap too small -> DestinationTooSmall(need, have=cap), dst untouched */
+    let mut d3: [byte; 2] = [7, 7];
+    if cr(strcpy(&mut d3[..], "ABC")) != 2 { return 8; }
+    if d3[0] != 7 { return 9; }
+
+    /* ================= strncpy (C23-009) ================= */
+    /* src shorter than n -> payload then zero-padding to n */
+    let mut p1: [byte; 6] = [9, 9, 9, 9, 9, 9];
+    let s1: [byte; 4] = [65, 66, 67, 0];   /* "ABC\0" */
+    if cr(strncpy(&mut p1[..], &s1[..], 5)) != 0 - 1 { return 10; }
+    if p1[0] != 65 { return 11; }
+    if p1[3] != 0 { return 12; }     /* zero-padded (from the NUL onward) */
+    if p1[4] != 0 { return 13; }     /* zero-padded */
+    if p1[5] != 9 { return 14; }     /* untouched past n */
+
+    /* src.len() >= n, no NUL in the first n bytes -> exactly n bytes, no padding */
+    let mut p2: [byte; 5] = [0, 0, 0, 0, 0];
+    let s2: [byte; 5] = [65, 66, 67, 68, 69];   /* "ABCDE", no NUL */
+    if cr(strncpy(&mut p2[..], &s2[..], 3)) != 0 - 1 { return 15; }
+    if p2[0] != 65 { return 16; }
+    if p2[2] != 67 { return 17; }
+    if p2[3] != 0 { return 18; }     /* untouched beyond n (still its init 0) */
+
+    /* n == 0 -> nothing written */
+    let mut p3: [byte; 4] = [1, 2, 3, 4];
+    if cr(strncpy(&mut p3[..], &s1[..], 0)) != 0 - 1 { return 19; }
+    if p3[0] != 1 { return 20; }
+
+    /* n > cap -> DestinationTooSmall(n, cap), dst untouched */
+    let mut p4: [byte; 2] = [5, 5];
+    if cr(strncpy(&mut p4[..], &s1[..], 4)) != 2 { return 21; }
+    if p4[0] != 5 { return 22; }
+
+    /* ================= strcat (C23-008) ================= */
+    let mut c1: [byte; 8] = [65, 66, 0, 9, 9, 9, 9, 9];   /* "AB\0" + junk */
+    if cr(strcat(&mut c1[..], "CD")) != 0 - 1 { return 30; }
+    if c1[2] != 67 { return 31; }    /* 'C' */
+    if c1[3] != 68 { return 32; }    /* 'D' */
+    if c1[4] != 0 { return 33; }     /* terminator */
+    if c1[5] != 9 { return 34; }     /* untouched past the write */
+
+    /* onto an already-empty CBuffer */
+    let mut c2: [byte; 4] = [0, 9, 9, 9];
+    if cr(strcat(&mut c2[..], "XY")) != 0 - 1 { return 35; }
+    if c2[0] != 88 { return 36; }    /* 'X' */
+    if c2[2] != 0 { return 37; }     /* terminator */
+
+    /* insufficient capacity -> DestinationTooSmall, dst untouched */
+    let mut c3: [byte; 4] = [65, 0, 9, 9];   /* "A\0" */
+    if cr(strcat(&mut c3[..], "BCDE")) != 4 { return 38; }
+    if c3[0] != 65 { return 39; }
+
+    /* ================= strncat (C23-010) ================= */
+    /* bounded to n out of a longer, unterminated-within-n source */
+    let mut n1: [byte; 8] = [65, 66, 0, 9, 9, 9, 9, 9];   /* "AB\0" */
+    let ns1: [byte; 3] = [67, 68, 69];   /* "CDE", no NUL */
+    if cr(strncat(&mut n1[..], &ns1[..], 2)) != 0 - 1 { return 40; }
+    if n1[2] != 67 { return 41; }    /* 'C' */
+    if n1[3] != 68 { return 42; }    /* 'D' */
+    if n1[4] != 0 { return 43; }     /* terminator */
+    if n1[5] != 9 { return 44; }     /* untouched */
+
+    /* n larger than the actual (NUL-terminated) source -> full append */
+    let mut n2: [byte; 8] = [65, 66, 0, 9, 9, 9, 9, 9];   /* "AB\0" */
+    let ns2: [byte; 2] = [67, 0];        /* "C\0" */
+    if cr(strncat(&mut n2[..], &ns2[..], 9)) != 0 - 1 { return 45; }
+    if n2[2] != 67 { return 46; }    /* 'C' */
+    if n2[3] != 0 { return 47; }     /* terminator */
+    if n2[4] != 9 { return 48; }     /* untouched */
+
+    return 0;
+}

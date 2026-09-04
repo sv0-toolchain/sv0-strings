@@ -123,6 +123,25 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   15 cases; the oracle gained `memchr`/`strchr`/`strrchr`/`strpbrk`/`strstr`/
   `strcmp`/`strncmp` ops). No new toolchain slice needed. `scripts/test
   --backend=both` = 31/31.
+- **`strings_c23::strcpy` / `strncpy` / `strcat` / `strncat`** (SS-144 /
+  C23-008 / C23-009 / C23-010): the copy/concatenation adapters. `strcpy` /
+  `strcat` require the full `CBuffer` capacity for the whole `CStr` payload
+  (never truncate, unlike `strings_cstr::copy_into`/`append_into`); an
+  insufficient `dst` is `CopyResult::DestinationTooSmall(need, have)` with
+  `dst` left unmodified — capacity is always the explicit slice length,
+  never inferred from a raw pointer (C23-008). `strncpy` reproduces C's exact
+  zero-padding byte-for-byte: copies through the first `0x00` within
+  `[0, min(n, src.len()))` (or through the whole window when none exists),
+  then zero-fills the rest of `dst[0..n]` — when `src.len() >= n` and no
+  `0x00` occurs in that window, exactly `n` bytes are copied with no
+  terminator appended, matching C23's own non-guarantee (C23-009). `strncat`
+  appends at most `n` source bytes (stopping at an earlier `0x00` if one
+  exists in the bound) plus one terminator, with checked capacity; the
+  bounded source form never requires a `0x00` within its first `n` bytes
+  (C23-010). Differential-checked against the host libc
+  (`test/differential/c23_strcpy_family_oracle.py`, 9 cases; the oracle
+  gained `strcpy`/`strncpy`/`strcat`/`strncat` ops). No new toolchain slice
+  needed. `scripts/test --backend=both` = 32/32.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

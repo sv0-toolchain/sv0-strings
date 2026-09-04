@@ -44,6 +44,10 @@
  *   strstr   ret=idx:<n>|idx:none (cstr= haystack, a= needle, both NUL-in-window)
  *   strcmp   normalized ordering (a, b both NUL-in-window)
  *   strncmp  normalized ordering, bounded by n (a, b need NOT contain a NUL)
+ *   strcpy   guarded write; cstr= source C string, cap must fit it + NUL
+ *   strncpy  guarded write, exact zero-padding; src= bounded (need not be NUL-terminated)
+ *   strcat   guarded write; src= dst's initial content (NUL-in-window), cstr= string to append
+ *   strncat  same as strcat, bounded by n; cstr need not contain a NUL within n
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too. */
@@ -455,6 +459,113 @@ static int op_strncmp(const struct req *r) {
     return 0;
 }
 
+static int op_strcpy(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    long k = find_nul(r->cstr, r->cstr_n);
+    if (k < 0) return fail_pre("no-nul-in-window");
+    if (k + 1 > r->cap) return fail_pre("cap-too-small");
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    errno = 0;
+    char *ret = strcpy((char *)d.pay, (const char *)r->cstr);
+    printf("precondition=ok\n");
+    printf("ret=ptr:%s\n", ret == (char *)d.pay ? "dst" : "other");
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
+static int op_strncpy(const struct req *r) {
+    if (r->src_n < 0) return fail_pre("src-missing");
+    if (r->n < 0)      return fail_pre("n-missing");
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    if (r->n > r->cap) return fail_pre("n-gt-cap");
+    {
+        long scan = r->n < r->src_n ? r->n : r->src_n;
+        long nul_at = find_nul(r->src, scan);
+        if (nul_at < 0 && r->n > r->src_n) return fail_pre("no-nul-and-n-gt-src");
+    }
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    errno = 0;
+    char *ret = strncpy((char *)d.pay, (const char *)r->src, (size_t)r->n);
+    printf("precondition=ok\n");
+    printf("ret=ptr:%s\n", ret == (char *)d.pay ? "dst" : "other");
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
+/* strcat/strncat: `src` carries the CBuffer's INITIAL content (must already
+   hold a NUL somewhere within it -- that's the real strcat precondition:
+   dst must already be a valid C string); `cstr` is the string to append. */
+static int op_strcat(const struct req *r) {
+    if (r->src_n < 0)  return fail_pre("src-missing");
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    if (r->src_n > r->cap) return fail_pre("src-gt-cap");
+    long f = find_nul(r->src, r->src_n);
+    if (f < 0) return fail_pre("dst-no-nul");
+    long k = find_nul(r->cstr, r->cstr_n);
+    if (k < 0) return fail_pre("cstr-no-nul-in-window");
+    if (f + k + 1 > r->cap) return fail_pre("cap-too-small");
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    memset(d.pay, 0xEE, (size_t)r->cap);
+    memcpy(d.pay, r->src, (size_t)r->src_n);
+    errno = 0;
+    char *ret = strcat((char *)d.pay, (const char *)r->cstr);
+    printf("precondition=ok\n");
+    printf("ret=ptr:%s\n", ret == (char *)d.pay ? "dst" : "other");
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
+static int op_strncat(const struct req *r) {
+    if (r->src_n < 0)  return fail_pre("src-missing");
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    if (r->n < 0)      return fail_pre("n-missing");
+    if (r->src_n > r->cap) return fail_pre("src-gt-cap");
+    long f = find_nul(r->src, r->src_n);
+    if (f < 0) return fail_pre("dst-no-nul");
+
+    long scan = r->n < r->cstr_n ? r->n : r->cstr_n;
+    long k = find_nul(r->cstr, scan);
+    if (k < 0 && r->n > r->cstr_n) return fail_pre("no-nul-and-n-gt-cstr");
+    long appended = (k >= 0) ? k : scan;
+    if (f + appended + 1 > r->cap) return fail_pre("cap-too-small");
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    memset(d.pay, 0xEE, (size_t)r->cap);
+    memcpy(d.pay, r->src, (size_t)r->src_n);
+    errno = 0;
+    char *ret = strncat((char *)d.pay, (const char *)r->cstr, (size_t)r->n);
+    printf("precondition=ok\n");
+    printf("ret=ptr:%s\n", ret == (char *)d.pay ? "dst" : "other");
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
 static int op_strlen(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     /* Bounded window: the argument must contain a NUL within the bytes given,
@@ -491,6 +602,10 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strstr") == 0)  return op_strstr(r);
     if (strcmp(r->fn, "strcmp") == 0)  return op_strcmp(r);
     if (strcmp(r->fn, "strncmp") == 0) return op_strncmp(r);
+    if (strcmp(r->fn, "strcpy") == 0)  return op_strcpy(r);
+    if (strcmp(r->fn, "strncpy") == 0) return op_strncpy(r);
+    if (strcmp(r->fn, "strcat") == 0)  return op_strcat(r);
+    if (strcmp(r->fn, "strncat") == 0) return op_strncat(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }

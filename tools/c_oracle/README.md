@@ -79,6 +79,10 @@ dispatch table in `oracle.c`:
 | `strstr` | `ret=idx:<n>` / `idx:none`; `cstr=` haystack, `a=` needle, both NUL-in-window |
 | `strcmp` | normalized ordering; `a`, `b` both NUL-in-window |
 | `strncmp` | normalized ordering, bounded by `n`; `a`, `b` need NOT contain a NUL |
+| `strcpy` | guarded write; `cstr=` source C string (NUL-in-window), `cap` must fit payload + NUL |
+| `strncpy` | guarded write, exact zero-padding; `src=` bounded (need NOT be NUL-terminated within `n`) |
+| `strcat` | guarded write; `src=` dst's INITIAL content (must already hold a NUL), `cstr=` string to append |
+| `strncat` | same as `strcat`, bounded by `n`; `cstr` need not contain a NUL within `n` |
 
 `value=` also carries the stop byte for `memccpy` and the search byte for
 `strchr` / `strrchr`.
@@ -90,4 +94,5 @@ sv0 property fixtures against this oracle (real host libc). Run by
 `scripts/check`. `c23_memcpy_oracle.py` covers `memcpy` / `memmove` /
 `memccpy` (SS-142); `c23_search_compare_oracle.py` covers `memchr` /
 `strchr` / `strrchr` / `strpbrk` / `strstr` / `memcmp` / `strcmp` /
-`strncmp` (SS-143).
+`strncmp` (SS-143); `c23_strcpy_family_oracle.py` covers `strcpy` /
+`strncpy` / `strcat` / `strncat` (SS-144).

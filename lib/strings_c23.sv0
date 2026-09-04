@@ -15,6 +15,8 @@
 ///   SS-143  memchr / strchr / strrchr / strpbrk / strstr (search) and
 ///           memcmp / strcmp / strncmp (comparison) -- IMPLEMENTED (this
 ///           file). C23-006 / C23-007.
+///   SS-144  strcpy / strncpy / strcat / strncat -- IMPLEMENTED (this
+///           file). C23-008 / C23-009 / C23-010.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -30,6 +32,8 @@ use strings_bytes::find_slice;
 use strings_bytes::span_not_in;
 use strings_bytes::compare;
 use strings_cstr::as_bytes;
+use strings_checked::checked_add;
+use strings_checked::CheckedUsize;
 
 /// C23-004 (Adapted). Copy `n` bytes of `src` into `dst`. Overlap is a
 /// compile-time borrow exclusion: two distinct safe slice arguments cannot
@@ -249,4 +253,182 @@ pub fn ordering_to_c_int(ordering: Ordering) -> i32
         Ordering::Equal => 0,
         Ordering::Greater => 1,
     };
+}
+
+/// First `0x00` in `buf`, or `slice_len(buf)` when none exists (same
+/// recompute model as `strings_cstr::first_nul`, D-8: no cached state to go
+/// stale).
+fn cat_first_nul(buf: &[byte]) -> usize {
+    let cap: usize = slice_len(buf);
+    let mut i: usize = 0;
+    while i < cap
+        loop_invariant(i <= cap)
+    {
+        if buf[i] == 0 { return i; }
+        i = i + 1;
+    }
+    return cap;
+}
+
+/// C23-008 (Adapted). Copy the whole `CStr` payload of `src`, plus one
+/// terminator, into `dst`. `dst` must have room for the full payload —
+/// unlike `strings_cstr::copy_into` (`strlcpy`), this never truncates.
+///
+/// DEVIATION from C `strcpy` (C23-008): destination capacity is the
+/// explicit `dst: &mut [byte]` length, never inferred from a raw pointer;
+/// insufficient capacity is `CopyResult::DestinationTooSmall(need, have)`
+/// with `dst` left unmodified, never UB.
+pub fn strcpy(dst: &mut [byte], src: string) -> CopyResult {
+    let cap: usize = slice_len(dst);
+    let plen: usize = string_len(src);
+    let total: CheckedUsize = checked_add(plen, 1);
+    let need: usize = match total {
+        CheckedUsize::Ok(n) => { n },
+        CheckedUsize::Overflow => { cap + 1 },
+    };
+    if need > cap {
+        return CopyResult::DestinationTooSmall(need, cap);
+    }
+    let mut i: usize = 0;
+    while i < plen
+        loop_invariant(i <= plen)
+        loop_invariant(plen + 1 <= cap)
+    {
+        dst[i] = string_char_at(src, i);
+        i = i + 1;
+    }
+    dst[plen] = 0;
+    return CopyResult::Copied(plen);
+}
+
+/// C23-009 (Adapted). Copy up to `n` bytes of `src` into `dst`, reproducing
+/// `strncpy`'s exact zero-padding behavior byte-for-byte: bytes are copied
+/// through the first `0x00` found within `[0, min(n, src.len()))` (or
+/// through `min(n, src.len())` when none exists), then the REMAINDER of
+/// `dst[0..n]` is filled with `0x00`. `src` need not be NUL-terminated or
+/// even `n` bytes long (a bounded initialized byte source, C23-009 /
+/// C23-027) -- when `src` is shorter than `n` with no `0x00` inside it, the
+/// façade pads from where `src` ran out rather than reading past its bound
+/// (real `strncpy` requires the caller to guarantee `n` valid `src` bytes
+/// or an earlier terminator; that guarantee is undefined behavior here, so
+/// the façade instead defines it).
+///
+/// DEVIATION from C `strncpy` (C23-009): when `src.len() >= n` and no
+/// `0x00` occurs within the first `n` bytes, exactly `n` bytes are copied
+/// with NO terminator appended (C23 does not guarantee one either) -- the
+/// result is reported as `CopyResult::Copied(n)`, a byte-buffer outcome,
+/// never a raw pointer. `n > dst.len()` is `DestinationTooSmall`, `dst`
+/// unmodified.
+pub fn strncpy(dst: &mut [byte], src: &[byte], n: usize) -> CopyResult {
+    let cap: usize = slice_len(dst);
+    if n > cap {
+        return CopyResult::DestinationTooSmall(n, cap);
+    }
+    let avail: usize = slice_len(src);
+    let mut lim: usize = n;
+    if lim > avail { lim = avail; }
+    let stop: usize = bound_to_nul(src, lim);
+
+    let mut i: usize = 0;
+    while i < stop
+        loop_invariant(i <= stop)
+        loop_invariant(stop <= n)
+        loop_invariant(n <= cap)
+    {
+        dst[i] = src[i];
+        i = i + 1;
+    }
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(stop <= i)
+        loop_invariant(n <= cap)
+    {
+        dst[i] = 0;
+        i = i + 1;
+    }
+    return CopyResult::Copied(n);
+}
+
+/// C23-008 (Adapted). Append the whole `CStr` payload of `src`, plus one
+/// terminator, after the first `0x00` of `dst` (the `CBuffer`'s existing
+/// C-string state, recomputed by a bounded scan -- D-8). `dst` must have
+/// room for the full appended payload; unlike `strings_cstr::append_into`
+/// (`strlcat`), this never truncates. If `dst` holds no `0x00` at all,
+/// there is no valid append point, so nothing is written.
+///
+/// DEVIATION from C `strcat` (C23-008): explicit `CBuffer` capacity, never
+/// a raw pointer; insufficient capacity or a missing first-NUL is
+/// `CopyResult::DestinationTooSmall(need, have)` with `dst` unmodified.
+pub fn strcat(dst: &mut [byte], src: string) -> CopyResult {
+    let cap: usize = slice_len(dst);
+    let f: usize = cat_first_nul(dst);
+    if f == cap {
+        return CopyResult::DestinationTooSmall(cap + string_len(src) + 1, cap);
+    }
+    let plen: usize = string_len(src);
+    let sum: CheckedUsize = checked_add(f, plen);
+    let sum_ok: usize = match sum {
+        CheckedUsize::Ok(k) => { k },
+        CheckedUsize::Overflow => { cap },
+    };
+    let total: CheckedUsize = checked_add(sum_ok, 1);
+    let need: usize = match total {
+        CheckedUsize::Ok(k) => { k },
+        CheckedUsize::Overflow => { cap + 1 },
+    };
+    if need > cap {
+        return CopyResult::DestinationTooSmall(need, cap);
+    }
+    let mut i: usize = 0;
+    while i < plen
+        loop_invariant(i <= plen)
+        loop_invariant(f + plen + 1 <= cap)
+    {
+        dst[f + i] = string_char_at(src, i);
+        i = i + 1;
+    }
+    dst[f + plen] = 0;
+    return CopyResult::Copied(plen);
+}
+
+/// C23-010 (Adapted). Append at most `n` bytes of `src` -- stopping at the
+/// first `0x00` within `[0, min(n, src.len()))` when one exists -- after
+/// the first `0x00` of `dst`, plus one terminator. `src` need not contain a
+/// `0x00` within its first `n` bytes (a bounded initialized byte source,
+/// C23-010). Checked destination capacity; if `dst` holds no `0x00` at all,
+/// or the append does not fit, nothing is written.
+pub fn strncat(dst: &mut [byte], src: &[byte], n: usize) -> CopyResult {
+    let cap: usize = slice_len(dst);
+    let f: usize = cat_first_nul(dst);
+    if f == cap {
+        return CopyResult::DestinationTooSmall(cap + n + 1, cap);
+    }
+    let avail: usize = slice_len(src);
+    let mut lim: usize = n;
+    if lim > avail { lim = avail; }
+    let m: usize = bound_to_nul(src, lim);
+
+    let sum: CheckedUsize = checked_add(f, m);
+    let sum_ok: usize = match sum {
+        CheckedUsize::Ok(k) => { k },
+        CheckedUsize::Overflow => { cap },
+    };
+    let total: CheckedUsize = checked_add(sum_ok, 1);
+    let need: usize = match total {
+        CheckedUsize::Ok(k) => { k },
+        CheckedUsize::Overflow => { cap + 1 },
+    };
+    if need > cap {
+        return CopyResult::DestinationTooSmall(need, cap);
+    }
+    let mut i: usize = 0;
+    while i < m
+        loop_invariant(i <= m)
+        loop_invariant(f + m + 1 <= cap)
+    {
+        dst[f + i] = src[i];
+        i = i + 1;
+    }
+    dst[f + m] = 0;
+    return CopyResult::Copied(m);
 }
