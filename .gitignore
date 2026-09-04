@@ -14,3 +14,7 @@
 # editor / OS
 .DS_Store
 ci-results.tsv
+
+# python bytecode
+__pycache__/
+*.pyc
