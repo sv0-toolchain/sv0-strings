@@ -31,3 +31,4 @@ T-C23-SPAN-001	test/property/c23_span.sv0	C23-012	c,vm	safe	runtime	property	don
 T-C23-STRTOK-001	test/property/c23_strtok.sv0	C23-013,TOK-008,TOK-009	c,vm	safe	runtime	property	done
 T-C23-MEMSET-001	test/property/c23_memset.sv0	C23-014	c,vm	safe	runtime	property	done
 T-COMPILEFAIL-C23-MEMSET-EXPLICIT-001	test/compile_fail/c23_memset_explicit_blocked.sv0	BYTE-010,C23-014	c	safe		compile-fail	done
+T-C23-STRLEN-001	test/property/c23_strlen.sv0	C23-015	c,vm	safe	runtime	property	done

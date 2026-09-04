@@ -24,6 +24,7 @@
 ///           Blocked (BYTE-010, docs/fill-explicit-blocked.md), same as
 ///           `strings_bytes::fill_explicit` -- NOT exported here either.
 ///           C23-014.
+///   SS-149  strlen -- IMPLEMENTED (this file). C23-015.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -44,6 +45,7 @@ use strings_bytes::compare;
 use strings_bytes::fill;
 use strings_cstr::as_bytes;
 use strings_cstr::clone_owned;
+use strings_cstr::len;
 use strings_checked::checked_add;
 use strings_checked::CheckedUsize;
 use strings_tokenize::next;
@@ -541,4 +543,24 @@ pub fn strtok(s: string, separators: string, pos: usize) -> TokenStep {
 /// NOT be presented as a substitute for it.
 pub fn memset(dst: &mut [byte], value: byte) -> () {
     fill(dst, value);
+}
+
+/// C23-015 (Adapted). The `CStr` payload's byte count -- the
+/// C23-recognizable name for `strings_cstr::len` (SPEC Appendix A.5 maps
+/// `strlen` directly there; thin re-export, no new logic).
+///
+/// **O(1), never a NUL scan.** `value` is an owned `string`, and EVERY
+/// owned `string` in this library carries its length as a stored field
+/// rather than requiring a terminator search (D-6/SS-U02b: `string_len`
+/// lowers to `sv0_str_table[h].len` on the C backend -- a single struct
+/// field read, `sv0c/runtime/sv0_runtime.h` -- and to SML's `size` on the
+/// native VM, which is likewise O(1) on an SML `string`). This is exactly
+/// C23-015's "accept `CStr`; SHALL NOT scan arbitrary `string` values or
+/// unbounded memory": there is no code path here that walks bytes looking
+/// for `0x00`, so a `CStr` payload with no trailing terminator at all
+/// (e.g. `strings_cstr::borrow`'s output) still returns instantly and
+/// correctly -- the correctness argument does not depend on one being
+/// present.
+pub fn strlen(value: string) -> usize {
+    return len(value);
 }

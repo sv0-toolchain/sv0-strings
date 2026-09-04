@@ -199,6 +199,17 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   (`test/differential/c23_memset_oracle.py`, 4 cases, reusing the `memset`
   op the oracle already wired for SS-141). No new toolchain slice needed.
   `scripts/test --backend=both` = 37/37.
+- **`strings_c23::strlen`** (SS-149 / C23-015): the C23-recognizable name
+  for `strings_cstr::len`. O(1) on both backends — `string_len` lowers to a
+  single struct field read (`sv0_str_table[h].len`, `sv0c/runtime/sv0_runtime.h`)
+  on the C backend and to SML's `size` (also O(1)) on the native VM; there is
+  no NUL-scanning code path at all, so a `CStr` payload with no trailing
+  terminator whatsoever (e.g. `strings_cstr::borrow`'s output) still returns
+  its exact length instantly, proven directly in the fixture rather than
+  merely asserted. Differential-checked against the host libc for
+  NUL-terminated payloads (`test/differential/c23_strlen_oracle.py`, 4
+  cases, reusing the `strlen` op the oracle already wired for SS-141). No
+  new toolchain slice needed. `scripts/test --backend=both` = 38/38.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

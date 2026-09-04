@@ -1,0 +1,38 @@
+/* SS-149 (SPEC C23-015): strings_c23::strlen.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `strlen` is a one-line map to `strings_cstr::len`, itself a stored-length
+ * field read (O(1) on both backends -- see the docstring in
+ * lib/strings_c23.sv0 for the exact runtime call sites). `CStr` values are
+ * NUL-free `string`s (D-7), so a string literal without a `\0` is a valid
+ * `CStr` argument. Expected results are hand-derived C23 facts (differential
+ * vs the C oracle is `test/differential/c23_strlen_oracle.py`).
+ */
+use strings_c23::strlen;
+use strings_cstr::from_text;
+use strings_cstr::borrow;
+use strings_types::CStringResult;
+
+fn owned(r: CStringResult) -> string {
+    return match r {
+        CStringResult::Owned(s) => { s },
+        CStringResult::InteriorAt(_i) => { "" },
+    };
+}
+
+fn main() -> i32 {
+    if strlen("hello") != 5 { return 1; }
+    if strlen("") != 0 { return 2; }
+    if strlen("a") != 1 { return 3; }
+    if strlen("the quick brown fox") != 19 { return 4; }
+
+    /* the payload need not have a trailing terminator at all -- strlen
+       doesn't scan for one. `borrow` strips a CString's terminator, so
+       this value has NO 0x00 anywhere in it, yet the length is still
+       exact and instant. */
+    let owned_cstring: string = owned(from_text("payload, no nul"));
+    let payload: string = borrow(owned_cstring);
+    if strlen(payload) != 15 { return 5; }
+
+    return 0;
+}
