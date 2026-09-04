@@ -1,0 +1,18 @@
+/* SS-142 compile-fail probe (SPEC C23-004): the safe façade's `memcpy`
+ * "non-overlap enforcement" is a COMPILE-TIME borrow exclusion, not a
+ * run-time check. Passing `&mut b[..]` and `&b[..]` of the same array as
+ * the two arguments is a conflicting borrow of `b` -- the toolchain
+ * borrow guard (SS-U03d) rejects it with E0323 before any code runs. This
+ * pins that the overlapping call cannot even be written.
+ *
+ * EXPECT-FAIL: E0323
+ */
+use strings_c23::memcpy;
+
+fn main() -> i32 {
+    let mut b: [byte; 6] = [1, 2, 3, 4, 5, 6];
+    let dst: &mut [byte] = &mut b[0..4];
+    let src: &[byte] = &b[2..6];
+    let _r = memcpy(dst, src, 4);
+    return 0;
+}

@@ -1,0 +1,157 @@
+/* SS-142 (SPEC C23-004, C23-005): strings_c23::memcpy / memmove /
+ * memmove_within / memccpy.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Expected results are hand-derived C23 facts (differential vs the C oracle
+ * is `test/differential/c23_memcpy_oracle.py`). Each case uses a fresh array
+ * so only one `&mut buf[..]` borrow is live at a time. Byte values decimal.
+ */
+use strings_types::CopyResult;
+use strings_types::MoveResult;
+use strings_types::MemccpyReport;
+use strings_c23::memcpy;
+use strings_c23::memmove;
+use strings_c23::memmove_within;
+use strings_c23::memccpy;
+
+/* -1 = Copied(n); k = DestinationTooSmall(need=?, have=k) */
+fn cr(r: CopyResult) -> i32 {
+    return match r {
+        CopyResult::Copied(k) => { 0 - 1 },
+        CopyResult::DestinationTooSmall(_need, have) => { have as i32 },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= memcpy (C23-004) ================= */
+    let mut d1: [byte; 6] = [9, 9, 9, 9, 9, 9];
+    let s1: [byte; 4] = [65, 66, 67, 68];       /* "ABCD" */
+    if cr(memcpy(&mut d1[..], &s1[..], 3)) != 0 - 1 { return 1; }
+    if d1[0] != 65 { return 2; }
+    if d1[2] != 67 { return 3; }
+    if d1[3] != 9 { return 4; }                 /* untouched past n */
+
+    /* n == cap == src.len */
+    let mut d2: [byte; 4] = [0, 0, 0, 0];
+    if cr(memcpy(&mut d2[..], &s1[..], 4)) != 0 - 1 { return 5; }
+    if d2[3] != 68 { return 6; }
+
+    /* n > cap -> DestinationTooSmall(need, have=cap); dst untouched */
+    let mut d3: [byte; 2] = [7, 7];
+    if cr(memcpy(&mut d3[..], &s1[..], 3)) != 2 { return 7; }
+    if d3[0] != 7 { return 8; }
+
+    /* n > src.len -> DestinationTooSmall(need, have=src.len) */
+    let mut d4: [byte; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    if cr(memcpy(&mut d4[..], &s1[..], 5)) != 4 { return 9; }
+
+    /* n == 0 -> Copied(0), nothing written */
+    let mut d5: [byte; 3] = [5, 6, 7];
+    if cr(memcpy(&mut d5[..], &s1[..], 0)) != 0 - 1 { return 10; }
+    if d5[0] != 5 { return 11; }
+
+    /* high bytes preserved (C23-018) */
+    let mut d6: [byte; 3] = [0, 0, 0];
+    let hi: [byte; 3] = [255, 128, 200];
+    if cr(memcpy(&mut d6[..], &hi[..], 3)) != 0 - 1 { return 12; }
+    if d6[0] != 255 { return 13; }
+    if d6[1] != 128 { return 14; }
+
+    /* ================= memmove (C23-004, disjoint slices) ============= */
+    let mut m1: [byte; 5] = [0, 0, 0, 0, 0];
+    let ms: [byte; 5] = [10, 20, 30, 40, 50];
+    if cr(memmove(&mut m1[..], &ms[..], 4)) != 0 - 1 { return 20; }
+    if m1[0] != 10 { return 21; }
+    if m1[3] != 40 { return 22; }
+    if m1[4] != 0 { return 23; }
+    let mut m2: [byte; 2] = [1, 1];
+    if cr(memmove(&mut m2[..], &ms[..], 3)) != 2 { return 24; }   /* n > cap */
+
+    /* ================= memmove_within (C23-004, overlapping) ========== */
+    /* buf "abcdef"; move 3 bytes from offset 0 to offset 2 -> "ababcf" */
+    let mut w1: [byte; 6] = [97, 98, 99, 100, 101, 102];
+    let wr1: i32 = match memmove_within(&mut w1[..], 2, 0, 3) {
+        MoveResult::Moved => { 0 },
+        MoveResult::RangeOutOfBounds(_a, _b, _c) => { 90 },
+    };
+    if wr1 != 0 { return 30; }
+    if w1[0] != 97 { return 31; }   /* 'a' */
+    if w1[2] != 97 { return 32; }   /* 'a' (was 'c') */
+    if w1[3] != 98 { return 33; }   /* 'b' */
+    if w1[4] != 99 { return 34; }   /* 'c' */
+    if w1[5] != 102 { return 35; }  /* 'f' unchanged */
+
+    /* backward overlap: move 3 from offset 2 to offset 0 on "ABCDEF" -> "CDEDEF" */
+    let mut w2: [byte; 6] = [65, 66, 67, 68, 69, 70];
+    let wr2: i32 = match memmove_within(&mut w2[..], 0, 2, 3) {
+        MoveResult::Moved => { 0 },
+        MoveResult::RangeOutOfBounds(_a, _b, _c) => { 91 },
+    };
+    if wr2 != 0 { return 36; }
+    if w2[0] != 67 { return 37; }   /* 'C' */
+    if w2[2] != 69 { return 38; }   /* 'E' */
+    if w2[3] != 68 { return 39; }   /* 'D' unchanged */
+
+    /* out-of-range -> RangeOutOfBounds, buf untouched */
+    let mut w3: [byte; 4] = [1, 2, 3, 4];
+    let wr3: i32 = match memmove_within(&mut w3[..], 0, 2, 5) {
+        MoveResult::Moved => { 92 },
+        MoveResult::RangeOutOfBounds(_a, _b, _c) => { 0 },
+    };
+    if wr3 != 0 { return 40; }
+    if w3[0] != 1 { return 41; }
+
+    /* ================= memccpy (C23-005) ================= */
+    /* stop found at offset 2 of src -> written 3, next_offset 3 */
+    let mut c1: [byte; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    let cs: [byte; 6] = [72, 105, 0, 88, 89, 90];   /* "Hi\0XYZ" */
+    let r1: MemccpyReport = memccpy(&mut c1[..], &cs[..], 0, 8);
+    if r1.written != 3 { return 50; }
+    if r1.next_offset_present != true { return 51; }
+    if r1.next_offset != 3 { return 52; }
+    if c1[0] != 72 { return 53; }
+    if c1[2] != 0 { return 54; }
+    if c1[3] != 0 { return 55; }                     /* not copied past the stop */
+
+    /* stop NOT found within n -> written == n, no next_offset */
+    let mut c2: [byte; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    let r2: MemccpyReport = memccpy(&mut c2[..], &cs[..], 90, 2);   /* stop 'Z' but n=2 */
+    if r2.written != 2 { return 56; }
+    if r2.next_offset_present != false { return 57; }
+    if c2[0] != 72 { return 58; }
+    if c2[1] != 105 { return 59; }
+    if c2[2] != 0 { return 60; }                     /* c2 stays zero past written */
+
+    /* stop found exactly at the bound */
+    let mut c3: [byte; 4] = [0, 0, 0, 0];
+    let cs3: [byte; 4] = [65, 66, 67, 88];           /* "ABCX" */
+    let r3: MemccpyReport = memccpy(&mut c3[..], &cs3[..], 67, 3);  /* 'C' at offset 2, n=3 */
+    if r3.written != 3 { return 61; }
+    if r3.next_offset_present != true { return 62; }
+    if r3.next_offset != 3 { return 63; }
+
+    /* n limited by src.len; stop absent -> written = src.len */
+    let mut c4: [byte; 8] = [1, 1, 1, 1, 1, 1, 1, 1];
+    let cs4: [byte; 3] = [10, 11, 12];
+    let r4: MemccpyReport = memccpy(&mut c4[..], &cs4[..], 99, 8);
+    if r4.written != 3 { return 64; }
+    if r4.next_offset_present != false { return 65; }
+    if c4[3] != 1 { return 66; }
+
+    /* n > dst capacity -> nothing copied */
+    let mut c5: [byte; 2] = [7, 7];
+    let r5: MemccpyReport = memccpy(&mut c5[..], &cs[..], 0, 4);
+    if r5.written != 0 { return 67; }
+    if r5.next_offset_present != false { return 68; }
+    if c5[0] != 7 { return 69; }
+
+    /* stop byte is a high byte (unsigned, C23-018/022) */
+    let mut c6: [byte; 6] = [0, 0, 0, 0, 0, 0];
+    let cs6: [byte; 4] = [1, 2, 255, 3];
+    let r6: MemccpyReport = memccpy(&mut c6[..], &cs6[..], 255, 6);
+    if r6.written != 3 { return 70; }
+    if r6.next_offset_present != true { return 71; }
+    if c6[2] != 255 { return 72; }
+
+    return 0;
+}

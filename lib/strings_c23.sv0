@@ -9,6 +9,111 @@
 /// Adapts shared safe implementations rather than duplicating algorithms
 /// (SPEC ARCH-003).
 ///
-/// Status: unimplemented (pre-F0). Implementation begins at BL-059 (R0.3),
-/// after the independent C oracle exists.
+/// R0.3 progress:
+///   SS-142  memcpy / memmove / memmove_within / memccpy -- IMPLEMENTED
+///           (this file). C23-004 / C23-005.
 module strings_c23;
+
+use strings_types::CopyResult;
+use strings_types::MoveResult;
+use strings_types::MemccpyReport;
+use strings_bytes::copy;
+use strings_bytes::move_within;
+
+/// C23-004 (Adapted). Copy `n` bytes of `src` into `dst`. Overlap is a
+/// compile-time borrow exclusion: two distinct safe slice arguments cannot
+/// alias (a caller who passes `&mut b[..]` and `&b[..]` is rejected with
+/// `E0323`), so this delegates to `strings_bytes::copy`, the non-overlapping
+/// element-wise primitive.
+///
+/// DEVIATION from C `memcpy` (C23-003): returns `CopyResult`, not the `dst`
+/// pointer; `n` exceeding the destination capacity or the available source
+/// is `DestinationTooSmall(need, have)` with `dst` unmodified, never UB.
+pub fn memcpy(dst: &mut [byte], src: &[byte], n: usize) -> CopyResult {
+    let cap: usize = slice_len(dst);
+    let avail: usize = slice_len(src);
+    if n > cap {
+        return CopyResult::DestinationTooSmall(n, cap);
+    }
+    if n > avail {
+        return CopyResult::DestinationTooSmall(n, avail);
+    }
+    return copy(&mut dst[0..n], &src[0..n]);
+}
+
+/// C23-004 (Adapted). Copy `n` bytes of `src` into `dst`, overlap-tolerant.
+/// In the safe façade two distinct slice arguments cannot alias, so this is
+/// `memcpy` without the borrow-exclusion delegation -- a direct byte copy
+/// over disjoint ranges, order-independent. The aliasing-storage move is
+/// `memmove_within`.
+///
+/// DEVIATION from C `memmove` (C23-003): returns `CopyResult`; a bad size is
+/// a typed error.
+pub fn memmove(dst: &mut [byte], src: &[byte], n: usize) -> CopyResult {
+    let cap: usize = slice_len(dst);
+    let avail: usize = slice_len(src);
+    if n > cap {
+        return CopyResult::DestinationTooSmall(n, cap);
+    }
+    if n > avail {
+        return CopyResult::DestinationTooSmall(n, avail);
+    }
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+    {
+        dst[i] = src[i];
+        i = i + 1;
+    }
+    return CopyResult::Copied(n);
+}
+
+/// C23-004 (Adapted). Overlap-safe `memmove` **within one buffer**: move
+/// `len` bytes from `buf[src_start..]` to `buf[dst_start..]` as if the source
+/// were snapshotted first. Delegates to `strings_bytes::move_within`
+/// (`memmove`-style direction selection). Any out-of-range range is
+/// `RangeOutOfBounds(start, len, available)` with `buf` unmodified.
+pub fn memmove_within(buf: &mut [byte], dst_start: usize, src_start: usize,
+                      len: usize) -> MoveResult {
+    return move_within(buf, src_start, len, dst_start);
+}
+
+/// C23-005 (Adapted). Copy bytes of `src` into `dst` up to and including the
+/// first byte equal to `stop`, or `n` bytes, whichever comes first.
+///
+/// `MemccpyReport`: `written` = number of bytes copied (includes the stop
+/// byte when it was copied); `next_offset_present` is true **iff** the stop
+/// byte was copied, and then `next_offset == written` -- the offset just past
+/// the stop byte, an owned index, **never an interior pointer**. When `stop`
+/// is not found within the bound, `written == min(n, src.len)` and
+/// `next_offset_present == false`.
+///
+/// If `n` exceeds the destination capacity nothing is copied
+/// (`written == 0`, `next_offset_present == false`): the safe façade does not
+/// perform a partial write past a bound.
+pub fn memccpy(dst: &mut [byte], src: &[byte], stop: byte, n: usize) -> MemccpyReport {
+    let cap: usize = slice_len(dst);
+    if n > cap {
+        return MemccpyReport { written: 0, next_offset_present: false, next_offset: 0 };
+    }
+    let avail: usize = slice_len(src);
+    let mut limit: usize = n;
+    if limit > avail { limit = avail; }
+
+    let mut i: usize = 0;
+    let mut hit: bool = false;
+    while i < limit
+        loop_invariant(i <= limit)
+        loop_invariant(limit <= cap)
+    {
+        let b: byte = src[i];
+        dst[i] = b;
+        i = i + 1;
+        if b == stop { hit = true; break; }
+    }
+
+    if hit {
+        return MemccpyReport { written: i, next_offset_present: true, next_offset: i };
+    }
+    return MemccpyReport { written: i, next_offset_present: false, next_offset: 0 };
+}

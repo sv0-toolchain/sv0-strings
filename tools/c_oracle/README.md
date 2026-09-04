@@ -67,6 +67,17 @@ dispatch table in `oracle.c`:
 | fn | shape |
 |---|---|
 | `memcpy` | guarded write, forbids overlap |
+| `memmove` | guarded write, overlap allowed |
+| `memccpy` | guarded write up to a stop byte; `ret=idx:<past-stop>` / `idx:none`, `written=` |
 | `memset` | guarded write |
 | `memcmp` | normalized ordering |
 | `strlen` | bounded read → length |
+
+`value=` also carries the stop byte for `memccpy`.
+
+## Differential drivers
+
+`test/differential/*.py` cross-check the C23 result values asserted by the
+sv0 property fixtures against this oracle (real host libc). Run by
+`scripts/check`. `c23_memcpy_oracle.py` covers `memcpy` / `memmove` /
+`memccpy` (SS-142).

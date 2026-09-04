@@ -91,6 +91,21 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R0.3 (in progress)
 
+- **`strings_c23::memcpy` / `memmove` / `memmove_within` / `memccpy`** (SS-142
+  / C23-004 / C23-005): the first safe C23 `<string.h>` adapters. `memcpy`
+  delegates to `strings_bytes::copy` (non-overlapping primitive) on `[0..n]`
+  sub-slices — overlap is a **compile-time** borrow exclusion
+  (`test/compile_fail/c23_memcpy_overlap.sv0` → `E0323`), a bad size is
+  `CopyResult::DestinationTooSmall` with `dst` unmodified. `memmove_within`
+  is the overlap-safe in-buffer move (→ `strings_bytes::move_within`).
+  `memccpy` returns `MemccpyReport` — `written` bytes copied, `next_offset =
+  Some(written)` iff the stop byte was copied, an **owned index, never an
+  interior pointer**. Differential-checked against the host libc via
+  `tools/c_oracle` (`test/differential/c23_memcpy_oracle.py`, wired into
+  `scripts/check`; the oracle gained `memmove` / `memccpy` ops). Needed the
+  toolchain slice **SS-U18** (a `fn memcpy` clashes with libc in the
+  `--project` translation unit → module-prefixed like a cross-module
+  collision). `scripts/test --backend=both` = 30/30.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

@@ -23,3 +23,4 @@ T-CBUFFER-OPS-001	test/property/cbuffer_ops.sv0	CSTR-010,CSTR-011,CSTR-012,CSTR-
 T-TOKENIZE-CURSOR-001	test/property/tokenize_cursor.sv0	TOK-001,TOK-002,TOK-003,TOK-004,TOK-005,TOK-006,TOK-007	c,vm	safe	runtime	property	done
 T-OWNED-LIFECYCLE-001	test/property/owned_lifecycle.sv0	UP-013,SEC-008,BACKEND-004	c,vm	safe	runtime	property	done
 T-C-ORACLE-001	tools/c_oracle/run_oracle.py	TEST-012,TEST-013	c	safe		tool	done
+T-C23-MEMCPY-FAMILY-001	test/property/c23_memcpy_family.sv0	C23-004,C23-005,C23-018	c,vm	safe	runtime	property	done

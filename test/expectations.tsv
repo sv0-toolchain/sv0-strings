@@ -25,3 +25,4 @@ test/property/cstr_owned.sv0	0	0	SS-127 CSTR-008/009; strings_cstr::clone_owned/
 test/property/cbuffer_ops.sv0	0	0	SS-128 CSTR-010..013/017/018; strings_cstr CBuffer strlcpy/strlcat state matrix (D-8: CBuffer = &mut [byte], first-NUL recomputed), C + VM
 test/property/tokenize_cursor.sv0	0	0	SS-129 TOK-001..007; strings_tokenize::next explicit scalar cursor (D-9: pos threaded, TokenStep carrier), C + VM
 test/property/owned_lifecycle.sv0	0	0	SS-130 UP-013/SEC-008/BACKEND-004; owned-string lifecycle stress (300 iters, all R0.2 producers), C + VM
+test/property/c23_memcpy_family.sv0	0	0	SS-142 C23-004/005; strings_c23::memcpy/memmove/memmove_within/memccpy safe adapters, C + VM

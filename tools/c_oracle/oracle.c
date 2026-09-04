@@ -30,12 +30,22 @@
  *   cap=i:<k>               destination capacity (mutable-buffer ops)
  *   guard=i:<k>              guard-byte padding each side (default 8)
  *
- * Wired operations (SS-141 -- the harness; SS-142+ extend the table):
+ * Wired operations (SS-142+ extend the table):
  *   memcpy   guarded write, forbids overlap
+ *   memmove  guarded write, overlap allowed
+ *   memccpy  guarded write up to a stop byte; ret=idx:<past-stop>|idx:none + written=
  *   memset   guarded write
  *   memcmp   normalized ordering
  *   strlen   bounded read -> length
  */
+
+/* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too. */
+#ifndef _DEFAULT_SOURCE
+#define _DEFAULT_SOURCE 1
+#endif
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
 
 #include <errno.h>
 #include <stdint.h>
@@ -256,6 +266,61 @@ static int op_memset(const struct req *r) {
     return 0;
 }
 
+static int op_memmove(const struct req *r) {
+    if (r->src_n < 0) return fail_pre("src-missing");
+    if (r->n < 0)     return fail_pre("n-missing");
+    if (r->cap < 0)   return fail_pre("cap-missing");
+    if (r->n > r->src_n) return fail_pre("n-gt-src");
+    if (r->n > r->cap)   return fail_pre("n-gt-cap");
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    errno = 0;
+    void *ret = memmove(d.pay, r->src, (size_t)r->n); /* overlap allowed */
+    printf("precondition=ok\n");
+    printf("ret=ptr:%s\n", ret == d.pay ? "dst" : "other");
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
+static int op_memccpy(const struct req *r) {
+    if (r->src_n < 0)   return fail_pre("src-missing");
+    if (r->value < 0)   return fail_pre("stop-missing"); /* `value` carries the stop byte */
+    if (r->n < 0)       return fail_pre("n-missing");
+    if (r->cap < 0)     return fail_pre("cap-missing");
+    if (r->value > 255) return fail_pre("stop-range");
+    if (r->n > r->cap)   return fail_pre("n-gt-cap");
+    /* memccpy reads src until the stop byte or n bytes, whichever first --
+       it is only safe if that many bytes exist in src. */
+    {
+        long scan = r->n < r->src_n ? r->n : r->src_n;
+        long stop_at = -1;
+        for (long i = 0; i < scan; i++)
+            if (r->src[i] == (unsigned char)r->value) { stop_at = i; break; }
+        if (stop_at < 0 && r->n > r->src_n) return fail_pre("no-stop-in-src");
+    }
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    errno = 0;
+    void *ret = memccpy(d.pay, r->src, (int)r->value, (size_t)r->n);
+    long written = ret ? (long)((unsigned char *)ret - d.pay) : r->n;
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - d.pay));
+    else     printf("ret=idx:none\n");
+    printf("written=%ld\n", written);
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
 static int op_memcmp(const struct req *r) {
     if (r->a_n < 0) return fail_pre("a-missing");
     if (r->b_n < 0) return fail_pre("b-missing");
@@ -294,10 +359,12 @@ static int dispatch(const struct req *r) {
     printf("impl=%s\n", impl_id());
     printf("std=%ld\n", std_version());
     printf("fn=%s\n", r->fn);
-    if (strcmp(r->fn, "memcpy") == 0) return op_memcpy(r);
-    if (strcmp(r->fn, "memset") == 0) return op_memset(r);
-    if (strcmp(r->fn, "memcmp") == 0) return op_memcmp(r);
-    if (strcmp(r->fn, "strlen") == 0) return op_strlen(r);
+    if (strcmp(r->fn, "memcpy") == 0)  return op_memcpy(r);
+    if (strcmp(r->fn, "memmove") == 0) return op_memmove(r);
+    if (strcmp(r->fn, "memccpy") == 0) return op_memccpy(r);
+    if (strcmp(r->fn, "memset") == 0)  return op_memset(r);
+    if (strcmp(r->fn, "memcmp") == 0)  return op_memcmp(r);
+    if (strcmp(r->fn, "strlen") == 0)  return op_strlen(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }
