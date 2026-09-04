@@ -1,0 +1,96 @@
+/* SS-130 (SPEC UP-013, SEC-008, BACKEND-004, BL-057): owned-`string` /
+ * `CString` lifecycle parity sweep.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Every R0.2 owned-string producer is exercised many times in a loop: if the
+ * arena mishandled release (double free, use-after-free, premature
+ * exhaustion) a run of hundreds of allocations would corrupt a result or
+ * crash. Both backends must survive with identical results. The recoverable
+ * typed failure (`LengthOverflow`) is covered by SS-123 / SS-127 / SS-128;
+ * the non-recoverable allocation-failure injection parity is
+ * `scripts/verify_string_alloc_failure.py` (C + VM, SS-U17).
+ */
+use strings_types::FromUtf8Result;
+use strings_types::ConcatResult;
+use strings_types::CStringResult;
+use strings_text::from_utf8;
+use strings_text::equal;
+use strings_text::len_bytes;
+use strings_cstr::from_text;
+use strings_cstr::from_bytes;
+use strings_cstr::clone_owned;
+use strings_cstr::borrow;
+
+fn utext(r: FromUtf8Result) -> string {
+    return match r {
+        FromUtf8Result::Text(s) => { s },
+        FromUtf8Result::Invalid(_k) => { "" },
+    };
+}
+fn joined(r: ConcatResult) -> string {
+    return match r {
+        ConcatResult::Joined(s) => { s },
+        ConcatResult::LengthOverflow => { "" },
+    };
+}
+fn owned(r: CStringResult) -> string {
+    return match r {
+        CStringResult::Owned(s) => { s },
+        CStringResult::InteriorAt(_k) => { "" },
+    };
+}
+
+fn main() -> i32 {
+    let src: [byte; 5] = [104, 105, 33, 0, 0];   /* "hi!" then padding */
+    let seed: [byte; 3] = [97, 98, 99];          /* "abc" */
+
+    let mut i: i32 = 0;
+    while i < 300
+        loop_invariant(i <= 300)
+    {
+        /* from_utf8: owned copy from bytes */
+        let s0: [byte; 3] = [65, 66, 67];
+        let t0: string = utext(from_utf8(&s0[..]));
+        if equal(t0, "ABC") != true { return 1; }
+        if len_bytes(t0) != 3 { return 2; }
+
+        /* strings_text::concat: owned join + terminator-free */
+        let j0: string = joined(strings_text::concat(t0, "xyz"));
+        if equal(j0, "ABCxyz") != true { return 3; }
+
+        /* strings_cstr::from_text: owned <payload><0x00> */
+        let ct: string = owned(from_text("payload"));
+        if len_bytes(ct) != 8 { return 4; }
+        if equal(borrow(ct), "payload") != true { return 5; }
+
+        /* strings_cstr::from_bytes: owned from a raw byte slice */
+        let cb: string = owned(from_bytes(&seed[..]));
+        if equal(borrow(cb), "abc") != true { return 6; }
+
+        /* strings_cstr::concat + clone_owned: chained owned construction */
+        let cc: string = joined(strings_cstr::concat("foo", "bar"));
+        if equal(borrow(cc), "foobar") != true { return 7; }
+        let clone: string = joined(clone_owned(borrow(cc)));
+        if equal(borrow(clone), "foobar") != true { return 8; }
+
+        /* a big-ish owned string each iteration, then discarded */
+        let big0: string = string_concat(j0, borrow(clone));
+        let big1: string = string_concat(big0, borrow(ct));
+        if len_bytes(big1) != 6 + 6 + 7 { return 9; }
+
+        /* embedded NUL survives owned construction every iteration */
+        let nul: string = utext(from_utf8(&src[..]));   /* "hi!\0\0" -> valid UTF-8 */
+        if len_bytes(nul) != 5 { return 10; }
+        if string_char_at(nul, 3) != 0 { return 11; }
+
+        i = i + 1;
+    }
+
+    /* the arena is not exhausted: fresh construction still works afterward */
+    let after: string = joined(strings_text::concat("still", "here"));
+    if equal(after, "stillhere") != true { return 20; }
+    let after_c: string = owned(from_text("ok"));
+    if equal(borrow(after_c), "ok") != true { return 21; }
+
+    return 0;
+}
