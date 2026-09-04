@@ -186,6 +186,19 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   exactly on that boundary; the fixture keeps the new set a superset of the
   old to stay unambiguous and matches real `strtok` there too. No new
   toolchain slice needed. `scripts/test --backend=both` = 35/35.
+- **`strings_c23::memset` ships; `memset_explicit` stays Blocked** (SS-148 /
+  C23-014): `memset` is a one-line map to `strings_bytes::fill`. C23's own
+  scrub variant, `memset_explicit`, hits the exact same BYTE-010
+  non-elision blocker as `strings_bytes::fill_explicit` (SS-108, R0.1) and
+  is deliberately **not exported from `strings_c23` either** — pinned by
+  `test/compile_fail/c23_memset_explicit_blocked.sv0`
+  (`EXPECT-FAIL: E0309`); the existing `docs/fill-explicit-blocked.md`
+  evidence and SS-U11 unblocking path now cover both `BYTE-010` and
+  `C23-014` (addendum added, no new evidence needed — the backend gap is
+  identical). Differential-checked against the host libc
+  (`test/differential/c23_memset_oracle.py`, 4 cases, reusing the `memset`
+  op the oracle already wired for SS-141). No new toolchain slice needed.
+  `scripts/test --backend=both` = 37/37.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

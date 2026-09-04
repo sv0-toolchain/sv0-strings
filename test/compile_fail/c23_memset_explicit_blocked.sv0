@@ -1,0 +1,18 @@
+/* SS-148 compile-fail evidence (SPEC C23-014 / BYTE-010).
+ *
+ * `memset_explicit` requires the same backend-enforced non-elision
+ * guarantee as `strings_bytes::fill_explicit` (BYTE-010) -- neither backend
+ * provides it today (see docs/fill-explicit-blocked.md), so it stays
+ * Blocked and MUST NOT be aliased to plain `memset` / `fill`. `strings_c23`
+ * therefore does not export it either. This probe pins that: importing it
+ * fails to resolve, and if a plain alias were ever added, this fixture
+ * would start compiling and the compile-fail gate would flag the
+ * regression.
+ *
+ * EXPECT-FAIL: E0309
+ */
+use strings_c23::memset_explicit;
+
+fn main() -> i32 {
+    return 0;
+}

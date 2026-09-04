@@ -74,3 +74,16 @@ The unblocking work is **toolchain slice SS-U11** (SPEC-deferred to R0.3):
 
 Only when **both** backends carry that guarantee does `fill_explicit` move from
 `Blocked` to implemented; it is still never a plain alias of `fill`.
+
+## C23 façade addendum (SS-148, C23-014)
+
+`strings_c23::memset` ships (SS-148) as the C23-recognizable one-line map to
+`strings_bytes::fill`. `memset_explicit` -- C23's own non-eliding scrub
+variant -- is subject to the exact same BYTE-010 blocker as `fill_explicit`
+above and is deliberately **not exported from `strings_c23` either**, pinned
+by `test/compile_fail/c23_memset_explicit_blocked.sv0` (`EXPECT-FAIL:
+E0309`). No separate evidence is recorded for it: the backend gap is
+identical, so this file's optimizer/VM-trace evidence and SS-U11 unblocking
+path cover both the SPEC `BYTE-010` and `C23-014` requirements at once. When
+SS-U11 lands and `fill_explicit` is implemented, `strings_c23::memset_explicit`
+becomes a one-line map to it, the same way `memset` maps to `fill` today.

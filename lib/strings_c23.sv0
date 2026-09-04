@@ -20,6 +20,10 @@
 ///   SS-145  strdup / strndup -- IMPLEMENTED (this file). C23-011.
 ///   SS-146  strspn / strcspn -- IMPLEMENTED (this file). C23-012.
 ///   SS-147  strtok -- IMPLEMENTED (this file). C23-013.
+///   SS-148  memset -- IMPLEMENTED (this file); memset_explicit stays
+///           Blocked (BYTE-010, docs/fill-explicit-blocked.md), same as
+///           `strings_bytes::fill_explicit` -- NOT exported here either.
+///           C23-014.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -37,6 +41,7 @@ use strings_bytes::find_slice;
 use strings_bytes::span_in;
 use strings_bytes::span_not_in;
 use strings_bytes::compare;
+use strings_bytes::fill;
 use strings_cstr::as_bytes;
 use strings_cstr::clone_owned;
 use strings_checked::checked_add;
@@ -519,4 +524,21 @@ pub fn strcspn(s: string, reject: string) -> usize {
 /// not by a runtime scan.
 pub fn strtok(s: string, separators: string, pos: usize) -> TokenStep {
     return next(as_bytes(s), as_bytes(separators), pos);
+}
+
+/// C23-014 (Adapted). Set every byte of `dst` to `value` -- the
+/// C23-recognizable name for `strings_bytes::fill` (SPEC Appendix A.5:
+/// `memset` maps directly there). The write is bounded by `dst.len()` on
+/// every path (slice bounds replace pointer/count UB).
+///
+/// This is the *plain* fill: it carries NO backend-enforced guarantee
+/// against dead-store elimination. `memset_explicit` -- the scrubbing
+/// variant C23 added for exactly that guarantee -- stays **Blocked**
+/// (BYTE-010) and is deliberately **not exported from this module either**,
+/// mirroring `strings_bytes::fill_explicit`'s own block; see
+/// `docs/fill-explicit-blocked.md` for the recorded optimizer/VM-trace
+/// evidence and the unblocking path (toolchain slice SS-U11). `memset` MUST
+/// NOT be presented as a substitute for it.
+pub fn memset(dst: &mut [byte], value: byte) -> () {
+    fill(dst, value);
 }
