@@ -191,6 +191,35 @@ T0-2d monomorphization neighbourhood) **and** a `&string` / borrow model.
 Not gate-blocking: every CSTR-* behavioural requirement in scope is met and
 cross-backend tested.
 
+## D-8 — `CBuffer` is its `&mut [byte]` storage; first-NUL state is recomputed (SS-128)
+
+**SPEC.** Section 8.2: `CBuffer borrows(storage) { storage: &mut [byte],
+first_nul: Option<usize> }`. CSTR-010 caches the first-NUL offset at
+construction; CSTR-016 (R1) requires the cache to be updated or invalidated
+atomically on mutation.
+
+**What the toolchain does.** A `struct` with a `&[byte]` / `&mut [byte]`
+field crashes the C emitter (KC-006 zone, same as D-7). sv0 also has no
+`Option<usize>` beyond the library-local scalar carrier (D-4).
+
+**What sv0-strings does.** A `CBuffer` value **is** its backing `&mut [byte]`
+storage. Capacity is `slice_len(storage)`. The "first NUL" state is
+**recomputed** by a bounded scan of `storage` (`first_nul`, private) each
+time it is needed (`append_into`, `require_cstr`) rather than cached in the
+value.
+
+**Why sound.** The scan is over the bounded storage only — never out of
+range — and produces the same offset the cache would hold. Because there is
+no cache, buffer mutation can never leave a **stale** first-NUL offset:
+CSTR-016's atomic-invalidation requirement is trivially satisfied. The
+`borrows(...)` relation is advisory (as D-7). The one cost is that
+`append_into` / `require_cstr` are `O(capacity)` in the first-NUL scan
+rather than `O(1)` — a PERF item, not a correctness one, and every
+`CSTR-01x` behavioural requirement in scope passes cross-backend.
+
+**Schedule.** Revisit alongside D-7 when sv0c lands struct-with-slice-field
+lowering; a cached `first_nul` then becomes a pure optimisation.
+
 ## SPEC-deferred (not decisions — the SPEC's own ladder)
 
 - **SS-U11** (`fill_explicit` non-elision primitive, UP-014) — SPEC-deferred to

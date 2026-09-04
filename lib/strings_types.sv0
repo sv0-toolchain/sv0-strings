@@ -262,6 +262,26 @@ pub enum CStringResult {
     InteriorAt(usize),
 }
 
+/* Result of `strings_cstr::append_into` (SPEC Section 13, CSTR-012; slice
+ * SS-128). The SPEC signature is `-> Result<CopyReport, BufferError>`; a
+ * struct (`CopyReport`) payload does not lower inside an enum variant on the
+ * C backend (same limit as D-7), so the report fields are inlined as a
+ * scalar tuple variant.
+ *
+ *   Reported(written, required, truncated)
+ *                      -- Ok: `written` = source payload bytes appended
+ *                         (CSTR-018), `required` = the full destination
+ *                         payload length the operation attempted,
+ *                         `truncated` = `required >= capacity`
+ *   LengthOverflow     -- Err: the checked `first_nul + src.len()` (or
+ *                         `capacity + src.len()` when no first NUL exists)
+ *                         did not fit in `usize`; nothing was written
+ */
+pub enum AppendResult {
+    Reported(usize, usize, bool),
+    LengthOverflow,
+}
+
 /* Result of `strings_bytes::move_within` (SPEC Section 10, BYTE-007 /
  * BYTE-008). Same GOV-004 / D-4 deviation as `CopyResult`: the SPEC
  * signature is `-> Result<(), BufferError>`; a structured `BufferError` in a

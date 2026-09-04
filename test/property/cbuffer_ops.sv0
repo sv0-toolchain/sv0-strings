@@ -1,0 +1,228 @@
+/* SS-128 (SPEC CSTR-010..013, CSTR-017, CSTR-018): strings_cstr `CBuffer`
+ * family -- copy_into (strlcpy), append_into (strlcat), buffer_from_storage,
+ * empty_buffer, require_cstr.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * A `CBuffer` value is its backing `&mut [byte]` (D-8); capacity is the
+ * slice length and the first-NUL state is recomputed. Each case uses a
+ * fresh array so only one `&mut buf[..]` borrow is live at a time. Byte
+ * values decimal; hex in comments.
+ */
+use strings_types::CopyReport;
+use strings_types::AppendResult;
+use strings_types::CStrResult;
+use strings_cstr::copy_into;
+use strings_cstr::append_into;
+use strings_cstr::buffer_from_storage;
+use strings_cstr::empty_buffer;
+use strings_cstr::require_cstr;
+use strings_cstr::len;
+use strings_text::equal;
+
+fn main() -> i32 {
+    /* ================= copy_into / strlcpy (CSTR-011) ================= */
+
+    /* fits with room to spare */
+    let mut b1: [byte; 8] = [9, 9, 9, 9, 9, 9, 9, 9];
+    let r1: CopyReport = copy_into(&mut b1[..], "abc");
+    if r1.written != 3 { return 1; }
+    if r1.required != 3 { return 2; }
+    if r1.truncated != false { return 3; }
+    if b1[0] != 97 { return 4; }
+    if b1[2] != 99 { return 5; }
+    if b1[3] != 0 { return 6; }
+
+    /* exact fit: payload == capacity - 1 */
+    let mut b2: [byte; 4] = [9, 9, 9, 9];
+    let r2: CopyReport = copy_into(&mut b2[..], "abc");
+    if r2.written != 3 { return 10; }
+    if r2.required != 3 { return 11; }
+    if r2.truncated != false { return 12; }       /* 3 >= 4 is false */
+    if b2[3] != 0 { return 13; }
+
+    /* payload == capacity -> truncated, wrote capacity - 1 */
+    let mut b3: [byte; 4] = [9, 9, 9, 9];
+    let r3: CopyReport = copy_into(&mut b3[..], "abcd");
+    if r3.written != 3 { return 20; }
+    if r3.required != 4 { return 21; }
+    if r3.truncated != true { return 22; }
+    if b3[3] != 0 { return 23; }
+    if b3[2] != 99 { return 24; }                 /* 'c', not 'd' */
+
+    /* payload > capacity */
+    let mut b4: [byte; 4] = [9, 9, 9, 9];
+    let r4: CopyReport = copy_into(&mut b4[..], "abcde");
+    if r4.written != 3 { return 30; }
+    if r4.required != 5 { return 31; }
+    if r4.truncated != true { return 32; }
+
+    /* capacity 1: only the terminator fits */
+    let mut b5: [byte; 1] = [9];
+    let r5: CopyReport = copy_into(&mut b5[..], "abc");
+    if r5.written != 0 { return 40; }
+    if r5.required != 3 { return 41; }
+    if r5.truncated != true { return 42; }
+    if b5[0] != 0 { return 43; }
+
+    /* capacity 1, empty source: fits (0 payload), not truncated */
+    let mut b6: [byte; 1] = [9];
+    let r6: CopyReport = copy_into(&mut b6[..], "");
+    if r6.written != 0 { return 44; }
+    if r6.required != 0 { return 45; }
+    if r6.truncated != false { return 46; }       /* 0 >= 1 is false */
+    if b6[0] != 0 { return 47; }
+
+    /* zero capacity: no write, truncated true even for empty source (CSTR-013) */
+    let mut b7: [byte; 0] = [];
+    let r7: CopyReport = copy_into(&mut b7[..], "");
+    if r7.written != 0 { return 50; }
+    if r7.required != 0 { return 51; }
+    if r7.truncated != true { return 52; }
+
+    let mut b8: [byte; 0] = [];
+    let r8: CopyReport = copy_into(&mut b8[..], "abc");
+    if r8.written != 0 { return 53; }
+    if r8.required != 3 { return 54; }
+    if r8.truncated != true { return 55; }
+
+    /* ================= append_into / strlcat (CSTR-012) ================= */
+
+    /* first NUL at 2, plenty of room */
+    let mut a1: [byte; 8] = [97, 98, 0, 0, 0, 0, 0, 0];   /* "ab\0..." */
+    let ar1: i32 = match append_into(&mut a1[..], "cd") {
+        AppendResult::Reported(w, req, tr) => {
+            if w != 2 { 61 } else { if req != 4 { 62 } else { if tr != false { 63 } else { 0 } } }
+        },
+        AppendResult::LengthOverflow => { 60 },
+    };
+    if ar1 != 0 { return ar1; }
+    if a1[2] != 99 { return 64; }                 /* 'c' */
+    if a1[3] != 100 { return 65; }                /* 'd' */
+    if a1[4] != 0 { return 66; }                  /* re-terminated */
+
+    /* no room to append: first NUL at capacity - 1 */
+    let mut a2: [byte; 4] = [97, 98, 99, 0];      /* "abc\0" */
+    let ar2: i32 = match append_into(&mut a2[..], "de") {
+        AppendResult::Reported(w, req, tr) => {
+            if w != 0 { 71 } else { if req != 5 { 72 } else { if tr != true { 73 } else { 0 } } }
+        },
+        AppendResult::LengthOverflow => { 70 },
+    };
+    if ar2 != 0 { return ar2; }
+    if a2[0] != 97 { return 74; }                 /* unchanged */
+    if a2[3] != 0 { return 75; }
+
+    /* partial append with truncation */
+    let mut a3: [byte; 5] = [97, 98, 0, 0, 0];    /* "ab\0.." cap 5, f=2, room=2 */
+    let ar3: i32 = match append_into(&mut a3[..], "cdefg") {
+        AppendResult::Reported(w, req, tr) => {
+            if w != 2 { 81 } else { if req != 7 { 82 } else { if tr != true { 83 } else { 0 } } }
+        },
+        AppendResult::LengthOverflow => { 80 },
+    };
+    if ar3 != 0 { return ar3; }
+    if a3[2] != 99 { return 84; }
+    if a3[3] != 100 { return 85; }
+    if a3[4] != 0 { return 86; }
+
+    /* append into an empty buffer (first NUL at 0) */
+    let mut a4: [byte; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    let ar4: i32 = match append_into(&mut a4[..], "xyz") {
+        AppendResult::Reported(w, req, tr) => {
+            if w != 3 { 91 } else { if req != 3 { 92 } else { if tr != false { 93 } else { 0 } } }
+        },
+        AppendResult::LengthOverflow => { 90 },
+    };
+    if ar4 != 0 { return ar4; }
+    if a4[0] != 120 { return 94; }
+    if a4[3] != 0 { return 95; }
+
+    /* unterminated storage: no first NUL -> no write, required = cap + src.len() */
+    let mut a5: [byte; 8] = [97, 98, 99, 100, 101, 102, 103, 104];   /* no 0 */
+    let ar5: i32 = match append_into(&mut a5[..], "xyz") {
+        AppendResult::Reported(w, req, tr) => {
+            if w != 0 { 101 } else { if req != 11 { 102 } else { if tr != true { 103 } else { 0 } } }
+        },
+        AppendResult::LengthOverflow => { 100 },
+    };
+    if ar5 != 0 { return ar5; }
+    if a5[0] != 97 { return 104; }                /* wholly unchanged */
+    if a5[7] != 104 { return 105; }
+
+    /* zero-capacity buffer: no first NUL, still reports required (CSTR-013) */
+    let mut a6: [byte; 0] = [];
+    let ar6: i32 = match append_into(&mut a6[..], "abcd") {
+        AppendResult::Reported(w, req, tr) => {
+            if w != 0 { 111 } else { if req != 4 { 112 } else { if tr != true { 113 } else { 0 } } }
+        },
+        AppendResult::LengthOverflow => { 110 },
+    };
+    if ar6 != 0 { return ar6; }
+
+    /* append empty source onto existing payload: no change, req = f */
+    let mut a7: [byte; 8] = [97, 98, 0, 0, 0, 0, 0, 0];
+    let ar7: i32 = match append_into(&mut a7[..], "") {
+        AppendResult::Reported(w, req, tr) => {
+            if w != 0 { 121 } else { if req != 2 { 122 } else { if tr != false { 123 } else { 0 } } }
+        },
+        AppendResult::LengthOverflow => { 120 },
+    };
+    if ar7 != 0 { return ar7; }
+
+    /* ================= empty_buffer / buffer_from_storage / require_cstr ===== */
+
+    /* empty_buffer writes 0x00 at index 0 (CSTR-010) */
+    let mut e1: [byte; 5] = [9, 9, 9, 9, 9];
+    let e1v: &mut [byte] = empty_buffer(&mut e1[..]);
+    if e1v[0] != 0 { return 130; }
+    let e1r: i32 = match require_cstr(&e1[..]) {
+        CStrResult::View(s) => { if len(s) == 0 { 0 } else { 131 } },
+        CStrResult::NoTerminator => { 132 },
+        CStrResult::InteriorAt(_k) => { 133 },
+    };
+    if e1r != 0 { return e1r; }
+
+    /* zero-capacity empty_buffer: no write, require_cstr -> NoTerminator */
+    let mut e2: [byte; 0] = [];
+    let _e2v: &mut [byte] = empty_buffer(&mut e2[..]);
+    let e2r: i32 = match require_cstr(&e2[..]) {
+        CStrResult::View(_s) => { 140 },
+        CStrResult::NoTerminator => { 0 },
+        CStrResult::InteriorAt(_k) => { 141 },
+    };
+    if e2r != 0 { return e2r; }
+
+    /* buffer_from_storage is identity; require_cstr reads the first-NUL payload */
+    let mut s1: [byte; 5] = [104, 105, 0, 88, 89];   /* "hi\0XY" */
+    let s1v: &mut [byte] = buffer_from_storage(&mut s1[..]);
+    if s1v[1] != 105 { return 150; }
+    let s1r: i32 = match require_cstr(&s1[..]) {
+        CStrResult::View(s) => {
+            if equal(s, "hi") { if len(s) == 2 { 0 } else { 151 } } else { 152 }
+        },
+        CStrResult::NoTerminator => { 153 },
+        CStrResult::InteriorAt(_k) => { 154 },
+    };
+    if s1r != 0 { return s1r; }
+
+    /* require_cstr on unterminated storage -> NoTerminator */
+    let s2: [byte; 3] = [65, 66, 67];
+    let s2r: i32 = match require_cstr(&s2[..]) {
+        CStrResult::View(_s) => { 160 },
+        CStrResult::NoTerminator => { 0 },
+        CStrResult::InteriorAt(_k) => { 161 },
+    };
+    if s2r != 0 { return s2r; }
+
+    /* copy_into then require_cstr round-trips the payload */
+    let mut rt: [byte; 8] = [9, 9, 9, 9, 9, 9, 9, 9];
+    let _rtr: CopyReport = copy_into(&mut rt[..], "sv0");
+    let rtr2: i32 = match require_cstr(&rt[..]) {
+        CStrResult::View(s) => { if equal(s, "sv0") { 0 } else { 170 } },
+        CStrResult::NoTerminator => { 171 },
+        CStrResult::InteriorAt(_k) => { 172 },
+    };
+    if rtr2 != 0 { return rtr2; }
+
+    return 0;
+}

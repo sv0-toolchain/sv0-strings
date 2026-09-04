@@ -22,3 +22,4 @@ test/property/text_search_slice.sv0	0	0	SS-124 TEXT-007..011; strings_text::find
 test/property/text_from_utf8.sv0	0	0	SS-125 TEXT-014/015; strings_text::from_utf8 (FromUtf8Result carrier, owned copy) / as_bytes (&[byte] view via SS-U16), C + VM
 test/property/cstr_construct.sv0	0	0	SS-126 CSTR-001..007/017; strings_cstr CStr/CString constructors + views (D-7: both are string), C + VM
 test/property/cstr_owned.sv0	0	0	SS-127 CSTR-008/009; strings_cstr::clone_owned/concat (ConcatResult carrier, checked_add pre-alloc, one terminator), C + VM
+test/property/cbuffer_ops.sv0	0	0	SS-128 CSTR-010..013/017/018; strings_cstr CBuffer strlcpy/strlcat state matrix (D-8: CBuffer = &mut [byte], first-NUL recomputed), C + VM

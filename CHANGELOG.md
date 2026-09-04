@@ -48,8 +48,17 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   to a `CStr` payload; `concat` builds `payload(a) ++ payload(b) ++ 0x00`.
   `len(a) + len(b)` and the `+ 1` for the terminator are checked for `usize`
   overflow (`strings_checked::checked_add`) before any allocation; result via
-  `strings_types::ConcatResult` (`Joined` / `LengthOverflow`). The `CBuffer`
-  family is SS-128.
+  `strings_types::ConcatResult` (`Joined` / `LengthOverflow`).
+- **`strings_cstr` `CBuffer` family** (SS-128, CSTR-010..013 / CSTR-017 /
+  CSTR-018): `copy_into` (bounded `strlcpy`), `append_into` (bounded
+  `strlcat`, `AppendResult` carrier with a checked `first_nul + src.len()`),
+  `buffer_from_storage`, `empty_buffer`, `require_cstr`. `CopyReport` /
+  `AppendResult` fields follow CSTR-018 (`written` = payload bytes moved,
+  `required` = attempted destination payload length, `truncated` derived from
+  the bound). Deviation **D-8**: a `CBuffer` value is its backing
+  `&mut [byte]` storage (a struct with a slice field crashes the C emitter);
+  the first-NUL state is recomputed by a bounded scan rather than cached, so
+  it can never go stale.
 - Whole-string semantics run on the length-bearing
   owned `string` (SS-U02b/c) with no `strlen` / `strcmp` (TEXT-016). Needed
   toolchain slice **SS-U15** (collision-gated per-module symbol mangling in

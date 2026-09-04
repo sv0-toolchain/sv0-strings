@@ -3,9 +3,18 @@
 ///
 /// SPEC.md Section 13. SS-126 landed the `CStr` / `CString` constructors and
 /// views: from_bytes_with_nul, from_bytes_until_nul, from_text, from_bytes,
-/// borrow, as_bytes, as_bytes_with_nul, len, to_text. SS-127 adds
-/// `clone_owned` / `concat` (checked owned construction). The `CBuffer`
-/// family is SS-128.
+/// borrow, as_bytes, as_bytes_with_nul, len, to_text. SS-127 added
+/// `clone_owned` / `concat`. SS-128 adds the `CBuffer` family: copy_into
+/// (strlcpy), append_into (strlcat), buffer_from_storage, empty_buffer,
+/// require_cstr.
+///
+/// DEVIATION D-8 (docs/f0-deviations.md): a `CBuffer` value is exactly its
+/// backing `&mut [byte]` storage (a `struct` with a `&mut [byte]` field
+/// crashes the C emitter, KC-006 zone). Its capacity is `slice_len(storage)`
+/// and the "first NUL" state is RECOMPUTED by a bounded scan of `storage`
+/// rather than cached in the value -- behaviour is identical to the cached
+/// model, and buffer mutation can never leave a stale cache (CSTR-016 is
+/// trivially satisfied). The `borrows(...)` relation is advisory.
 ///
 /// DEVIATION D-7 (docs/f0-deviations.md): `CStr` and `CString` are both an
 /// owned `string` -- an enum variant carrying a struct payload does not lower
@@ -21,6 +30,8 @@ module strings_cstr;
 use strings_types::CStrResult;
 use strings_types::CStringResult;
 use strings_types::ConcatResult;
+use strings_types::CopyReport;
+use strings_types::AppendResult;
 use strings_types::FromUtf8Result;
 use strings_text::from_utf8;
 use strings_checked::checked_add;
@@ -172,4 +183,137 @@ pub fn concat(a: string, b: string) -> ConcatResult {
     }
     let joined: string = string_concat(a, b);
     return ConcatResult::Joined(string_concat(joined, "\0"));
+}
+
+/// First `0x00` in the bounded storage `buf`, or `slice_len(buf)` when none
+/// exists (D-8: recomputed, never cached). Never reads past `slice_len`.
+fn first_nul(buf: &[byte]) -> usize {
+    let cap: usize = slice_len(buf);
+    let mut i: usize = 0;
+    while i < cap
+        loop_invariant(i <= cap)
+    {
+        if buf[i] == 0 { return i; }
+        i = i + 1;
+    }
+    return cap;
+}
+
+/// CSTR-010 (R0.2): adopt `storage` as a `CBuffer`. With the recompute model
+/// (D-8) there is nothing to scan or cache at construction; the value is the
+/// storage itself.
+pub fn buffer_from_storage(storage: &mut [byte]) -> &mut [byte] {
+    return storage;
+}
+
+/// CSTR-010 (R0.2): a `CBuffer` in the empty state -- write `0x00` at index 0
+/// when capacity is nonzero; at zero capacity write nothing. Either way the
+/// value is the storage.
+pub fn empty_buffer(storage: &mut [byte]) -> &mut [byte] {
+    if slice_len(storage) > 0 {
+        storage[0] = 0;
+    }
+    return storage;
+}
+
+/// CSTR-011 (R0.2): bounded `strlcpy` into `dst`. When capacity is nonzero,
+/// write `min(src.len(), capacity - 1)` payload bytes then one terminator;
+/// `written` = payload bytes copied, `required` = `src.len()` (CSTR-018),
+/// `truncated` = `required >= capacity` (derived from the bound, not from
+/// `written`). At zero capacity: write nothing, `written = 0`, `truncated`
+/// is true even for an empty source (CSTR-013). `src` is a `CStr` payload
+/// (NUL-free).
+pub fn copy_into(dst: &mut [byte], src: string) -> CopyReport {
+    let cap: usize = slice_len(dst);
+    let need: usize = string_len(src);
+    if cap == 0 {
+        return CopyReport { written: 0, required: need, truncated: true };
+    }
+    let room: usize = cap - 1;
+    let mut w: usize = need;
+    if w > room { w = room; }
+    let mut i: usize = 0;
+    while i < w
+        loop_invariant(i <= w)
+        loop_invariant(w <= room)
+    {
+        dst[i] = string_char_at(src, i);
+        i = i + 1;
+    }
+    dst[w] = 0;
+    let mut trunc: bool = false;
+    if need >= cap { trunc = true; }
+    return CopyReport { written: w, required: need, truncated: trunc };
+}
+
+/// CSTR-012 (R0.2): bounded `strlcat` over the whole `CBuffer`. If a first
+/// `0x00` exists at offset `f`, append `min(src.len(), capacity - f - 1)`
+/// payload bytes after it and re-terminate; `required = f + src.len()`. If
+/// no first `0x00` exists, write nothing and `required = capacity +
+/// src.len()`. `first_nul + src.len()` (or `capacity + src.len()`) is
+/// checked for `usize` overflow BEFORE any modification and returns
+/// `LengthOverflow`; otherwise `truncated = required >= capacity`. `src` is
+/// a `CStr` payload (NUL-free).
+pub fn append_into(dst: &mut [byte], src: string) -> AppendResult {
+    let cap: usize = slice_len(dst);
+    let need: usize = string_len(src);
+    let f: usize = first_nul(dst);
+
+    if f == cap {
+        let ovf: CheckedUsize = checked_add(cap, need);
+        let ovf_req: usize = match ovf {
+            CheckedUsize::Ok(n) => { n },
+            CheckedUsize::Overflow => { 0 },
+        };
+        let ovf_bad: bool = match ovf {
+            CheckedUsize::Ok(_n) => { false },
+            CheckedUsize::Overflow => { true },
+        };
+        if ovf_bad {
+            return AppendResult::LengthOverflow;
+        }
+        return AppendResult::Reported(0, ovf_req, true);
+    }
+
+    let chk: CheckedUsize = checked_add(f, need);
+    let req: usize = match chk {
+        CheckedUsize::Ok(n) => { n },
+        CheckedUsize::Overflow => { 0 },
+    };
+    let overflowed: bool = match chk {
+        CheckedUsize::Ok(_n) => { false },
+        CheckedUsize::Overflow => { true },
+    };
+    if overflowed {
+        return AppendResult::LengthOverflow;
+    }
+
+    let room: usize = cap - f - 1;
+    let mut w: usize = need;
+    if w > room { w = room; }
+    let mut k: usize = 0;
+    while k < w
+        loop_invariant(k <= w)
+        loop_invariant(w <= room)
+    {
+        dst[f + k] = string_char_at(src, k);
+        k = k + 1;
+    }
+    dst[f + w] = 0;
+
+    let mut trunc: bool = false;
+    if req >= cap { trunc = true; }
+    return AppendResult::Reported(w, req, trunc);
+}
+
+/// CSTR-017 (R0.2): the payload up to the first `0x00` of the `CBuffer`, as
+/// a `CStr` (`CStrResult::View`); `NoTerminator` when the bounded storage
+/// holds no `0x00`. The first-NUL state is recomputed by a bounded scan
+/// (D-8); the payload is copied into the `CStr` value (D-7).
+pub fn require_cstr(value: &[byte]) -> CStrResult {
+    let f: usize = first_nul(value);
+    if f == slice_len(value) {
+        return CStrResult::NoTerminator;
+    }
+    return CStrResult::View(string_from_bytes(&value[0..f]));
 }
