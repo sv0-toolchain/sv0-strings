@@ -14,9 +14,12 @@
 ///   SS-163  strlcpy / strlcat -- IMPLEMENTED (this file). POSIX-004.
 ///   SS-164  strnlen -- IMPLEMENTED (this file). POSIX-005.
 ///   SS-165  strtok_r -- IMPLEMENTED (this file). POSIX-006.
+///   SS-166  strcasecmp / strncasecmp (POSIX-locale) -- IMPLEMENTED (this
+///           file). POSIX-007 / POSIX-017 / ASCII-007.
 module strings_posix2024;
 
 use strings_types::Option;
+use strings_types::Ordering;
 use strings_types::EndOffsetResult;
 use strings_types::CopyReport;
 use strings_types::AppendResult;
@@ -24,6 +27,9 @@ use strings_types::TokenStep;
 use strings_bytes::find_slice;
 use strings_cstr::copy_into;
 use strings_cstr::append_into;
+use strings_ascii::compare_ignore_case;
+use strings_ascii::to_lower;
+use strings_cstr::as_bytes;
 use strings_c23::strtok;
 
 /// First `0x00` in `buf` within `limit`, else `limit` -- the effective end
@@ -199,4 +205,56 @@ pub fn strnlen(s: &[byte], n: usize) -> usize {
 /// non-mutating; the façade SHALL document this adaptation").
 pub fn strtok_r(s: string, separators: string, pos: usize) -> TokenStep {
     return strtok(s, separators, pos);
+}
+
+/// POSIX-007 / ASCII-007 (Adapted). Case-insensitive comparison of the
+/// `CStr` payloads of `a` and `b` for the **POSIX locale profile**: an
+/// ASCII `A`..`Z` <-> `a`..`z` fold (`strings_ascii::to_lower`), every
+/// other byte compared as-is. **Independent of the ambient process
+/// locale** -- there is no locale query; a locale-aware comparison
+/// requires the explicit capability model (SS-167/168, Section 17,
+/// Host-dependent). Delegates to `strings_ascii::compare_ignore_case` over
+/// the payload bytes.
+///
+/// DEVIATION from C `strcasecmp` (POSIX): returns `Ordering`, not an
+/// arbitrary signed magnitude; the POSIX-locale profile is explicit
+/// (non-"C"/"POSIX" locale behavior is out of scope here).
+pub fn strcasecmp(a: string, b: string) -> Ordering {
+    return compare_ignore_case(as_bytes(a), as_bytes(b));
+}
+
+/// POSIX-017 / AC-028 (Adapted). Compare at most `n` case-folded bytes of
+/// `a` and `b`, **stopping at the first `0x00` within that bound on each
+/// side** (whichever comes first, NUL or `n`). `a` / `b` are bounded
+/// initialized byte sources that need NOT contain a `0x00` within their
+/// first `n` bytes; the scan window is clamped to `min(n, side.len())`, so
+/// nothing is ever read past either slice. Same POSIX-locale ASCII fold
+/// and locale-independence as `strcasecmp`.
+pub fn strncasecmp(a: &[byte], b: &[byte], n: usize) -> Ordering {
+    let acap: usize = slice_len(a);
+    let bcap: usize = slice_len(b);
+    let mut abound: usize = n;
+    if abound > acap { abound = acap; }
+    let mut bbound: usize = n;
+    if bbound > bcap { bbound = bcap; }
+    let ae: usize = bound_to_nul(a, abound);
+    let be: usize = bound_to_nul(b, bbound);
+
+    let mut m: usize = ae;
+    if be < m { m = be; }
+    let mut i: usize = 0;
+    while i < m
+        loop_invariant(i <= m)
+        loop_invariant(m <= acap)
+        loop_invariant(m <= bcap)
+    {
+        let av: byte = to_lower(a[i]);
+        let bv: byte = to_lower(b[i]);
+        if av < bv { return Ordering::Less; }
+        if av > bv { return Ordering::Greater; }
+        i = i + 1;
+    }
+    if ae < be { return Ordering::Less; }
+    if ae > be { return Ordering::Greater; }
+    return Ordering::Equal;
 }

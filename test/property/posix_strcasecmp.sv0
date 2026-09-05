@@ -1,0 +1,74 @@
+/* SS-166 (SPEC POSIX-007, POSIX-017, AC-012, AC-028): POSIX-locale
+ * strings_posix2024::strcasecmp / strncasecmp.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * POSIX-locale profile only: an ASCII A-Z <-> a-z fold, every other byte
+ * as-is, independent of the ambient process locale (there is no locale
+ * query -- locale-aware compare is SS-167/168, Host-dependent).
+ * `strncasecmp` stops at the first `0x00` within the bound or at `n`.
+ * `CStr` values are NUL-free `string`s (D-7). Ordering is mapped through
+ * `ordering_to_c_int` so only the SIGN is asserted (AC-012 -- never a
+ * host-specific magnitude). Well-defined cases are also differential-checked
+ * (`test/differential/posix_strcasecmp_oracle.py`). Byte values decimal.
+ */
+use strings_types::Ordering;
+use strings_posix2024::strcasecmp;
+use strings_posix2024::strncasecmp;
+use strings_c23::ordering_to_c_int;
+
+fn oc(o: Ordering) -> i32 {
+    return ordering_to_c_int(o);
+}
+
+fn main() -> i32 {
+    /* ================= strcasecmp (POSIX-007 / AC-012) ================= */
+    if oc(strcasecmp("Hello", "hello")) != 0 { return 1; }
+    if oc(strcasecmp("HELLO", "hello")) != 0 { return 2; }
+    if oc(strcasecmp("abc", "abd")) != 0 - 1 { return 3; }
+    if oc(strcasecmp("ABD", "abc")) != 1 { return 4; }
+    if oc(strcasecmp("abc", "abcd")) != 0 - 1 { return 5; }    /* prefix -> shorter Less */
+    if oc(strcasecmp("Zebra", "apple")) != 1 { return 6; }
+    if oc(strcasecmp("", "")) != 0 { return 7; }
+    if oc(strcasecmp("a", "")) != 1 { return 8; }
+    /* non-letter bytes compared as-is (fold only touches A-Z) */
+    if oc(strcasecmp("a1", "A2")) != 0 - 1 { return 9; }
+
+    /* ================= strncasecmp (POSIX-017 / AC-028) =============== */
+    let ax: [byte; 4] = [65, 66, 67, 88];   /* "ABCX" */
+    let ay: [byte; 4] = [97, 98, 99, 89];   /* "abcY" */
+    if oc(strncasecmp(&ax[..], &ay[..], 3)) != 0 { return 20; }   /* equal within n */
+    let az: [byte; 4] = [97, 98, 100, 89];  /* "abdY" */
+    if oc(strncasecmp(&ax[..], &az[..], 3)) != 0 - 1 { return 21; }
+
+    /* both stop at an embedded 0x00 within n */
+    let p1: [byte; 5] = [65, 66, 0, 122, 122];   /* "AB\0zz" */
+    let p2: [byte; 5] = [97, 98, 0, 121, 121];   /* "ab\0yy" */
+    if oc(strncasecmp(&p1[..], &p2[..], 5)) != 0 { return 22; }
+
+    /* n == 0 -> Equal */
+    if oc(strncasecmp(&ax[..], &az[..], 0)) != 0 { return 23; }
+
+    /* bounded, NON-terminated sources: no 0x00 anywhere, compare exactly n
+       (AC-028) -- and n larger than the slice clamps safely (guard-page;
+       UB for real strncasecmp, pinned here per SPEC 21.4) */
+    let q1: [byte; 3] = [65, 66, 67];   /* "ABC", no NUL */
+    let q2: [byte; 3] = [97, 98, 67];   /* "abC", no NUL */
+    if oc(strncasecmp(&q1[..], &q2[..], 3)) != 0 { return 24; }   /* folds equal */
+    if oc(strncasecmp(&q1[..], &q2[..], 999)) != 0 { return 25; } /* clamped to len 3 */
+    let q3: [byte; 3] = [97, 98, 68];   /* "abD" */
+    if oc(strncasecmp(&q1[..], &q3[..], 999)) != 0 - 1 { return 26; }  /* 'C' < 'D' */
+
+    /* differing effective lengths after a NUL stop -> shorter is Less */
+    let r1: [byte; 4] = [97, 98, 0, 0];   /* "ab\0" */
+    let r2: [byte; 4] = [97, 98, 99, 0];  /* "abc\0" */
+    if oc(strncasecmp(&r1[..], &r2[..], 4)) != 0 - 1 { return 27; }
+
+    /* locale independence: an accented byte (0xE9) is NOT folded -- equal
+       only to itself, never to 0xC9, regardless of any host locale */
+    let s1: [byte; 2] = [233, 0];   /* 0xE9 */
+    let s2: [byte; 2] = [201, 0];   /* 0xC9 */
+    if oc(strncasecmp(&s1[..], &s2[..], 2)) != 1 { return 28; }   /* 0xE9 > 0xC9 */
+    if oc(strncasecmp(&s1[..], &s1[..], 2)) != 0 { return 29; }
+
+    return 0;
+}

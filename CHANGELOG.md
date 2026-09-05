@@ -167,6 +167,25 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   (`test/differential/posix_strtok_r_oracle.py`, 6 same-separator-set cases;
   the oracle gained a `strtok_r` op with a caller-owned saveptr). No new
   toolchain slice needed. `scripts/test --backend=both` = 48/48.
+- **`strings_posix2024::strcasecmp` / `strncasecmp` (POSIX-locale profile)**
+  (SS-166 / POSIX-007 / POSIX-017 / AC-012 / AC-028): case-insensitive
+  comparison for the **"C"/"POSIX" locale profile** — an ASCII `A`..`Z` <->
+  `a`..`z` fold (`strings_ascii::to_lower`), every other byte compared
+  as-is, **independent of the ambient process locale** (no locale query; a
+  locale-aware compare is SS-167/168, Host-dependent). `strcasecmp(a, b)`
+  delegates to `strings_ascii::compare_ignore_case` over the `CStr`
+  payloads. `strncasecmp(a: &[byte], b: &[byte], n)` compares at most `n`
+  case-folded bytes, **stopping at the first `0x00` within the bound on each
+  side** (NUL or `n`, whichever first, POSIX-017); the sources need not
+  contain a `0x00` within their first `n` bytes (AC-028), and the scan
+  window clamps to `min(n, side.len())` so nothing is read past either
+  slice. Returns `Ordering`; the fixture maps through `ordering_to_c_int`
+  so only the required **sign** is asserted, never a host magnitude
+  (AC-012). An accented byte (`0xE9`) is not folded — proving locale
+  independence. Differential-checked against host `strcasecmp` /
+  `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
+  cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
+  No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
 
 ### R0.3 (complete — gate PASS, SS-141..155)
 

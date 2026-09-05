@@ -65,6 +65,8 @@
  *   strtok   runs the FULL hidden-state sequence in one process (cstr= input,
  *            a= separators, both NUL-in-window); ntokens=<n>, tok<i>=start:end
  *   strtok_r same as strtok but a caller-owned saveptr, not a global; same output
+ *   strcasecmp  normalized ordering (a, b both NUL-in-window; POSIX-locale ASCII fold)
+ *   strncasecmp normalized ordering, bounded by n (a, b need NOT contain a NUL)
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too.
@@ -88,6 +90,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>   /* strcasecmp / strncasecmp (POSIX) */
 
 #define ORACLE_LINE 65536
 #define ORACLE_MAXBYTES 8192
@@ -511,6 +514,38 @@ static int op_strncmp(const struct req *r) {
 
     errno = 0;
     int c = strncmp((const char *)r->a, (const char *)r->b, (size_t)r->n);
+    printf("precondition=ok\n");
+    printf("ret=ord:%d\n", norm_ord(c));
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+/* strcasecmp / strncasecmp: the oracle process never calls setlocale, so
+   LC_CTYPE is "C" -- these behave as a pure ASCII fold (the POSIX-locale
+   profile the sv0 façade targets). */
+static int op_strcasecmp(const struct req *r) {
+    if (r->a_n < 0) return fail_pre("a-missing");
+    if (r->b_n < 0) return fail_pre("b-missing");
+    if (find_nul(r->a, r->a_n) < 0) return fail_pre("no-nul-in-window:a");
+    if (find_nul(r->b, r->b_n) < 0) return fail_pre("no-nul-in-window:b");
+
+    errno = 0;
+    int c = strcasecmp((const char *)r->a, (const char *)r->b);
+    printf("precondition=ok\n");
+    printf("ret=ord:%d\n", norm_ord(c));
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strncasecmp(const struct req *r) {
+    if (r->a_n < 0) return fail_pre("a-missing");
+    if (r->b_n < 0) return fail_pre("b-missing");
+    if (r->n < 0)   return fail_pre("n-missing");
+    if (r->n > r->a_n) return fail_pre("n-gt-a");
+    if (r->n > r->b_n) return fail_pre("n-gt-b");
+
+    errno = 0;
+    int c = strncasecmp((const char *)r->a, (const char *)r->b, (size_t)r->n);
     printf("precondition=ok\n");
     printf("ret=ord:%d\n", norm_ord(c));
     printf("errno=%s\n", errno_name(errno));
@@ -946,6 +981,8 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strstr") == 0)  return op_strstr(r);
     if (strcmp(r->fn, "strcmp") == 0)  return op_strcmp(r);
     if (strcmp(r->fn, "strncmp") == 0) return op_strncmp(r);
+    if (strcmp(r->fn, "strcasecmp") == 0)  return op_strcasecmp(r);
+    if (strcmp(r->fn, "strncasecmp") == 0) return op_strncasecmp(r);
     if (strcmp(r->fn, "strcpy") == 0)  return op_strcpy(r);
     if (strcmp(r->fn, "strncpy") == 0) return op_strncpy(r);
     if (strcmp(r->fn, "strcat") == 0)  return op_strcat(r);
