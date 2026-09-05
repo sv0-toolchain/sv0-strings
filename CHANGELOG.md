@@ -254,6 +254,24 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   13 cases; the oracle gained `strchr_int`/`strrchr_int` ops passing `c` raw
   so libc's own conversion is what's under test). No new toolchain slice
   needed. `scripts/test --backend=both` = 40/40.
+- **C23 non-function header surface + type-generic search catalog closed**
+  (SS-152 / C23-020 / C23-026 / C23-028): `docs/c23-header-surface.md`
+  classifies each non-function `<string.h>` name exactly once — `size_t` →
+  `usize` (every public bound/offset/length), `NULL` → `Option::None` /
+  absence (a safe search never yields a null or dangling pointer),
+  `__STDC_VERSION_STRING_H__` deliberately **not** provided by the safe
+  façade (standards/profile metadata, ABI-profile-only) — and resolves the
+  type-generic search rows: sv0 has no preprocessor / `_Generic`, so
+  "macro-suppression" is vacuous (the names resolve only to functions), and
+  because every search returns an owned `usize` offset rather than a
+  pointer, there is no const/mutable qualification to preserve and no
+  distinct immutable/mutable function pair is needed (C23-020's "cannot
+  express const-preserving overloads" branch). Compile-probe
+  `test/cases/c23_header_surface.sv0` is the executable half (`size_t` bound
+  round-trip, `Option::None` for the absent case, one concrete function per
+  type-generic name). `tools/standards_matrix.py` already machine-checks the
+  "exactly once" property for the three declarations. No new toolchain slice
+  needed. `scripts/test --backend=both` = 41/41.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

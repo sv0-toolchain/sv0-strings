@@ -34,3 +34,4 @@ T-COMPILEFAIL-C23-MEMSET-EXPLICIT-001	test/compile_fail/c23_memset_explicit_bloc
 T-C23-STRLEN-001	test/property/c23_strlen.sv0	C23-015	c,vm	safe	runtime	property	done
 T-C23-LOCALE-STUBS-001	test/property/c23_locale_stubs.sv0	C23-016,C23-017	c,vm	safe	runtime	property	done
 T-C23-C21-030-001	test/property/c23_c21_030.sv0	C23-021,C23-022,C23-023,C23-024,C23-025,C23-027,C23-029,C23-030	c,vm	safe	runtime	property	done
+T-C23-HEADER-SURFACE-001	test/cases/c23_header_surface.sv0	C23-020,C23-026,C23-028	c,vm	safe	runtime	compile-pass	done

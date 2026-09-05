@@ -1,0 +1,62 @@
+/* SS-152 compile-pass probe (SPEC C23-020, C23-026, C23-028): the safe
+ * mappings for the non-function C23 `<string.h>` surface.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Classification prose is docs/c23-header-surface.md. This is its executable
+ * half:
+ *   - `size_t` -> `usize`: a bound round-trips through a façade call.
+ *   - `NULL`   -> `Option::None`: the absent case is `None`, the present
+ *     case is a real offset -- a safe search never yields a null/dangling
+ *     pointer, so there is nothing for `NULL` to name.
+ *   - type-generic search names resolve to exactly ONE concrete function
+ *     each (no macro form, no separate mutable variant): every call below
+ *     goes through a single `pub fn` returning `Option<usize>`.
+ *   - `__STDC_VERSION_STRING_H__` has no safe-façade probe: it is
+ *     ABI-profile-only and deliberately not defined here.
+ */
+use strings_types::Option;
+use strings_c23::memchr;
+use strings_c23::strchr;
+use strings_c23::strrchr;
+use strings_c23::strpbrk;
+use strings_c23::strstr;
+
+fn present(o: Option<usize>) -> bool {
+    return match o {
+        Option::Some(_k) => { true },
+        Option::None => { false },
+    };
+}
+
+fn offset(o: Option<usize>) -> usize {
+    return match o {
+        Option::Some(k) => { k },
+        Option::None => { 0 },
+    };
+}
+
+fn main() -> i32 {
+    /* size_t -> usize: a `usize` bound flows in, a `usize` offset flows out */
+    let hay: [byte; 5] = [10, 20, 30, 40, 50];
+    let n: usize = 5;
+    let hit: Option<usize> = memchr(&hay[..], 30, n);
+    if present(hit) != true { return 1; }
+    if offset(hit) != 2 { return 2; }
+
+    /* NULL -> Option::None for "not found" (no null pointer anywhere) */
+    let miss: Option<usize> = memchr(&hay[..], 99, n);
+    if present(miss) != false { return 3; }
+
+    /* each type-generic name is a single concrete function -> Option<usize> */
+    if present(strchr("abc", 98)) != true { return 4; }       /* 'b' */
+    if present(strchr("abc", 122)) != false { return 5; }     /* 'z' absent -> None */
+    if present(strrchr("abcb", 98)) != true { return 6; }
+    if offset(strrchr("abcb", 98)) != 3 { return 7; }
+    if present(strpbrk("hello world", " ")) != true { return 8; }
+    if present(strpbrk("hello", "xyz")) != false { return 9; }
+    if present(strstr("hello world", "world")) != true { return 10; }
+    if offset(strstr("hello", "")) != 0 { return 11; }        /* empty needle -> Some(0) */
+    if present(strstr("hello", "xyz")) != false { return 12; }
+
+    return 0;
+}
