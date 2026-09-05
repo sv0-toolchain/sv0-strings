@@ -47,15 +47,17 @@ if ! echo 'int main(void){return 0;}' | "$CC" $STD $SAN -x c - -o /dev/null 2>/d
   exit 0
 fi
 
-# Warnings-as-errors, minus the sv0c codegen-style noise that is emitter
-# output, not fixture logic:
-#   parentheses-equality  -> emitter writes `if ((x == y))`
-#   unused-*              -> whole-library TU carries unused helpers/params
-#   sign-compare          -> emitter mixes int/size_t in a few generated loops
-WFLAGS="-Werror -Wall -Wextra \
-  -Wno-parentheses-equality -Wno-unused-function -Wno-unused-variable \
-  -Wno-unused-parameter -Wno-sign-compare -Wno-unused-but-set-variable \
-  -Wno-implicitly-unsigned-literal -Wno-constant-conversion"
+# "Warnings-as-errors" per BACKEND-005 means the categories that signal a
+# real bug / UB are FATAL. A blanket -Werror across -Wall -Wextra trips on
+# sv0c emitter style that varies by compiler (clang's `if ((x == y))`
+# double-parens, gcc's "decimal constant is unsigned" for a u64 MAX
+# literal, unused whole-library-TU helpers) -- none of it a fixture defect.
+# So: -Wall -Wextra for visibility, but -Werror only on the hazard set.
+WFLAGS="-Wall -Wextra \
+  -Werror=implicit-function-declaration -Werror=uninitialized \
+  -Werror=return-type -Werror=array-bounds -Werror=int-conversion \
+  -Werror=incompatible-pointer-types -Werror=format \
+  -Werror=sizeof-pointer-memaccess"
 
 FIXTURES=()
 while IFS= read -r f; do FIXTURES+=("$f"); done < <(find test/property test/cases test/fuzz -name '*.sv0' 2>/dev/null | sort)
