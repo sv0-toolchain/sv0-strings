@@ -28,6 +28,9 @@
 ///   SS-150  strcoll / strxfrm / strerror -- capability STUBS (this file):
 ///           always Unsupported, fail closed, no bytewise/synthesized
 ///           substitute. C23-016 / C23-017.
+///   SS-151  terminator search (strchr/strrchr with 0), exact-integer
+///           strchr_int/strrchr_int (int c -> char), strxfrm_size query
+///           form, + fixtures pinning C23-021..030. C23-021..030.
 module strings_c23;
 
 use strings_types::CopyResult;
@@ -167,22 +170,61 @@ pub fn memchr(haystack: &[byte], needle: byte, n: usize) -> Option<usize> {
     return find(&haystack[0..limit], needle);
 }
 
-/// C23-006 / C23-020 (Adapted). Index of the first byte of the `CStr`
-/// payload `s` equal to `c`. The terminator itself is out of scope for this
-/// slice (C23-021, `strchr(s, 0)`, lands with SS-151); `c` is compared
-/// against payload bytes only.
+/// C23-006 / C23-020 / C23-021 (Adapted). Index of the first byte of the
+/// `CStr` payload `s` equal to `c`. Per C23-021, searching for `c == 0`
+/// finds the TERMINATING zero at payload offset `s.len()` (there is exactly
+/// one, so first and last coincide); a nonzero `c` is compared against
+/// payload bytes only and never inspects anything at or past the
+/// terminator.
 ///
 /// DEVIATION from C `strchr`: returns `Option<usize>`, an offset into the
 /// payload -- never an interior pointer, so it cannot dangle past `s`'s
 /// lifetime.
 pub fn strchr(s: string, c: byte) -> Option<usize> {
+    if c == 0 {
+        return Option::Some(len(s));
+    }
     return find(as_bytes(s), c);
 }
 
-/// C23-006 / C23-020 (Adapted). Index of the LAST byte of the `CStr`
-/// payload `s` equal to `c`. Same terminator scope note as `strchr`.
+/// C23-006 / C23-020 / C23-021 (Adapted). Index of the LAST byte of the
+/// `CStr` payload `s` equal to `c`. `c == 0` finds the terminator at
+/// `s.len()` (C23-021), identical to `strchr` since the terminator is
+/// unique.
 pub fn strrchr(s: string, c: byte) -> Option<usize> {
+    if c == 0 {
+        return Option::Some(len(s));
+    }
     return rfind(as_bytes(s), c);
+}
+
+/// C `int c` -> `char` reduction for `strchr`/`strrchr` (C23-022): take the
+/// low 8 bits. `c & 255` is signedness-agnostic -- the match is bit-pattern
+/// equality on the resulting byte, never an arithmetic magnitude -- so a
+/// target `char` being signed or unsigned does not change any result (see
+/// docs/c23-char-conversion.md). Negative `c` wraps: `-1 & 255 == 255`.
+fn c23_int_to_byte(c: i32) -> byte {
+    return (c & 255) as byte;
+}
+
+/// C23-022 (Adapted). Exact-integer `strchr`: real C `strchr` takes an
+/// `int c` and converts it to the target's `char` before comparing. The
+/// observable rule is bit-pattern equality on the low 8 bits -- `c` and
+/// `c + 256k` match the same byte, and target `char` signedness does not
+/// change any match result (the comparison is on the byte value, not an
+/// arithmetic magnitude; see docs/c23-char-conversion.md). This adapter
+/// takes the wide `i32`, reduces it modulo 256, and forwards to `strchr`
+/// (so `c == 0` still finds the terminator, C23-021).
+pub fn strchr_int(s: string, c: i32) -> Option<usize> {
+    let b: byte = c23_int_to_byte(c);
+    return strchr(s, b);
+}
+
+/// C23-022 (Adapted). Exact-integer `strrchr`; same `int c` -> `char`
+/// reduction as `strchr_int`.
+pub fn strrchr_int(s: string, c: i32) -> Option<usize> {
+    let b: byte = c23_int_to_byte(c);
+    return strrchr(s, b);
 }
 
 /// C23-006 (Adapted). Index of the first byte of the `CStr` payload `s`
@@ -585,13 +627,31 @@ pub fn strcoll(a: string, b: string) -> HostCapability {
     return HostCapability::Unsupported;
 }
 
-/// C23-016 (Host-dependent, capability STUB). Locale-sensitive transform of
-/// `src` into `dst` for later bytewise comparison. **Always
+/// C23-016 / C23-029 (Host-dependent, capability STUB). Locale-sensitive
+/// transform of `src` into `dst` for later bytewise comparison. **Always
 /// `HostCapability::Unsupported` today**, for the same reason as `strcoll`
 /// above; `dst` is never written to (no partial or synthesized transform is
-/// ever observable). Once `strings_locale::transform` lands (R0.4), this
-/// becomes a thin delegating wrapper.
+/// ever observable -- so C23-029's "SHALL NOT expose destination bytes as
+/// initialized transformed data when the standard makes their
+/// representation indeterminate" holds trivially: nothing is ever written,
+/// let alone exposed). Once `strings_locale::transform` lands (R0.4), this
+/// becomes a thin delegating wrapper; the real form returns a report whose
+/// payload is readable only when `required < n`, and callers who need the
+/// length first use `strxfrm_size` below.
 pub fn strxfrm(dst: &mut [byte], src: string) -> HostCapability {
+    return HostCapability::Unsupported;
+}
+
+/// C23-024 (Host-dependent, capability STUB). The size-query form: how many
+/// bytes `strxfrm(_, src)` would need. Takes **NO** destination -- C23-024
+/// requires the zero-sized-destination query to be modeled "without
+/// constructing an invalid mutable reference", and the cleanest way to
+/// guarantee that is a signature with no `&mut [byte]` at all rather than a
+/// `&mut []` a caller has to fabricate. **Always `HostCapability::Unsupported`
+/// today**; once wired, this returns the required length and the two-call
+/// pattern (`strxfrm_size` then an owned buffer then `strxfrm`) replaces C's
+/// pass-`NULL`-with-size-0 idiom.
+pub fn strxfrm_size(src: string) -> HostCapability {
     return HostCapability::Unsupported;
 }
 

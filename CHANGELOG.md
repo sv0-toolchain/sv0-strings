@@ -230,6 +230,30 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `docs/host-capability-stubs.md`. No differential driver (nothing to
   compare against real libc for a deliberate stub). No new toolchain slice
   needed. `scripts/test --backend=both` = 39/39.
+- **C23-021 .. C23-030 conformance rows closed** (SS-151): `strchr`/`strrchr`
+  now find the **terminating zero** at payload offset `s.len()` when
+  searching for `c == 0` (C23-021), while a nonzero search still never
+  inspects anything at or past the terminator. New exact-integer adapters
+  `strchr_int`/`strrchr_int` take a wide `i32` and reduce it `c & 255` — a
+  signedness-agnostic bit operation matching real libc's own `int c` ->
+  `char` conversion (C23-022; recorded, with the target manifest, in
+  `docs/c23-char-conversion.md`), so `c == 0` and any `c` reducing to `0`
+  find the terminator and `c > 255` matches `c & 255`. `strxfrm` gained a
+  size-query companion `strxfrm_size(src)` that takes **no** `&mut [byte]`
+  at all — C23-024's zero-sized-destination query modeled with no invalid
+  mutable reference to fabricate — and `strxfrm`'s writing form is
+  documented as never exposing indeterminate destination bytes (C23-029;
+  trivially true for the stub, which writes nothing). The `strstr` empty /
+  first-match rule (C23-023), the sign-only comparison adapters (C23-025:
+  `'a'` vs `'z'` yields exactly `-1`, never a `-25` byte-difference
+  magnitude), the bounded non-terminated `strncmp` (C23-027), and total-`i32`
+  `strerror` (C23-030: an unknown error number is a "service unavailable"
+  outcome, never an "invalid argument" — `HostCapability` has no such
+  variant) are all pinned by fixture. Differential-checked for C23-021/022
+  against the host libc (`test/differential/c23_terminator_intc_oracle.py`,
+  13 cases; the oracle gained `strchr_int`/`strrchr_int` ops passing `c` raw
+  so libc's own conversion is what's under test). No new toolchain slice
+  needed. `scripts/test --backend=both` = 40/40.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

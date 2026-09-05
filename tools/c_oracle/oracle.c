@@ -40,6 +40,9 @@
  *   memchr   ret=idx:<n>|idx:none (bounded by n <= src_n)
  *   strchr   ret=idx:<n>|idx:none (cstr must contain a NUL in-window; value= is the byte)
  *   strrchr  same shape as strchr, last match
+ *   strchr_int  like strchr but c comes from `n` (>=0), passed raw to libc so its
+ *               own int->char conversion is under test; c=0 finds the terminator
+ *   strrchr_int same shape as strchr_int, last match
  *   strpbrk  ret=idx:<n>|idx:none (cstr= haystack, a= accept set, both NUL-in-window)
  *   strstr   ret=idx:<n>|idx:none (cstr= haystack, a= needle, both NUL-in-window)
  *   strcmp   normalized ordering (a, b both NUL-in-window)
@@ -406,6 +409,39 @@ static int op_strrchr(const struct req *r) {
     return 0;
 }
 
+/* strchr_int / strrchr_int: pass `c` (in `n`, must be >= 0 here -- negative-c
+   behavior is a pure `c & 255` arithmetic fact checked in the sv0 fixture,
+   not against libc) straight to libc so its own int->char conversion is what
+   is under test. `c == 0` finds the terminator (C23-021); `c > 255` must
+   match `c & 255` (C23-022). */
+static int op_strchr_int(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->n < 0)      return fail_pre("n-missing-or-negative");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window");
+
+    errno = 0;
+    char *ret = strchr((const char *)r->cstr, (int)r->n);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - r->cstr));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
+static int op_strrchr_int(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->n < 0)      return fail_pre("n-missing-or-negative");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window");
+
+    errno = 0;
+    char *ret = strrchr((const char *)r->cstr, (int)r->n);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((unsigned char *)ret - r->cstr));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
 static int op_strpbrk(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     if (r->a_n < 0)    return fail_pre("a-missing");
@@ -715,6 +751,8 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "memchr") == 0)  return op_memchr(r);
     if (strcmp(r->fn, "strchr") == 0)  return op_strchr(r);
     if (strcmp(r->fn, "strrchr") == 0) return op_strrchr(r);
+    if (strcmp(r->fn, "strchr_int") == 0)  return op_strchr_int(r);
+    if (strcmp(r->fn, "strrchr_int") == 0) return op_strrchr_int(r);
     if (strcmp(r->fn, "strpbrk") == 0) return op_strpbrk(r);
     if (strcmp(r->fn, "strstr") == 0)  return op_strstr(r);
     if (strcmp(r->fn, "strcmp") == 0)  return op_strcmp(r);

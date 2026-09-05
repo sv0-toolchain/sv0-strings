@@ -1,0 +1,111 @@
+/* SS-151 (SPEC C23-021 .. C23-030): the remaining C23 conformance rows for
+ * the `strings_c23` façade -- terminator search, `int c` -> `char`
+ * conversion, empty-needle `strstr`, `strxfrm` size-query without an
+ * invalid mutable reference, sign-only comparison adapters, bounded
+ * non-terminated `strncmp`, indeterminate `strxfrm` destination bytes, and
+ * total-`i32` `strerror`.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `CStr` values are NUL-free `string`s (D-7). Differential vs the C oracle
+ * for C23-021/022 is `test/differential/c23_terminator_intc_oracle.py`;
+ * C23-023/027 also cross-check in `c23_search_compare_oracle.py` and
+ * C23-029/030 in the SS-150 stub fixture.
+ */
+use strings_types::Option;
+use strings_types::Ordering;
+use strings_types::HostCapability;
+use strings_c23::strchr;
+use strings_c23::strrchr;
+use strings_c23::strchr_int;
+use strings_c23::strrchr_int;
+use strings_c23::strstr;
+use strings_c23::strcmp;
+use strings_c23::strncmp;
+use strings_c23::memcmp;
+use strings_c23::ordering_to_c_int;
+use strings_c23::strxfrm;
+use strings_c23::strxfrm_size;
+use strings_c23::strerror;
+
+fn oi(o: Option<usize>) -> i32 {
+    return match o {
+        Option::Some(k) => { k as i32 },
+        Option::None => { 0 - 1 },
+    };
+}
+
+fn is_unsupported(r: HostCapability) -> bool {
+    return match r {
+        HostCapability::Unsupported => { true },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= C23-021: terminator search ================= */
+    if oi(strchr("abc", 0)) != 3 { return 1; }        /* terminator at s.len() */
+    if oi(strrchr("abc", 0)) != 3 { return 2; }       /* unique -> same offset */
+    if oi(strchr("", 0)) != 0 { return 3; }           /* empty payload */
+    if oi(strrchr("hello", 0)) != 5 { return 4; }
+    /* a nonzero search must not "find" the terminator */
+    if oi(strchr("abc", 120)) != 0 - 1 { return 5; }  /* 'x' absent -> None, not Some(3) */
+    if oi(strrchr("abc", 120)) != 0 - 1 { return 6; }
+
+    /* ================= C23-022: int c -> char conversion ============= */
+    if oi(strchr_int("ABC", 65)) != 0 { return 10; }              /* 'A' */
+    if oi(strchr_int("ABC", 65 + 256)) != 0 { return 11; }        /* 321 & 255 == 65 */
+    if oi(strchr_int("ABC", 66 + 256 * 3)) != 1 { return 12; }    /* 834 & 255 == 66 */
+    if oi(strrchr_int("ABCA", 65 + 256 * 5)) != 3 { return 13; }  /* 1345 & 255 == 65, last */
+    /* negative c wraps: -1 & 255 == 255; here byte 255 is absent -> None,
+       and it must match the plain-byte form for the same reduced value */
+    if oi(strchr_int("ABC", 0 - 1)) != oi(strchr("ABC", 255)) { return 14; }
+    if oi(strchr_int("ABC", 0 - 1)) != 0 - 1 { return 15; }
+    /* c=0 (and c that reduces to 0) still finds the terminator */
+    if oi(strchr_int("ABC", 0)) != 3 { return 16; }
+    if oi(strchr_int("ABC", 256)) != 3 { return 17; }             /* 256 & 255 == 0 */
+
+    /* ================= C23-023: strstr empty / first-match ========== */
+    if oi(strstr("abc", "")) != 0 { return 20; }
+    if oi(strstr("abcabc", "bc")) != 1 { return 21; }
+    if oi(strstr("abc", "xyz")) != 0 - 1 { return 22; }
+
+    /* ================= C23-025: comparison adapters, sign only =======
+     * A host-magnitude (raw byte difference) would be -25 for 'a' vs 'z';
+     * our adapter yields exactly -1. */
+    if ordering_to_c_int(strcmp("a", "z")) != 0 - 1 { return 30; }
+    if ordering_to_c_int(strcmp("z", "a")) != 1 { return 31; }
+    if ordering_to_c_int(strcmp("m", "m")) != 0 { return 32; }
+    let ba: [byte; 1] = [1];
+    let bz: [byte; 1] = [200];
+    if ordering_to_c_int(memcmp(&ba[..], &bz[..], 1)) != 0 - 1 { return 33; }
+
+    /* ================= C23-027: bounded non-terminated strncmp =======
+     * neither slice contains a 0x00; comparison stays within n. */
+    let x1: [byte; 5] = [97, 98, 99, 1, 2];
+    let x2: [byte; 5] = [97, 98, 99, 254, 255];
+    if ordering_to_c_int(strncmp(&x1[..], &x2[..], 3)) != 0 { return 40; }   /* equal within n */
+    if ordering_to_c_int(strncmp(&x1[..], &x2[..], 4)) != 0 - 1 { return 41; } /* differ at [3] */
+
+    /* ================= C23-024 / C23-029: strxfrm ==================
+     * size-query form takes NO &mut buffer (cannot construct an invalid
+     * mutable reference); writing form never exposes destination bytes. */
+    if is_unsupported(strxfrm_size("hello")) != true { return 50; }
+    let dst: [byte; 4] = [9, 9, 9, 9];
+    if is_unsupported(strxfrm(&mut dst[..], "hello")) != true { return 51; }
+    if dst[0] != 9 { return 52; }     /* untouched -- no indeterminate transformed bytes */
+    if dst[3] != 9 { return 53; }
+    let zero_dst: [byte; 0] = [];
+    if is_unsupported(strxfrm(&mut zero_dst[..], "x")) != true { return 54; }
+
+    /* ================= C23-030: strerror accepts every i32 ==========
+     * An unknown / out-of-range error number is NOT an invalid argument --
+     * every input yields the same typed "service unavailable" outcome, and
+     * `HostCapability` has no "invalid argument" variant at all. */
+    if is_unsupported(strerror(0)) != true { return 60; }
+    if is_unsupported(strerror(2)) != true { return 61; }
+    if is_unsupported(strerror(4095)) != true { return 62; }         /* unknown-but-not-invalid */
+    if is_unsupported(strerror(0 - 4096)) != true { return 63; }
+    if is_unsupported(strerror(2147483647)) != true { return 64; }
+    if is_unsupported(strerror(0 - 2147483647 - 1)) != true { return 65; }
+
+    return 0;
+}
