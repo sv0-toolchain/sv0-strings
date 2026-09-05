@@ -6,7 +6,60 @@
 /// never a native API input, and an unsupported locale fails closed rather
 /// than downgrading to ASCII or bytewise comparison.
 ///
-/// Status: unimplemented (pre-F0). Host-dependent; blocked on a versioned
-/// host-capability ABI with equivalent VM behavior (SPEC UP-015, OQ-005).
-/// Implementation begins at BL-080 (R0.4).
+/// R0.4 progress:
+///   SS-167  LocaleId + open() capability-lifecycle STUB (this file).
+///           HOST-001 / HOST-002 / HOST-004. The real service is blocked on
+///           the versioned host-capability ABI (toolchain slice SS-U12,
+///           SPEC UP-015 / OQ-005) -- until it lands, `open` fails closed
+///           for every locale, so no locale-sensitive comparison exists to
+///           silently downgrade. Lifecycle contract:
+///           `docs/locale-capability.md`.
 module strings_locale;
+
+/// SPEC §17.1: the locale a caller asks for. `Posix` is the named "C" /
+/// "POSIX" locale (the deterministic profile `strings_ascii` /
+/// `strings_posix2024::strcasecmp` already implement without any host
+/// call); `HostNamed` is an OS-provided locale by name (e.g.
+/// `"tr_TR.UTF-8"`).
+pub enum LocaleId {
+    Posix,
+    HostNamed(string),
+}
+
+/// Outcome of `open` (SPEC §17.1 `open(id) -> Result<Locale, LocaleError>`;
+/// a concrete carrier -- a generic `Result` with a struct `Ok` slot does
+/// not lower on the C backend, D-4). No `Opened(Locale)` arm exists yet:
+/// the host-capability ABI (SS-U12) is deferred, so a `Locale` object can
+/// never be constructed at R0.4.
+///
+///   Unsupported  -- (reserved for SS-U12+) a `HostNamed` locale the wired
+///                   host does not provide -- a typed error, NEVER a silent
+///                   downgrade to ASCII/bytewise (HOST-004).
+///   Unavailable  -- R0.4: no host locale-capability service is wired on
+///                   this build at all; every `open` returns this. Distinct
+///                   from `Unsupported` per TEST-015 ("distinguish
+///                   unavailable locale from semantic failure").
+pub enum LocaleOpen {
+    Unsupported,
+    Unavailable,
+}
+
+/// SPEC §17.1 (Host-dependent, capability-lifecycle STUB). Open an explicit
+/// locale object. **Always `LocaleOpen::Unavailable` today** -- the
+/// versioned host-capability ABI with equivalent VM behavior (SS-U12) is
+/// deferred, so there is no locale service to open, on either backend.
+/// This is deliberately NOT `Blocked`/unexported (`fill_explicit`'s
+/// treatment): a callable function that fails closed with a typed,
+/// inspectable outcome is safer than an absent symbol, and there is no
+/// incorrectness risk -- the enum cannot carry a `Locale`, so no
+/// locale-sensitive operation can be reached, so nothing can silently
+/// downgrade (HOST-001 / HOST-004).
+///
+/// Ownership / thread-safety / backend support: `docs/locale-capability.md`.
+pub fn open(id: LocaleId) -> LocaleOpen {
+    match id {
+        LocaleId::Posix => {},
+        LocaleId::HostNamed(_name) => {},
+    }
+    return LocaleOpen::Unavailable;
+}

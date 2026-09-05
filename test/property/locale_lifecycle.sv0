@@ -1,0 +1,47 @@
+/* SS-167 (SPEC HOST-001, HOST-002, HOST-004, TEST-015):
+ * strings_locale::open capability lifecycle stub.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * The versioned host-capability ABI (SS-U12) is deferred, so `open` fails
+ * closed for EVERY locale on both backends -- `LocaleOpen` has no
+ * `Opened(Locale)` arm, so no `Locale` object can exist, so no
+ * locale-sensitive comparison exists to silently downgrade to ASCII or
+ * bytewise (HOST-001 / HOST-004). This fixture pins that. Lifecycle
+ * contract prose: docs/locale-capability.md.
+ */
+use strings_locale::LocaleId;
+use strings_locale::LocaleOpen;
+use strings_locale::open;
+
+fn is_unavailable(r: LocaleOpen) -> bool {
+    return match r {
+        LocaleOpen::Unavailable => { true },
+        LocaleOpen::Unsupported => { false },
+    };
+}
+
+fn main() -> i32 {
+    /* the named POSIX locale: still needs the host-capability wiring, so
+       it is Unavailable too (the deterministic POSIX-locale *profile* is
+       strings_ascii / strings_posix2024::strcasecmp, which take no Locale) */
+    if is_unavailable(open(LocaleId::Posix)) != true { return 1; }
+
+    /* a common host locale name -> Unavailable (no service), NOT a silent
+       fallback */
+    if is_unavailable(open(LocaleId::HostNamed("en_US.UTF-8"))) != true { return 2; }
+
+    /* the SPEC B.7 case: a locale whose fold rules differ from ASCII
+       (Turkish dotless i) must never downgrade to ASCII */
+    if is_unavailable(open(LocaleId::HostNamed("tr_TR.UTF-8"))) != true { return 3; }
+
+    /* empty / nonsense names -> Unavailable, no crash */
+    if is_unavailable(open(LocaleId::HostNamed(""))) != true { return 4; }
+    if is_unavailable(open(LocaleId::HostNamed("not-a-locale"))) != true { return 5; }
+
+    /* deterministic: repeated opens of the same id give the same outcome
+       (no hidden state, no ambient-locale dependence -- HOST-001) */
+    if is_unavailable(open(LocaleId::HostNamed("en_US.UTF-8"))) != true { return 6; }
+    if is_unavailable(open(LocaleId::Posix)) != true { return 7; }
+
+    return 0;
+}

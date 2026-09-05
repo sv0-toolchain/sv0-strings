@@ -186,6 +186,28 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
   cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
   No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
+- **`strings_locale::open` capability-lifecycle stub** (SS-167 / HOST-001 /
+  HOST-002 / HOST-004): `LocaleId` (`Posix` / `HostNamed(string)`) and
+  `open(id) -> LocaleOpen` exist and are callable, but return
+  `LocaleOpen::Unavailable` for **every** `id`, on both backends — the
+  versioned host-capability ABI with equivalent VM behaviour (toolchain
+  slice SS-U12) is deferred, so there is no locale service to open.
+  `LocaleOpen` has no `Opened(Locale)` arm — a `Locale` object cannot be
+  constructed at R0.4 — so `compare` / `transform` / `compare_ignore_case`
+  (SPEC §17.1) are not exported yet (they land with SS-168), which means
+  **nothing locale-sensitive can be reached, so nothing can silently
+  downgrade to ASCII/bytewise** (HOST-001 / HOST-004). Deliberately a
+  callable capability stub, not a `Blocked`/unexported symbol —
+  zero incorrectness risk since the enum cannot carry a `Locale`. Full
+  lifecycle contract (ownership = caller-owned arena value, no shared
+  static; thread-safety = independent, no `setlocale`/`uselocale` global
+  side effect; backend support = C/VM both not wired, both fail closed
+  identically; SS-U12 / SS-168 / SS-169 unblock path; DOC-006 stable-identity
+  vs unstable-text; TEST-015 unavailable-vs-unsupported) in new
+  `docs/locale-capability.md`. `test/property/locale_lifecycle.sv0` pins the
+  fail-closed + determinism behaviour (incl. the SPEC B.7 `"tr_TR.UTF-8"`
+  case). No differential (deliberate stub). No new toolchain slice needed.
+  `scripts/test --backend=both` = 50/50.
 
 ### R0.3 (complete — gate PASS, SS-141..155)
 
