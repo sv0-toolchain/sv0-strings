@@ -10,10 +10,26 @@
 ///
 /// R0.4 progress:
 ///   SS-161  memmem -- IMPLEMENTED (this file). POSIX-002.
+///   SS-162  stpcpy / stpncpy -- IMPLEMENTED (this file). POSIX-003.
 module strings_posix2024;
 
 use strings_types::Option;
+use strings_types::EndOffsetResult;
 use strings_bytes::find_slice;
+
+/// First `0x00` in `buf` within `limit`, else `limit` -- the effective end
+/// of a bounded, possibly non-terminated source (local copy of the helper
+/// `strings_c23` uses privately).
+fn bound_to_nul(buf: &[byte], limit: usize) -> usize {
+    let mut i: usize = 0;
+    while i < limit
+        loop_invariant(i <= limit)
+    {
+        if buf[i] == 0 { return i; }
+        i = i + 1;
+    }
+    return limit;
+}
 
 /// POSIX-002 (Adapted). Binary-safe substring search: the offset of the
 /// first occurrence of `needle` within `haystack`, or `Option::None`.
@@ -28,4 +44,72 @@ use strings_bytes::find_slice;
 /// never an interior pointer -- so it cannot dangle past `haystack`.
 pub fn memmem(haystack: &[byte], needle: &[byte]) -> Option<usize> {
     return find_slice(haystack, needle);
+}
+
+/// POSIX-003 (Adapted). Copy the whole `CStr` payload of `src` plus one
+/// terminator into `dst`, and return the offset of that terminator
+/// (`EndOffsetResult::EndAt(payload.len())`) -- C `stpcpy` returns a
+/// pointer to the same position; this returns it as an offset, never a raw
+/// interior pointer (POSIX-003). `dst` must have room for the full payload;
+/// insufficient capacity is `DestinationTooSmall(need, have)` with `dst`
+/// unmodified (C `stpcpy` would overrun).
+pub fn stpcpy(dst: &mut [byte], src: string) -> EndOffsetResult {
+    let cap: usize = slice_len(dst);
+    let plen: usize = string_len(src);
+    if plen + 1 > cap {
+        return EndOffsetResult::DestinationTooSmall(plen + 1, cap);
+    }
+    let mut i: usize = 0;
+    while i < plen
+        loop_invariant(i <= plen)
+        loop_invariant(plen + 1 <= cap)
+    {
+        dst[i] = string_char_at(src, i);
+        i = i + 1;
+    }
+    dst[plen] = 0;
+    return EndOffsetResult::EndAt(plen);
+}
+
+/// POSIX-003 (Adapted). Bounded, zero-padded copy of `src` into `dst`,
+/// preserving C `stpncpy`'s exact end-position and padding rules: bytes are
+/// copied through the first `0x00` within `[0, min(n, src.len()))` (or
+/// through the whole window when none exists), then the remainder of
+/// `dst[0..n]` is zero-filled. The returned offset is C's `stpncpy` end
+/// position -- `dst + strnlen(src, n)`, i.e. the first `0x00` within the
+/// bound, or `n` when the source is not terminated within `n` (in which
+/// case no terminator is written, exactly like C). Returned as an
+/// `EndOffsetResult::EndAt(offset)`, never a raw pointer.
+///
+/// `src` need not be `n` bytes long or contain a `0x00`; the copy window is
+/// bounded by the slice's own length, so nothing is ever read past it.
+/// `n > dst.len()` is `DestinationTooSmall(n, dst.len())`, `dst` unmodified.
+pub fn stpncpy(dst: &mut [byte], src: &[byte], n: usize) -> EndOffsetResult {
+    let cap: usize = slice_len(dst);
+    if n > cap {
+        return EndOffsetResult::DestinationTooSmall(n, cap);
+    }
+    let avail: usize = slice_len(src);
+    let mut lim: usize = n;
+    if lim > avail { lim = avail; }
+    let stop: usize = bound_to_nul(src, lim);
+
+    let mut i: usize = 0;
+    while i < stop
+        loop_invariant(i <= stop)
+        loop_invariant(stop <= n)
+        loop_invariant(n <= cap)
+    {
+        dst[i] = src[i];
+        i = i + 1;
+    }
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(stop <= i)
+        loop_invariant(n <= cap)
+    {
+        dst[i] = 0;
+        i = i + 1;
+    }
+    return EndOffsetResult::EndAt(stop);
 }

@@ -1,0 +1,89 @@
+/* SS-162 (SPEC POSIX-003): strings_posix2024::stpcpy / stpncpy.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Both return `EndOffsetResult` -- C's written-end position as an OFFSET
+ * into `dst`, never a raw interior pointer. `stpncpy` preserves C's exact
+ * end-position + zero-padding rules. `CStr` values are NUL-free `string`s
+ * (D-7). The well-defined cases are also differential-checked against the
+ * host libc (`test/differential/posix_stpcpy_oracle.py`). Byte values
+ * decimal.
+ */
+use strings_types::EndOffsetResult;
+use strings_posix2024::stpcpy;
+use strings_posix2024::stpncpy;
+
+/* -1 = DestinationTooSmall(_, have); k = EndAt(k). (all end offsets < 100) */
+fn eo(r: EndOffsetResult) -> i32 {
+    return match r {
+        EndOffsetResult::EndAt(k) => { k as i32 },
+        EndOffsetResult::DestinationTooSmall(_need, have) => { 0 - (have as i32) - 1 },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= stpcpy (POSIX-003) ================= */
+    let d1: [byte; 6] = [9, 9, 9, 9, 9, 9];
+    if eo(stpcpy(&mut d1[..], "ABC")) != 3 { return 1; }   /* end == payload len */
+    if d1[0] != 65 { return 2; }
+    if d1[3] != 0 { return 3; }                            /* terminator at the end offset */
+    if d1[4] != 9 { return 4; }                            /* tail untouched */
+
+    let d2: [byte; 1] = [7];
+    if eo(stpcpy(&mut d2[..], "")) != 0 { return 5; }      /* empty payload -> EndAt(0) */
+    if d2[0] != 0 { return 6; }
+
+    /* cap too small -> DestinationTooSmall(need, have=cap), dst untouched */
+    let d3: [byte; 2] = [5, 5];
+    if eo(stpcpy(&mut d3[..], "abc")) != 0 - 2 - 1 { return 7; }   /* have == 2 */
+    if d3[0] != 5 { return 8; }
+
+    /* ================= stpncpy (POSIX-003) ================= */
+    /* src shorter than n -> copy prefix, zero-pad to n, end at the source's
+       first (virtual) terminator */
+    let p1: [byte; 6] = [9, 9, 9, 9, 9, 9];
+    let s1: [byte; 4] = [97, 98, 99, 0];   /* "abc\0" */
+    if eo(stpncpy(&mut p1[..], &s1[..], 5)) != 3 { return 10; }
+    if p1[0] != 97 { return 11; }
+    if p1[3] != 0 { return 12; }           /* padded */
+    if p1[4] != 0 { return 13; }           /* padded */
+    if p1[5] != 9 { return 14; }           /* untouched past n */
+
+    /* src.len() >= n, no 0x00 in first n -> exactly n bytes, NO terminator,
+       end == n (C's footgun, preserved) */
+    let p2: [byte; 5] = [0, 0, 0, 0, 0];
+    let s2: [byte; 5] = [97, 98, 99, 100, 101];   /* "abcde" */
+    if eo(stpncpy(&mut p2[..], &s2[..], 3)) != 3 { return 15; }
+    if p2[2] != 99 { return 16; }
+    if p2[3] != 0 { return 17; }           /* untouched beyond n (its init 0) */
+
+    /* embedded 0x00 within the window -> copy up to it, zero-pad, end there */
+    let p3: [byte; 5] = [7, 7, 7, 7, 7];
+    let s3: [byte; 5] = [97, 98, 0, 99, 100];   /* "ab\0cd" */
+    if eo(stpncpy(&mut p3[..], &s3[..], 5)) != 2 { return 18; }
+    if p3[0] != 97 { return 19; }
+    if p3[2] != 0 { return 20; }
+    if p3[4] != 0 { return 21; }
+
+    /* n == 0 -> nothing written, EndAt(0) */
+    let p4: [byte; 3] = [1, 2, 3];
+    if eo(stpncpy(&mut p4[..], &s1[..], 0)) != 0 { return 22; }
+    if p4[0] != 1 { return 23; }
+
+    /* n > dst.len() -> DestinationTooSmall(n, cap), dst untouched */
+    let p5: [byte; 2] = [4, 4];
+    if eo(stpncpy(&mut p5[..], &s1[..], 4)) != 0 - 2 - 1 { return 24; }
+    if p5[0] != 4 { return 25; }
+
+    /* source shorter than n with NO 0x00 -- UB for real stpncpy; the safe
+       façade bounds the read by the slice's own length and pads from
+       there. Not differential-checked (SPEC 21.4). */
+    let p6: [byte; 6] = [8, 8, 8, 8, 8, 8];
+    let s6: [byte; 3] = [120, 121, 122];   /* "xyz", no NUL */
+    if eo(stpncpy(&mut p6[..], &s6[..], 5)) != 3 { return 26; }  /* end at slice end */
+    if p6[2] != 122 { return 27; }
+    if p6[3] != 0 { return 28; }           /* padded from where src ran out */
+    if p6[4] != 0 { return 29; }
+    if p6[5] != 8 { return 30; }           /* untouched past n */
+
+    return 0;
+}

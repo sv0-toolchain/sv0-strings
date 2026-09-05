@@ -52,6 +52,8 @@
  *   strcat   guarded write; src= dst's initial content (NUL-in-window), cstr= string to append
  *   strncat  same as strcat, bounded by n; cstr need not contain a NUL within n
  *   memmem   binary-safe substring; src= haystack, a= needle (raw bytes); ret=idx:<n>|idx:none
+ *   stpcpy   guarded write; cstr= source C string (NUL-in-window); ret=idx:<end offset>
+ *   stpncpy  guarded write, bounded by n; src need not be NUL-terminated; ret=idx:<end offset>
  *   strdup   fresh allocation; cstr= source C string (NUL-in-window); ret=ptr:nonnull, out=, term=
  *   strndup  fresh allocation, bounded by n; src need not contain a NUL within n
  *   strspn   bounded read -> length; cstr= s, a= accept set (both NUL-in-window)
@@ -632,6 +634,52 @@ static int op_memmem(const struct req *r) {
     return 0;
 }
 
+static int op_stpcpy(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    long k = find_nul(r->cstr, r->cstr_n);
+    if (k < 0) return fail_pre("no-nul-in-window");
+    if (k + 1 > r->cap) return fail_pre("cap-too-small");
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    errno = 0;
+    char *ret = stpcpy((char *)d.pay, (const char *)r->cstr);
+    printf("precondition=ok\n");
+    printf("ret=idx:%ld\n", (long)((unsigned char *)ret - d.pay));
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
+static int op_stpncpy(const struct req *r) {
+    if (r->src_n < 0) return fail_pre("src-missing");
+    if (r->n < 0)      return fail_pre("n-missing");
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    if (r->n > r->cap) return fail_pre("n-gt-cap");
+    {
+        long scan = r->n < r->src_n ? r->n : r->src_n;
+        long nul_at = find_nul(r->src, scan);
+        if (nul_at < 0 && r->n > r->src_n) return fail_pre("no-nul-and-n-gt-src");
+    }
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    errno = 0;
+    char *ret = stpncpy((char *)d.pay, (const char *)r->src, (size_t)r->n);
+    printf("precondition=ok\n");
+    printf("ret=idx:%ld\n", (long)((unsigned char *)ret - d.pay));
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+}
+
 static int op_strdup(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     long k = find_nul(r->cstr, r->cstr_n);
@@ -786,6 +834,8 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strcat") == 0)  return op_strcat(r);
     if (strcmp(r->fn, "strncat") == 0) return op_strncat(r);
     if (strcmp(r->fn, "memmem") == 0)  return op_memmem(r);
+    if (strcmp(r->fn, "stpcpy") == 0)  return op_stpcpy(r);
+    if (strcmp(r->fn, "stpncpy") == 0) return op_stpncpy(r);
     if (strcmp(r->fn, "strdup") == 0)  return op_strdup(r);
     if (strcmp(r->fn, "strndup") == 0) return op_strndup(r);
     if (strcmp(r->fn, "strspn") == 0)  return op_strspn(r);

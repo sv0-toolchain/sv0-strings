@@ -386,3 +386,21 @@ pub struct MemccpyReport {
 pub enum HostCapability {
     Unsupported,
 }
+
+/* Result of a POSIX `stpcpy`/`stpncpy`-style copy (SPEC POSIX-003; slice
+ * SS-162). C returns a raw interior pointer to the written end; the safe
+ * adapter returns that position as an OFFSET into `dst` instead:
+ *
+ *   EndAt(offset)   -- for `stpcpy`, the offset of the terminator written
+ *                      (== payload length); for `stpncpy`, the offset just
+ *                      past the last non-NUL byte written (== the first
+ *                      `0x00` within the bound, or `n` when the source is
+ *                      not terminated within `n` -- C's exact end-position
+ *                      rule). `dst[0..offset]` holds the copied prefix.
+ *   DestinationTooSmall(need, have)
+ *                   -- `dst` was too small; it was left unmodified.
+ */
+pub enum EndOffsetResult {
+    EndAt(usize),
+    DestinationTooSmall(usize, usize),
+}

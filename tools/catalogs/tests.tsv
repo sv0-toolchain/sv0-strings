@@ -40,3 +40,4 @@ T-COMPAT-DOC-001	tools/compat_doc.py	C23-002,DOC-004	c	safe		generator	done
 T-C23-FUZZ-001	test/fuzz/c23_fuzz.sv0	C23-019,SEC-001,SEC-004	c,vm	safe	runtime	fuzz	done
 T-SANITIZE-001	scripts/sanitize	C23-019,BACKEND-005,TEST-014,SEC-009	c	safe	runtime	tool	done
 T-POSIX-MEMMEM-001	test/property/posix_memmem.sv0	POSIX-002	c,vm	safe	runtime	property	done
+T-POSIX-STPCPY-001	test/property/posix_stpcpy.sv0	POSIX-003	c,vm	safe	runtime	property	done

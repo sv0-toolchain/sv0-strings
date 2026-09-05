@@ -103,6 +103,24 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   property fixture rather than differential-checked because some hosts
   (macOS) return `NULL` there — the standards value wins (SPEC §21.4 rule 8).
   No new toolchain slice needed. `scripts/test --backend=both` = 44/44.
+- **`strings_posix2024::stpcpy` / `stpncpy`** (SS-162 / POSIX-003): safe
+  end-offset adapters. Both return `strings_types::EndOffsetResult` —
+  `EndAt(offset)` gives C's written-end **position as an offset into `dst`**,
+  never a raw interior pointer (POSIX-003). `stpcpy` copies the whole `CStr`
+  payload + one terminator and returns `EndAt(payload.len())`; insufficient
+  capacity → `DestinationTooSmall(need, have)`, `dst` unmodified. `stpncpy`
+  preserves C's exact end-position + zero-padding rules: bytes through the
+  first `0x00` within `[0, min(n, src.len()))` (or the whole window), then
+  zero-fill to `n`; the returned offset is `strnlen(src, n)` — the first
+  `0x00` within the bound, or `n` when the source is not terminated within
+  `n` (no terminator written, exactly like C). A source shorter than `n`
+  with no `0x00` is UB for real `stpncpy`; the façade bounds the read by the
+  slice's own length and pads from there (fixture-pinned, not
+  differential-checked). Differential-checked for the well-defined cases
+  against host libc (`test/differential/posix_stpcpy_oracle.py`, 7 cases;
+  the oracle gained `stpcpy`/`stpncpy` ops reporting `ret - dst` as an
+  offset). No new toolchain slice needed. `scripts/test --backend=both` =
+  45/45.
 
 ### R0.3 (complete — gate PASS, SS-141..155)
 
