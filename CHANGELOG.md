@@ -314,6 +314,17 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   that removes it. `scripts/sanitize` PASS across 34 fixtures — no C runtime
   error, OOB access, signed overflow, invalid shift, or leak anywhere in the
   corpus. `scripts/test --backend=both` = 43/43.
+- **R0.3 gate: PASS** (`docs/r0.3-gate-review.md`, SS-155 / SPEC §24.4). The
+  safe C23 `<string.h>` façade is complete for R0.3: all 26 core functions
+  carry an Appendix-A.2 disposition + adapter rationale, every `Adapted`
+  function has a green `--backend=both` fixture (and a host-libc differential
+  for the raw-memory ops), C23-001..030 all pass or are matrix-gated (zero
+  traceability gaps), and `strcoll`/`strxfrm`/`strerror` are profile-gated
+  capability stubs. No new deviation across the whole track — D-4 / D-6 /
+  D-7 / D-8 / D-9 carry forward unchanged. `scripts/test --backend=both` =
+  43/43; `scripts/sanitize` PASS (34 fixtures, ASan/UBSan). Deferred out of
+  R0.3: real `strcoll`/`strxfrm` (R0.4, BL-080), real `strerror` (SS-169),
+  SEC-011 thread-sanitizer (R0.4), TEST-017 formal fuzz budget (R1).
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated
