@@ -121,6 +121,27 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   the oracle gained `stpcpy`/`stpncpy` ops reporting `ret - dst` as an
   offset). No new toolchain slice needed. `scripts/test --backend=both` =
   45/45.
+- **`strings_posix2024::strlcpy` / `strlcat`** (SS-163 / POSIX-004 / AC-009 /
+  AC-027): the Issue 8 size-bounded copy/append — C23-recognizable names for
+  `strings_cstr::copy_into` / `append_into` (already implementing exactly
+  these semantics since SS-128). `strlcpy(dst, src) -> CopyReport`:
+  `required` is the **total attempted length** (`src.len()`), `written` the
+  bytes actually copied (`min(required, dst.len() - 1)`), `truncated` iff
+  `required >= dst.len()`; NUL-terminated when capacity is nonzero; zero cap
+  → no access, `written 0`, `truncated`. `strlcat(dst, src, dstsize) ->
+  AppendResult`: bounds the initial destination scan by `dstsize` (clamped
+  to `dst.len()`); a first `0x00` at offset `f` → append
+  `min(src.len(), dstsize - f - 1)` bytes + re-terminate, `required = f +
+  src.len()`; **no `0x00` in the first `dstsize` bytes → write nothing,
+  every byte preserved, `required = dstsize + src.len()`, `truncated`**
+  (AC-027); `f + src.len()` checked for `usize` overflow before any
+  modification → `LengthOverflow`. Full Issue 8 differential matrix
+  (`test/differential/posix_strl_oracle.py`, 5 `strlcpy` + 5 `strlcat`
+  cases; the oracle gained `strlcpy`/`strlcat` ops, `build.sh` compile-probes
+  the host — `strlcpy`/`strlcat` are absent on glibc < 2.38, so the driver
+  SKIPs and the standards values are pinned in the sv0 fixture, SPEC §21.4
+  rule 8). No new toolchain slice needed. `scripts/test --backend=both` =
+  46/46.
 
 ### R0.3 (complete — gate PASS, SS-141..155)
 

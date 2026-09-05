@@ -11,11 +11,16 @@
 /// R0.4 progress:
 ///   SS-161  memmem -- IMPLEMENTED (this file). POSIX-002.
 ///   SS-162  stpcpy / stpncpy -- IMPLEMENTED (this file). POSIX-003.
+///   SS-163  strlcpy / strlcat -- IMPLEMENTED (this file). POSIX-004.
 module strings_posix2024;
 
 use strings_types::Option;
 use strings_types::EndOffsetResult;
+use strings_types::CopyReport;
+use strings_types::AppendResult;
 use strings_bytes::find_slice;
+use strings_cstr::copy_into;
+use strings_cstr::append_into;
 
 /// First `0x00` in `buf` within `limit`, else `limit` -- the effective end
 /// of a bounded, possibly non-terminated source (local copy of the helper
@@ -112,4 +117,44 @@ pub fn stpncpy(dst: &mut [byte], src: &[byte], n: usize) -> EndOffsetResult {
         i = i + 1;
     }
     return EndOffsetResult::EndAt(stop);
+}
+
+/// POSIX-004 (Adapted). Size-bounded copy of the `CStr` payload `src` into
+/// `dst`, the C23-recognizable name for `strings_cstr::copy_into`
+/// (`strlcpy` semantics, SPEC Appendix A.4 / CSTR-011). The `CopyReport`
+/// carries the **total attempted length** as `required` (`src.len()`),
+/// `written` = payload bytes actually copied (`min(required, dst.len() -
+/// 1)`, or 0 at zero capacity), and `truncated` iff `required >= dst.len()`.
+/// When capacity is nonzero the result is NUL-terminated. Zero-length
+/// `dst`: no access through the slice, `written == 0`, `truncated == true`
+/// (matching the conventional `strlcpy` return-value test).
+///
+/// DEVIATION from C `strlcpy`: returns a `CopyReport`, not the bare
+/// attempted length -- truncation is a field, not a value the caller has
+/// to re-derive.
+pub fn strlcpy(dst: &mut [byte], src: string) -> CopyReport {
+    return copy_into(dst, src);
+}
+
+/// POSIX-004 (Adapted). Size-bounded append of the `CStr` payload `src`
+/// onto the C-string in `dst`, bounding the initial destination scan by
+/// `dstsize` -- the C23-recognizable name for `strings_cstr::append_into`
+/// (`strlcat` semantics, CSTR-012 / AC-027). `dstsize` is clamped to
+/// `dst.len()` (POSIX-004: "checks `dstsize <= storage.len()`"); the
+/// bounded destination is `dst[0..dstsize]`.
+///
+/// - A first `0x00` at offset `f` within `dstsize`: append
+///   `min(src.len(), dstsize - f - 1)` bytes after it, re-terminate;
+///   `required = f + src.len()` (the total attempted length).
+/// - **No `0x00` in the first `dstsize` bytes** (AC-027): write NOTHING,
+///   every destination byte preserved, `required = dstsize + src.len()`,
+///   `truncated`.
+/// - `f + src.len()` (or `dstsize + src.len()`) is checked for `usize`
+///   overflow **before any modification** and returns
+///   `AppendResult::LengthOverflow`.
+pub fn strlcat(dst: &mut [byte], src: string, dstsize: usize) -> AppendResult {
+    let cap: usize = slice_len(dst);
+    let mut ds: usize = dstsize;
+    if ds > cap { ds = cap; }
+    return append_into(&mut dst[0..ds], src);
 }

@@ -54,6 +54,9 @@
  *   memmem   binary-safe substring; src= haystack, a= needle (raw bytes); ret=idx:<n>|idx:none
  *   stpcpy   guarded write; cstr= source C string (NUL-in-window); ret=idx:<end offset>
  *   stpncpy  guarded write, bounded by n; src need not be NUL-terminated; ret=idx:<end offset>
+ *   strlcpy  guarded write; cstr= source (NUL-in-window), cap= dstsize; ret=i:<total>, written=, truncated=
+ *   strlcat  guarded write; src= initial dst content, a= append source (NUL-in-window), cap= dstsize
+ *            (needs host strlcpy/strlcat -- else precondition=FAILED:not-available)
  *   strdup   fresh allocation; cstr= source C string (NUL-in-window); ret=ptr:nonnull, out=, term=
  *   strndup  fresh allocation, bounded by n; src need not contain a NUL within n
  *   strspn   bounded read -> length; cstr= s, a= accept set (both NUL-in-window)
@@ -680,6 +683,69 @@ static int op_stpncpy(const struct req *r) {
     return 0;
 }
 
+/* strlcpy/strlcat: BSD/CX extensions, not on every host (see build.sh). */
+static int op_strlcpy(const struct req *r) {
+#ifndef ORACLE_HAVE_STRL
+    (void)r;
+    return fail_pre("not-available");
+#else
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window");
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    errno = 0;
+    size_t total = strlcpy((char *)d.pay, (const char *)r->cstr, (size_t)r->cap);
+    long written = r->cap > 0 ? (long)strnlen((char *)d.pay, (size_t)r->cap) : 0;
+    printf("precondition=ok\n");
+    printf("ret=i:%zu\n", total);
+    printf("written=%ld\n", written);
+    printf("truncated=%d\n", total >= (size_t)r->cap ? 1 : 0);
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+#endif
+}
+
+static int op_strlcat(const struct req *r) {
+#ifndef ORACLE_HAVE_STRL
+    (void)r;
+    return fail_pre("not-available");
+#else
+    if (r->src_n < 0)  return fail_pre("src-missing");   /* initial dst content */
+    if (r->a_n < 0)    return fail_pre("a-missing");     /* append source */
+    if (r->cap < 0)    return fail_pre("cap-missing");
+    if (r->src_n > r->cap) return fail_pre("src-gt-cap");
+    if (find_nul(r->a, r->a_n) < 0) return fail_pre("append-no-nul-in-window");
+
+    struct dbuf d;
+    if (dbuf_alloc(&d, r->cap, r->guard) != 0) return fail_pre("alloc");
+    memset(d.pay, 0xEE, (size_t)r->cap);
+    memcpy(d.pay, r->src, (size_t)r->src_n);
+    size_t init_len = strnlen((char *)d.pay, (size_t)r->cap);
+
+    errno = 0;
+    size_t total = strlcat((char *)d.pay, (const char *)r->a, (size_t)r->cap);
+    size_t fin_len = strnlen((char *)d.pay, (size_t)r->cap);
+    long written = (long)fin_len - (long)init_len;
+    if (written < 0) written = 0;
+    printf("precondition=ok\n");
+    printf("ret=i:%zu\n", total);
+    printf("written=%ld\n", written);
+    printf("truncated=%d\n", total >= (size_t)r->cap ? 1 : 0);
+    emit_hex("out", d.pay, r->cap);
+    printf("outlen=%ld\n", r->cap);
+    printf("guard=%s\n", dbuf_guard_state(&d));
+    printf("errno=%s\n", errno_name(errno));
+    dbuf_free(&d);
+    return 0;
+#endif
+}
+
 static int op_strdup(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     long k = find_nul(r->cstr, r->cstr_n);
@@ -836,6 +902,8 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "memmem") == 0)  return op_memmem(r);
     if (strcmp(r->fn, "stpcpy") == 0)  return op_stpcpy(r);
     if (strcmp(r->fn, "stpncpy") == 0) return op_stpncpy(r);
+    if (strcmp(r->fn, "strlcpy") == 0) return op_strlcpy(r);
+    if (strcmp(r->fn, "strlcat") == 0) return op_strlcat(r);
     if (strcmp(r->fn, "strdup") == 0)  return op_strdup(r);
     if (strcmp(r->fn, "strndup") == 0) return op_strndup(r);
     if (strcmp(r->fn, "strspn") == 0)  return op_strspn(r);

@@ -1,0 +1,109 @@
+/* SS-163 (SPEC POSIX-004, AC-009, AC-027): strings_posix2024::strlcpy /
+ * strlcat.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Thin C23-recognizable names for `strings_cstr::copy_into` / `append_into`
+ * (`strlcpy` / `strlcat` semantics). `CopyReport` / `AppendResult` carry
+ * the total attempted length (`required`), bytes actually written, and
+ * exact truncation. `CStr` values are NUL-free `string`s (D-7). The
+ * well-defined cases are also differential-checked against a host that
+ * provides `strlcpy`/`strlcat` (`test/differential/posix_strl_oracle.py`);
+ * these hand-derived POSIX Issue 8 values are authoritative regardless
+ * (SPEC 21.4 rule 8). Byte values decimal.
+ */
+use strings_types::CopyReport;
+use strings_types::AppendResult;
+use strings_posix2024::strlcpy;
+use strings_posix2024::strlcat;
+
+/* pack an AppendResult: -1 = LengthOverflow; else written*10000 + req*10 + (tr?1:0) */
+fn ar(r: AppendResult) -> i32 {
+    return match r {
+        AppendResult::Reported(w, req, tr) => {
+            let t: i32 = match tr { true => { 1 }, false => { 0 } };
+            (w as i32) * 10000 + (req as i32) * 10 + t
+        },
+        AppendResult::LengthOverflow => { 0 - 1 },
+    };
+}
+
+fn cp(r: CopyReport) -> i32 {
+    let t: i32 = match r.truncated { true => { 1 }, false => { 0 } };
+    return (r.written as i32) * 10000 + (r.required as i32) * 10 + t;
+}
+
+fn main() -> i32 {
+    /* ================= strlcpy (AC-009) ================= */
+    /* src longer than cap -> truncate to cap-1, terminate, report total */
+    let d1: [byte; 5] = [9, 9, 9, 9, 9];
+    if cp(strlcpy(&mut d1[..], "example")) != 4 * 10000 + 7 * 10 + 1 { return 1; }
+    if d1[0] != 101 { return 2; }        /* 'e' */
+    if d1[3] != 109 { return 3; }        /* 'm' */
+    if d1[4] != 0 { return 4; }          /* terminator fills the last slot */
+
+    /* exact fit: src.len() == cap - 1 */
+    let d2: [byte; 5] = [9, 9, 9, 9, 9];
+    if cp(strlcpy(&mut d2[..], "abcd")) != 4 * 10000 + 4 * 10 + 0 { return 5; }
+    if d2[4] != 0 { return 6; }
+
+    /* room to spare: only src.len()+1 bytes touched, tail preserved */
+    let d3: [byte; 5] = [9, 9, 9, 9, 9];
+    if cp(strlcpy(&mut d3[..], "abc")) != 3 * 10000 + 3 * 10 + 0 { return 7; }
+    if d3[3] != 0 { return 8; }
+    if d3[4] != 9 { return 9; }          /* untouched */
+
+    /* empty src -> just the terminator, not truncated */
+    let d4: [byte; 4] = [9, 9, 9, 9];
+    if cp(strlcpy(&mut d4[..], "")) != 0 * 10000 + 0 * 10 + 0 { return 10; }
+    if d4[0] != 0 { return 11; }
+    if d4[1] != 9 { return 12; }
+
+    /* capacity 1 -> only the terminator, truncated, total reported */
+    let d5: [byte; 1] = [9];
+    if cp(strlcpy(&mut d5[..], "hi")) != 0 * 10000 + 2 * 10 + 1 { return 13; }
+    if d5[0] != 0 { return 14; }
+
+    /* capacity 0 -> no write, truncated even so */
+    let d6: [byte; 0] = [];
+    if cp(strlcpy(&mut d6[..], "x")) != 0 * 10000 + 1 * 10 + 1 { return 15; }
+
+    /* ================= strlcat (AC-027) ================= */
+    /* first NUL at f=2, append "cd" fits within dstsize 6 */
+    let a1: [byte; 6] = [97, 98, 0, 8, 8, 8];   /* "ab\0" + junk */
+    if ar(strlcat(&mut a1[..], "cd", 6)) != 2 * 10000 + 4 * 10 + 0 { return 20; }
+    if a1[2] != 99 { return 21; }        /* 'c' */
+    if a1[3] != 100 { return 22; }       /* 'd' */
+    if a1[4] != 0 { return 23; }         /* re-terminated */
+
+    /* first NUL at f=1, append "xyz" truncates to 2 within dstsize 4 */
+    let a2: [byte; 4] = [97, 0, 8, 8];   /* "a\0" */
+    if ar(strlcat(&mut a2[..], "xyz", 4)) != 2 * 10000 + 4 * 10 + 1 { return 24; }
+    if a2[1] != 120 { return 25; }       /* 'x' */
+    if a2[2] != 121 { return 26; }       /* 'y' */
+    if a2[3] != 0 { return 27; }         /* terminator */
+
+    /* NO NUL in the first dstsize bytes -> write nothing (AC-027) */
+    let a3: [byte; 4] = [97, 98, 99, 100];   /* "abcd", no NUL */
+    if ar(strlcat(&mut a3[..], "x", 4)) != 0 * 10000 + 5 * 10 + 1 { return 28; }
+    if a3[0] != 97 { return 29; }        /* every byte preserved */
+    if a3[3] != 100 { return 30; }
+
+    /* empty destination ("\0" at 0), append "hi" */
+    let a4: [byte; 5] = [0, 8, 8, 8, 8];
+    if ar(strlcat(&mut a4[..], "hi", 5)) != 2 * 10000 + 2 * 10 + 0 { return 31; }
+    if a4[0] != 104 { return 32; }       /* 'h' */
+    if a4[2] != 0 { return 33; }
+
+    /* empty append onto "ab\0" -> nothing appended, still terminated */
+    let a5: [byte; 4] = [97, 98, 0, 8];
+    if ar(strlcat(&mut a5[..], "", 4)) != 0 * 10000 + 2 * 10 + 0 { return 34; }
+    if a5[2] != 0 { return 35; }
+
+    /* dstsize clamped to the physical slice length (POSIX-004) */
+    let a6: [byte; 4] = [97, 0, 8, 8];   /* "a\0" */
+    if ar(strlcat(&mut a6[..], "z", 999)) != 1 * 10000 + 2 * 10 + 0 { return 36; }
+    if a6[1] != 122 { return 37; }       /* 'z' */
+    if a6[2] != 0 { return 38; }
+
+    return 0;
+}

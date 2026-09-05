@@ -30,6 +30,18 @@ for cand in -std=c23 -std=c2x -std=c17; do
 done
 [[ -n "$STD" ]] || { echo "c_oracle: no usable -std= for $CC" >&2; exit 1; }
 
+# strlcpy/strlcat are a BSD/CX extension: native on macOS, glibc >= 2.38,
+# absent on older glibc (e.g. ubuntu-22.04's 2.35). Compile-probe so the
+# oracle can report `precondition=FAILED:not-available` where the host
+# does not provide them (SPEC 21.4 rule 8 -- standards-derived expected
+# values then win in the differential fixtures).
+STRL=""
+if printf '%s\n' '#define _DEFAULT_SOURCE 1' '#include <string.h>' \
+    'int main(void){char b[4];return (int)strlcpy(b,"x",sizeof b)+ (int)strlcat(b,"y",sizeof b);}' \
+    | "$CC" $STD -x c - -o /dev/null 2>/dev/null; then
+  STRL="-DORACLE_HAVE_STRL=1"
+fi
+
 # shellcheck disable=SC2086
-"$CC" $STD $WARN $SAN -O1 -o "$OUT" "$HERE/oracle.c"
-echo "c_oracle: built $OUT with $CC $STD${SAN:+ $SAN}" >&2
+"$CC" $STD $WARN $SAN $STRL -O1 -o "$OUT" "$HERE/oracle.c"
+echo "c_oracle: built $OUT with $CC $STD${STRL:+ $STRL}${SAN:+ $SAN}" >&2
