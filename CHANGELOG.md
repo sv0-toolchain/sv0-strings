@@ -291,6 +291,29 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   (`Future`, "if implemented" clauses) resolve as not-applicable while Annex
   K is entirely absent. Only **C23-019** (ASan/UBSan + fuzz + safe-UB audit)
   remains open, tracked to SS-154. `scripts/test --backend=both` = 42/42.
+- **Warnings-as-errors + ASan/UBSan + fuzz + safe-UB audit** (SS-154 /
+  C23-019 / BACKEND-005 / SEC-009): new `scripts/sanitize` emits the
+  generated C of **every** runtime fixture, compiles it warnings-as-errors
+  (`-Werror -Wall -Wextra`, minus the sv0c emitter's own style noise —
+  documented), links `-fsanitize=address,undefined -fno-sanitize-recover=all`,
+  runs it, and fails on any non-zero exit or ASan/UBSan/leak diagnostic —
+  wired into `.github/workflows/ci.yml`, skips gracefully where `cc` lacks
+  `-fsanitize`. New `test/fuzz/c23_fuzz.sv0` is a seeded, deterministic
+  160-round sweep of the slice-based ops (`memcpy`/`memmove`/`memchr`/
+  `memcmp`/`strncmp`) over randomised lengths, bounds (including `n` past
+  capacity) and contents, checking universal invariants (`Copied(n)` ⟹
+  bytewise-equal prefix + untouched tail; `memchr` result is a real first
+  match or a genuine absence; `memcmp`/`strncmp` sign matches a hand-rolled
+  reference). The PRNG is a Lehmer generator in `i64` (`(s*48271) %
+  2147483647`) — every intermediate fits a signed 64-bit int with no
+  overflow, so C (`long long`) and the native VM (wide int) produce
+  byte-identical sequences; it passes on `--backend=both` **and** under
+  `scripts/sanitize`. `docs/safe-ub-audit.md` is the SEC-009 per-adapter
+  hazard review: a table of each façade function's C UB precondition(s) and
+  the safe type constraint / checked error / compile-time borrow exclusion
+  that removes it. `scripts/sanitize` PASS across 34 fixtures — no C runtime
+  error, OOB access, signed overflow, invalid shift, or leak anywhere in the
+  corpus. `scripts/test --backend=both` = 43/43.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated

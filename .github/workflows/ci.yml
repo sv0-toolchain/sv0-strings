@@ -85,6 +85,12 @@ jobs:
           ./scripts/test --backend=both --dir=test --record=ci-results.tsv
           ./scripts/test --self-test
 
+      - name: scripts/sanitize  (BACKEND-005 / C23-019: warnings-as-errors + ASan/UBSan)
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: ./scripts/sanitize
+
       - name: Upload run record
         if: always()
         uses: actions/upload-artifact@v4

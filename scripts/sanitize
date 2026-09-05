@@ -1,0 +1,102 @@
+#!/usr/bin/env bash
+# SS-154 (SPEC BACKEND-005 / TEST-014 / C23-019): compile the generated C
+# of every runtime fixture with warnings-as-errors and run it under
+# AddressSanitizer + UndefinedBehaviorSanitizer. A safe façade function
+# must never invoke C UB for any value constructible through its public
+# safe types; this is the executable enforcement of that (`test/fuzz/`
+# supplies the wide input coverage).
+#
+# Toolchain: $SV0_TOOLCHAIN_ROOT, else the parent dir when sv0-strings is a
+# submodule, else ../sv0-toolchain. Needs build/sv0-megatu-compiler-native
+# and a `cc` with -fsanitize=address,undefined. If the sanitizers are not
+# available the run SKIPS (not fails) with a clear note, same policy as the
+# c_oracle --asan probe.
+#
+# Usage: scripts/sanitize [-q]
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+if [[ -n "${SV0_TOOLCHAIN_ROOT:-}" ]]; then
+  TC="$SV0_TOOLCHAIN_ROOT"
+elif [[ -d "$HERE/../sv0c" && -x "$HERE/../build/sv0-megatu-compiler-native" ]]; then
+  TC="$HERE/.."
+elif [[ -d "$HERE/../sv0-toolchain" ]]; then
+  TC="$HERE/../sv0-toolchain"
+else
+  echo "scripts/sanitize: cannot locate sv0-toolchain (set SV0_TOOLCHAIN_ROOT)" >&2
+  exit 2
+fi
+TC="$(cd "$TC" && pwd)"
+NC="$TC/build/sv0-megatu-compiler-native"
+RT="$TC/sv0c/runtime"
+QUIET="${1:-}"
+
+[[ -x "$NC" ]] || { echo "scripts/sanitize: missing $NC -- build the toolchain first" >&2; exit 2; }
+
+CC="${CC:-cc}"
+STD=""
+for s in c23 c2x c17; do
+  if echo 'int main(void){return 0;}' | "$CC" -std="$s" -x c - -o /dev/null 2>/dev/null; then STD="-std=$s"; break; fi
+done
+
+# Probe sanitizer support once.
+SAN="-fsanitize=address,undefined -fno-sanitize-recover=all"
+if ! echo 'int main(void){return 0;}' | "$CC" $STD $SAN -x c - -o /dev/null 2>/dev/null; then
+  echo "scripts/sanitize: SKIP -- $CC has no -fsanitize=address,undefined"
+  exit 0
+fi
+
+# Warnings-as-errors, minus the sv0c codegen-style noise that is emitter
+# output, not fixture logic:
+#   parentheses-equality  -> emitter writes `if ((x == y))`
+#   unused-*              -> whole-library TU carries unused helpers/params
+#   sign-compare          -> emitter mixes int/size_t in a few generated loops
+WFLAGS="-Werror -Wall -Wextra \
+  -Wno-parentheses-equality -Wno-unused-function -Wno-unused-variable \
+  -Wno-unused-parameter -Wno-sign-compare -Wno-unused-but-set-variable \
+  -Wno-implicitly-unsigned-literal -Wno-constant-conversion"
+
+FIXTURES=()
+while IFS= read -r f; do FIXTURES+=("$f"); done < <(find test/property test/cases test/fuzz -name '*.sv0' 2>/dev/null | sort)
+
+fail=0
+n=0
+for main in "${FIXTURES[@]}"; do
+  n=$((n + 1))
+  s="$(mktemp -d)"
+  mkdir -p "$s/lib"
+  cp lib/*.sv0 "$s/lib/"
+  cp "$main" "$s/main.sv0"
+
+  if ! "$NC" --project "$s" > "$s/out.c" 2> "$s/emit.err"; then
+    echo "  FAIL  $main   emit failed"; sed 's/^/        /' "$s/emit.err" | head -4
+    fail=1; rm -rf "$s"; continue
+  fi
+  # shellcheck disable=SC2086
+  if ! "$CC" $STD -O1 -g $SAN $WFLAGS -I "$RT" "$s/out.c" "$RT/sv0_runtime.c" -o "$s/bin" 2> "$s/cc.err"; then
+    echo "  FAIL  $main   sanitizer build (warnings-as-errors)"; sed 's/^/        /' "$s/cc.err" | head -8
+    fail=1; rm -rf "$s"; continue
+  fi
+  # LeakSanitizer is unsupported on macOS ASan (aborts if forced on); let it
+  # default -- off on Darwin, on for Linux CI.
+  ASAN_OPT="UBSAN_OPTIONS=print_stacktrace=1"
+  [[ "$(uname)" == "Darwin" ]] && ASAN_OPT="ASAN_OPTIONS=detect_leaks=0 $ASAN_OPT"
+  out="$(env $ASAN_OPT "$s/bin" 2>&1)"; code=$?
+  if [[ $code -ne 0 ]]; then
+    echo "  FAIL  $main   exit $code (want 0)"; echo "$out" | sed 's/^/        /' | head -8
+    fail=1; rm -rf "$s"; continue
+  fi
+  if echo "$out" | grep -qE 'runtime error:|AddressSanitizer|UndefinedBehaviorSanitizer|LeakSanitizer|SUMMARY: '; then
+    echo "  FAIL  $main   sanitizer diagnostic"; echo "$out" | sed 's/^/        /' | head -10
+    fail=1; rm -rf "$s"; continue
+  fi
+  [[ "$QUIET" == "-q" ]] || echo "  ok    $main"
+  rm -rf "$s"
+done
+
+if [[ "$fail" -ne 0 ]]; then
+  echo "scripts/sanitize: FAIL ($n fixture(s))"
+  exit 1
+fi
+echo "scripts/sanitize: PASS ($n fixture(s), ASan+UBSan, warnings-as-errors)"

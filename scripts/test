@@ -93,7 +93,7 @@ resolve_case() {
   local c="$1"
   if [[ -f "$HERE/$c" ]]; then echo "$c"; return; fi
   local d
-  for d in test/cases test/property test/fixtures/regressions test/compile_fail; do
+  for d in test/cases test/property test/fixtures/regressions test/compile_fail test/fuzz; do
     if [[ -f "$HERE/$d/$c" ]]; then echo "$d/$c"; return; fi
     if [[ -f "$HERE/$d/$c.sv0" ]]; then echo "$d/$c.sv0"; return; fi
   done

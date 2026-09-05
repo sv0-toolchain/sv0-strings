@@ -103,7 +103,7 @@ by `test/compile_fail/c23_annex_k_absent.sv0` (C23K-001).
 | C23-016 | R0.3 | `T-C23-LOCALE-STUBS-001` |
 | C23-017 | R0.3 | `T-C23-LOCALE-STUBS-001` |
 | C23-018 | R0.3 | `T-C23-MEMCPY-FAMILY-001` |
-| C23-019 | R0.3 | Deferred to **SS-154** (warnings-as-errors + ASan/UBSan + fuzz + safe-UB audit); tracked, not yet closed. |
+| C23-019 | R0.3 | `T-C23-FUZZ-001`, `T-SANITIZE-001` |
 | C23-020 | R0.3 | `T-C23-HEADER-SURFACE-001` |
 | C23-021 | R0.3 | `T-C23-C21-030-001` |
 | C23-022 | R0.3 | `T-C23-C21-030-001` |
