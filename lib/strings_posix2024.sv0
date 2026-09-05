@@ -8,5 +8,24 @@
 /// modules for common operations (SPEC ARCH-004). Base / CX / XSI
 /// classification is explicit; removed historical interfaces are not here.
 ///
-/// Status: unimplemented (pre-F0). Implementation begins at BL-073 (R0.4).
+/// R0.4 progress:
+///   SS-161  memmem -- IMPLEMENTED (this file). POSIX-002.
 module strings_posix2024;
+
+use strings_types::Option;
+use strings_bytes::find_slice;
+
+/// POSIX-002 (Adapted). Binary-safe substring search: the offset of the
+/// first occurrence of `needle` within `haystack`, or `Option::None`.
+/// Delegates directly to `strings_bytes::find_slice`, which scans raw
+/// bytes with no NUL semantics -- an embedded `0x00` in EITHER `haystack`
+/// or `needle` is just another byte value (SPEC ARCH-004: reuse the safe
+/// module). An empty `needle` yields `Option::Some(0)` (matching POSIX
+/// Issue 8 / glibc >= 2.30, which return `haystack`); a `needle` longer
+/// than `haystack` yields `Option::None`.
+///
+/// DEVIATION from C `memmem` (POSIX): returns `Option<usize>`, an offset,
+/// never an interior pointer -- so it cannot dangle past `haystack`.
+pub fn memmem(haystack: &[byte], needle: &[byte]) -> Option<usize> {
+    return find_slice(haystack, needle);
+}

@@ -1,0 +1,62 @@
+/* SS-161 (SPEC POSIX-002): strings_posix2024::memmem.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `memmem` is a one-line binary-safe map to `strings_bytes::find_slice`
+ * (SPEC ARCH-004): a raw byte scan with no NUL semantics, so an embedded
+ * `0x00` in EITHER argument is just a byte value. Expected offsets are
+ * hand-derived POSIX facts; the non-empty-needle cases are also
+ * differential-checked against the host libc
+ * (`test/differential/posix_memmem_oracle.py`). Byte values decimal.
+ */
+use strings_types::Option;
+use strings_posix2024::memmem;
+
+fn oi(o: Option<usize>) -> i32 {
+    return match o {
+        Option::Some(k) => { k as i32 },
+        Option::None => { 0 - 1 },
+    };
+}
+
+fn main() -> i32 {
+    let hay: [byte; 8] = [0, 1, 0, 2, 0, 3, 0, 4];
+    let n1: [byte; 2] = [0, 2];
+    if oi(memmem(&hay[..], &n1[..])) != 2 { return 1; }
+
+    /* embedded NUL in haystack AND needle */
+    let h2: [byte; 6] = [97, 0, 98, 0, 99, 0];   /* "a\0b\0c\0" */
+    let n2: [byte; 3] = [0, 98, 0];              /* "\0b\0" */
+    if oi(memmem(&h2[..], &n2[..])) != 1 { return 2; }
+
+    /* needle absent -> None */
+    let n3: [byte; 3] = [98, 99, 100];
+    if oi(memmem(&hay[..], &n3[..])) != 0 - 1 { return 3; }
+
+    /* needle longer than haystack -> None */
+    let tiny: [byte; 1] = [170];
+    let big: [byte; 3] = [170, 187, 204];
+    if oi(memmem(&tiny[..], &big[..])) != 0 - 1 { return 4; }
+
+    /* whole-haystack match -> Some(0) */
+    let h5: [byte; 3] = [16, 32, 48];
+    if oi(memmem(&h5[..], &h5[..])) != 0 { return 5; }
+
+    /* match only at the end */
+    let h6: [byte; 4] = [120, 120, 120, 121];    /* "xxxy" */
+    let n6: [byte; 2] = [120, 121];              /* "xy" */
+    if oi(memmem(&h6[..], &n6[..])) != 2 { return 6; }
+
+    /* empty needle -> Some(0). POSIX Issue 8 / glibc >= 2.30 return the
+       haystack; some hosts (macOS) return NULL for this, so it is pinned
+       here rather than differential-checked (SPEC 21.4 rule 8). */
+    let empty: [byte; 0] = [];
+    if oi(memmem(&hay[..], &empty[..])) != 0 { return 7; }
+
+    /* empty haystack, empty needle -> Some(0) */
+    if oi(memmem(&empty[..], &empty[..])) != 0 { return 8; }
+
+    /* empty haystack, non-empty needle -> None */
+    if oi(memmem(&empty[..], &n1[..])) != 0 - 1 { return 9; }
+
+    return 0;
+}

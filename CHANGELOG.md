@@ -89,7 +89,22 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   --backend=both` = 28/28. R0.2 deviations D-4 / D-6 / D-7 / D-8 / D-9 are
   registered and change no behavioural result.
 
-### R0.3 (in progress)
+### R0.4 (in progress)
+
+- **`strings_posix2024::memmem`** (SS-161 / POSIX-002): binary-safe substring
+  search — a one-line map to `strings_bytes::find_slice` (SPEC ARCH-004: a
+  raw byte scan with no NUL semantics, so an embedded `0x00` in either
+  `haystack` or `needle` is just a byte). Returns `Option<usize>`, an
+  offset, never an interior pointer. Empty needle → `Some(0)` (POSIX Issue 8
+  / glibc ≥ 2.30 semantics); needle longer than haystack → `None`.
+  Differential-checked against the host libc for non-empty needles
+  (`test/differential/posix_memmem_oracle.py`, 8 cases; the oracle gained a
+  `memmem` op with explicit lengths). The empty-needle case is pinned in the
+  property fixture rather than differential-checked because some hosts
+  (macOS) return `NULL` there — the standards value wins (SPEC §21.4 rule 8).
+  No new toolchain slice needed. `scripts/test --backend=both` = 44/44.
+
+### R0.3 (complete — gate PASS, SS-141..155)
 
 - **`strings_c23::memcpy` / `memmove` / `memmove_within` / `memccpy`** (SS-142
   / C23-004 / C23-005): the first safe C23 `<string.h>` adapters. `memcpy`

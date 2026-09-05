@@ -51,6 +51,7 @@
  *   strncpy  guarded write, exact zero-padding; src= bounded (need not be NUL-terminated)
  *   strcat   guarded write; src= dst's initial content (NUL-in-window), cstr= string to append
  *   strncat  same as strcat, bounded by n; cstr need not contain a NUL within n
+ *   memmem   binary-safe substring; src= haystack, a= needle (raw bytes); ret=idx:<n>|idx:none
  *   strdup   fresh allocation; cstr= source C string (NUL-in-window); ret=ptr:nonnull, out=, term=
  *   strndup  fresh allocation, bounded by n; src need not contain a NUL within n
  *   strspn   bounded read -> length; cstr= s, a= accept set (both NUL-in-window)
@@ -59,7 +60,15 @@
  *            a= separators, both NUL-in-window); ntokens=<n>, tok<i>=start:end
  */
 
-/* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too. */
+/* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too.
+   memmem is a CX/GNU extension -- _GNU_SOURCE exposes it on glibc, and it
+   is available by default on macOS. */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE 1
+#endif
+#ifndef _DARWIN_C_SOURCE
+#define _DARWIN_C_SOURCE 1
+#endif
 #ifndef _DEFAULT_SOURCE
 #define _DEFAULT_SOURCE 1
 #endif
@@ -608,6 +617,21 @@ static int op_strncat(const struct req *r) {
     return 0;
 }
 
+/* memmem: binary-safe substring search. `src` = haystack, `a` = needle;
+   both raw byte args (no NUL semantics -- embedded 0x00 is just a byte). */
+static int op_memmem(const struct req *r) {
+    if (r->src_n < 0) return fail_pre("src-missing");
+    if (r->a_n < 0)   return fail_pre("a-missing");
+
+    errno = 0;
+    void *ret = memmem(r->src, (size_t)r->src_n, r->a, (size_t)r->a_n);
+    printf("precondition=ok\n");
+    if (ret) printf("ret=idx:%ld\n", (long)((const unsigned char *)ret - r->src));
+    else     printf("ret=idx:none\n");
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
 static int op_strdup(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     long k = find_nul(r->cstr, r->cstr_n);
@@ -761,6 +785,7 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strncpy") == 0) return op_strncpy(r);
     if (strcmp(r->fn, "strcat") == 0)  return op_strcat(r);
     if (strcmp(r->fn, "strncat") == 0) return op_strncat(r);
+    if (strcmp(r->fn, "memmem") == 0)  return op_memmem(r);
     if (strcmp(r->fn, "strdup") == 0)  return op_strdup(r);
     if (strcmp(r->fn, "strndup") == 0) return op_strndup(r);
     if (strcmp(r->fn, "strspn") == 0)  return op_strspn(r);
