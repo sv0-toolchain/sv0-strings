@@ -57,6 +57,7 @@
  *   strlcpy  guarded write; cstr= source (NUL-in-window), cap= dstsize; ret=i:<total>, written=, truncated=
  *   strlcat  guarded write; src= initial dst content, a= append source (NUL-in-window), cap= dstsize
  *            (needs host strlcpy/strlcat -- else precondition=FAILED:not-available)
+ *   strnlen  bounded read; src= raw bytes, n= bound; ret=i:min(first NUL, n)
  *   strdup   fresh allocation; cstr= source C string (NUL-in-window); ret=ptr:nonnull, out=, term=
  *   strndup  fresh allocation, bounded by n; src need not contain a NUL within n
  *   strspn   bounded read -> length; cstr= s, a= accept set (both NUL-in-window)
@@ -746,6 +747,25 @@ static int op_strlcat(const struct req *r) {
 #endif
 }
 
+static int op_strnlen(const struct req *r) {
+    if (r->src_n < 0) return fail_pre("src-missing");
+    if (r->n < 0)     return fail_pre("n-missing");
+    /* real strnlen reads at most n bytes -- safe only if that many exist in
+       src, OR a NUL occurs earlier. */
+    {
+        long scan = r->n < r->src_n ? r->n : r->src_n;
+        long nul_at = find_nul(r->src, scan);
+        if (nul_at < 0 && r->n > r->src_n) return fail_pre("no-nul-and-n-gt-src");
+    }
+
+    errno = 0;
+    size_t len = strnlen((const char *)r->src, (size_t)r->n);
+    printf("precondition=ok\n");
+    printf("ret=i:%zu\n", len);
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
 static int op_strdup(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     long k = find_nul(r->cstr, r->cstr_n);
@@ -904,6 +924,7 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "stpncpy") == 0) return op_stpncpy(r);
     if (strcmp(r->fn, "strlcpy") == 0) return op_strlcpy(r);
     if (strcmp(r->fn, "strlcat") == 0) return op_strlcat(r);
+    if (strcmp(r->fn, "strnlen") == 0) return op_strnlen(r);
     if (strcmp(r->fn, "strdup") == 0)  return op_strdup(r);
     if (strcmp(r->fn, "strndup") == 0) return op_strndup(r);
     if (strcmp(r->fn, "strspn") == 0)  return op_strspn(r);

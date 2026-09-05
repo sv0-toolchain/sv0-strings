@@ -42,3 +42,4 @@ T-SANITIZE-001	scripts/sanitize	C23-019,BACKEND-005,TEST-014,SEC-009	c	safe	runt
 T-POSIX-MEMMEM-001	test/property/posix_memmem.sv0	POSIX-002	c,vm	safe	runtime	property	done
 T-POSIX-STPCPY-001	test/property/posix_stpcpy.sv0	POSIX-003	c,vm	safe	runtime	property	done
 T-POSIX-STRL-001	test/property/posix_strl.sv0	POSIX-004	c,vm	safe	runtime	property	done
+T-POSIX-STRNLEN-001	test/property/posix_strnlen.sv0	POSIX-005	c,vm	safe	runtime	property	done

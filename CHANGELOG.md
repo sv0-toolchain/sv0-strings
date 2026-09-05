@@ -142,6 +142,16 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   SKIPs and the standards values are pinned in the sv0 fixture, SPEC §21.4
   rule 8). No new toolchain slice needed. `scripts/test --backend=both` =
   46/46.
+- **`strings_posix2024::strnlen`** (SS-164 / POSIX-005): `strnlen(s, n)`
+  inspects at most `n` bytes and returns `min(first_0x00, n)` — `s` need
+  not contain a `0x00` within the bound. The scan window is clamped to
+  `min(n, s.len())`, so a caller may pass any `n` (even far past the slice)
+  and the scan still never reads past `s`'s own bound — the "guard-page"
+  safety C `strnlen` leaves to the caller. Differential-checked against
+  host libc for the well-defined cases (`test/differential/posix_strnlen_oracle.py`,
+  8 cases; the oracle gained a `strnlen` op); the `n`-past-the-slice /
+  no-`0x00` case is UB for real `strnlen` and is fixture-pinned. No new
+  toolchain slice needed. `scripts/test --backend=both` = 47/47.
 
 ### R0.3 (complete — gate PASS, SS-141..155)
 

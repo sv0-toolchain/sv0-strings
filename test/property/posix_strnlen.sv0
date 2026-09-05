@@ -1,0 +1,47 @@
+/* SS-164 (SPEC POSIX-005): strings_posix2024::strnlen.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `strnlen(s, n)` inspects at most `n` bytes and returns
+ * `min(first_0x00, n)` -- `s` need not contain a `0x00` within the bound.
+ * The scan window is clamped to `min(n, s.len())`, so any `n` is safe: the
+ * scan never reads past `s` (the "guard-page" safety C `strnlen` leaves to
+ * the caller). Well-defined cases are also differential-checked against the
+ * host libc (`test/differential/posix_strnlen_oracle.py`). Byte values
+ * decimal.
+ */
+use strings_posix2024::strnlen;
+
+fn main() -> i32 {
+    let s: [byte; 5] = [97, 98, 99, 0, 100];   /* "abc\0d" */
+
+    /* NUL within the bound -> its index */
+    if strnlen(&s[..], 10) != 3 { return 1; }
+    if strnlen(&s[..], 4) != 3 { return 2; }
+    if strnlen(&s[..], 3) != 3 { return 3; }    /* NUL exactly at n */
+
+    /* bound hit before the NUL -> n */
+    if strnlen(&s[..], 2) != 2 { return 4; }
+    if strnlen(&s[..], 0) != 0 { return 5; }
+
+    /* no 0x00 anywhere, n <= s.len() -> n (no terminator required) */
+    let t: [byte; 5] = [97, 98, 99, 100, 101];   /* "abcde" */
+    if strnlen(&t[..], 3) != 3 { return 6; }
+    if strnlen(&t[..], 5) != 5 { return 7; }
+
+    /* leading NUL -> 0 */
+    let u: [byte; 3] = [0, 97, 98];
+    if strnlen(&u[..], 3) != 0 { return 8; }
+
+    /* GUARD-PAGE case: n far larger than the slice, NO 0x00 -- UB for real
+       strnlen; the safe façade clamps the scan to s.len() and returns it.
+       (Pinned here, not differential-checked -- SPEC 21.4.) */
+    if strnlen(&t[..], 999) != 5 { return 9; }
+    if strnlen(&s[..], 100000) != 3 { return 10; }   /* still stops at the NUL */
+
+    /* empty slice -> 0 for any n */
+    let e: [byte; 0] = [];
+    if strnlen(&e[..], 0) != 0 { return 11; }
+    if strnlen(&e[..], 50) != 0 { return 12; }
+
+    return 0;
+}
