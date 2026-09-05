@@ -1,0 +1,22 @@
+/* SS-153 compile-fail evidence (SPEC C23K-001, Appendix A.3).
+ *
+ * EXPECT-FAIL: E0309
+ *
+ * C23 Annex K (the `_s` bounds-checked functions) is OPTIONAL in C23 and
+ * Excluded from this library's core C23 claim. No safe module exports any
+ * Annex K symbol; a future Annex K profile, if ever built, would be a
+ * separately versioned surface (like `strings_unsafe_abi`). This probe pins
+ * the exclusion: importing an Annex K name fails to resolve, and if one
+ * were ever added this fixture would start compiling and the compile-fail
+ * gate would flag the regression.
+ *
+ * `memcpy_s` stands in for the whole Annex K set (`memmove_s`, `strcpy_s`,
+ * `strncpy_s`, `strcat_s`, `strncat_s`, `strtok_s`, `memset_s`,
+ * `strerror_s`, `strerrorlen_s`, `strnlen_s`, `errno_t`, `rsize_t`), all
+ * `Excluded` in `tools/catalogs/standards.tsv` / `docs/compatibility.md`.
+ */
+use strings_c23::memcpy_s;
+
+fn main() -> i32 {
+    return 0;
+}

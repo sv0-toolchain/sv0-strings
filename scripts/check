@@ -16,6 +16,9 @@ python3 tools/check_catalogs.py || fail=1
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 
+echo "== compat_doc --check (DOC-004 digest/rebuild) =="
+python3 tools/compat_doc.py --check || fail=1
+
 echo "== c_oracle selftest (SS-141) =="
 python3 tools/c_oracle/run_oracle.py --selftest || fail=1
 

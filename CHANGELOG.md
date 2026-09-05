@@ -272,6 +272,25 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   type-generic name). `tools/standards_matrix.py` already machine-checks the
   "exactly once" property for the three declarations. No new toolchain slice
   needed. `scripts/test --backend=both` = 41/41.
+- **Every C23 row closed + `docs/compatibility.md` generated** (SS-153 /
+  C23-001 .. C23-003 / DOC-004 / AC-016): new `tools/compat_doc.py` rebuilds
+  `docs/compatibility.md` entirely from `tools/catalogs/*.tsv` — the C23
+  §7.26 declaration + function disposition tables (26 functions: 22
+  `Adapted`, 3 `Host-dependent`, 1 `Blocked`; 0 `Exact`), the Annex K
+  `Excluded` table, and a C23-001..030 / C23K requirement-coverage table
+  mapping each id to its covering fixture(s), a non-test verification method,
+  an explicit vacuity note, or a tracked deferral. `--check` regenerates in
+  memory and byte-compares against the committed file (the DOC-004
+  generated-file digest/rebuild test), wired into `scripts/check`;
+  dependency-free and needs no SPEC checkout, so it runs on every CI leg.
+  **C23-002** (differential match for `Exact` outputs) is closed as vacuous
+  — 0 functions are `Exact`, and the generator fails if that changes without
+  a covering differential row. **C23K-001** (Annex K optional / Excluded)
+  closed with a symbol-absence compile-fail probe
+  (`test/compile_fail/c23_annex_k_absent.sv0` → `E0309`); `C23K-002`/`003`
+  (`Future`, "if implemented" clauses) resolve as not-applicable while Annex
+  K is entirely absent. Only **C23-019** (ASan/UBSan + fuzz + safe-UB audit)
+  remains open, tracked to SS-154. `scripts/test --backend=both` = 42/42.
 - **Independent C23 differential oracle** (SS-141 / BL-059 / SPEC §21.4):
   `tools/c_oracle/` — `oracle.c` computes the host-libc result of a
   `<string.h>` operation on inputs whose C preconditions it has validated
