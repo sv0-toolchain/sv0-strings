@@ -1,0 +1,89 @@
+/* SS-165 (SPEC POSIX-006, TOK-008, TOK-009): strings_posix2024::strtok_r.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `strtok_r` threads its cursor as an explicit `pos: usize` (== C's
+ * caller-owned `saveptr`, never a hidden global). It delegates to
+ * `strings_c23::strtok`, so it inherits: pure function of `(s, seps, pos)`,
+ * `s` never mutated (unlike C `strtok_r`, which overwrites separators),
+ * separator set free to change per call. Expected token boundaries are
+ * hand-derived C `strtok_r` facts (same-separator sequences are also
+ * differential-checked in `test/differential/posix_strtok_r_oracle.py`).
+ */
+use strings_types::TokenStep;
+use strings_posix2024::strtok_r;
+
+/* -1 = Complete; encodes Emit(start,end,_) as start*1000 + end */
+fn step(r: TokenStep) -> i32 {
+    return match r {
+        TokenStep::Emit(start, end, _next_pos) => { (start * 1000 + end) as i32 },
+        TokenStep::Complete => { 0 - 1 },
+    };
+}
+
+fn next_pos(r: TokenStep) -> usize {
+    return match r {
+        TokenStep::Emit(_start, _end, next_pos) => { next_pos },
+        TokenStep::Complete => { 0 },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= basic sequence ================= */
+    let s1: string = "  hello, world!  foo";
+    let sep1: string = " ,!";
+    let r1: TokenStep = strtok_r(s1, sep1, 0);
+    if step(r1) != 2007 { return 1; }
+    let r2: TokenStep = strtok_r(s1, sep1, next_pos(r1));
+    if step(r2) != 9014 { return 2; }
+    let r3: TokenStep = strtok_r(s1, sep1, next_pos(r2));
+    if step(r3) != 17020 { return 3; }
+    if step(strtok_r(s1, sep1, next_pos(r3))) != 0 - 1 { return 4; }
+
+    /* double-separator collapse */
+    let s2: string = "a,b,,c";
+    let q1: TokenStep = strtok_r(s2, ",", 0);
+    if step(q1) != 1 { return 10; }
+    let q2: TokenStep = strtok_r(s2, ",", next_pos(q1));
+    if step(q2) != 2003 { return 11; }
+    let q3: TokenStep = strtok_r(s2, ",", next_pos(q2));
+    if step(q3) != 5006 { return 12; }
+    if step(strtok_r(s2, ",", next_pos(q3))) != 0 - 1 { return 13; }
+
+    /* separator-only / empty-separator-set */
+    if step(strtok_r("   ", " ", 0)) != 0 - 1 { return 14; }
+    if step(strtok_r("one", "", 0)) != 3 { return 15; }
+
+    /* input is never mutated: re-tokenizing s2 from 0 gives the same first
+       token even after the calls above (a real strtok_r would have written
+       0x00 over the commas) */
+    if step(strtok_r(s2, ",", 0)) != 1 { return 16; }
+
+    /* ================= interleaved caller-owned state (TOK-008) =======
+     * Two tokenizations of DIFFERENT strings advance independently when
+     * interleaved -- there is no shared saveptr / global to clobber. */
+    let a: string = "aa bb cc";
+    let b: string = "xx-yy-zz";
+    let a1: TokenStep = strtok_r(a, " ", 0);
+    if step(a1) != 2 { return 20; }
+    let b1: TokenStep = strtok_r(b, "-", 0);
+    if step(b1) != 2 { return 21; }
+    let a2: TokenStep = strtok_r(a, " ", next_pos(a1));
+    if step(a2) != 3005 { return 22; }         /* unaffected by b1 */
+    let b2: TokenStep = strtok_r(b, "-", next_pos(b1));
+    if step(b2) != 3005 { return 23; }         /* unaffected by a2 */
+    let a3: TokenStep = strtok_r(a, " ", next_pos(a2));
+    if step(a3) != 6008 { return 24; }
+    let b3: TokenStep = strtok_r(b, "-", next_pos(b2));
+    if step(b3) != 6008 { return 25; }
+
+    /* ================= changing separators between calls (TOK-009) ==== */
+    let c: string = "aa,bb-cc";
+    let c1: TokenStep = strtok_r(c, ",", 0);
+    if step(c1) != 2 { return 30; }
+    let c2: TokenStep = strtok_r(c, ",-", next_pos(c1));   /* superset, unambiguous */
+    if step(c2) != 3005 { return 31; }
+    let c3: TokenStep = strtok_r(c, ",-", next_pos(c2));
+    if step(c3) != 6008 { return 32; }
+
+    return 0;
+}

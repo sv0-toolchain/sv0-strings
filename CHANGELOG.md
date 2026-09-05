@@ -152,6 +152,21 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   8 cases; the oracle gained a `strnlen` op); the `n`-past-the-slice /
   no-`0x00` case is UB for real `strnlen` and is fixture-pinned. No new
   toolchain slice needed. `scripts/test --backend=both` = 47/47.
+- **`strings_posix2024::strtok_r`** (SS-165 / POSIX-006): reentrant
+  tokenizer. C's `strtok_r` distinction from `strtok` is that its
+  continuation state lives in a caller-owned `char **saveptr` rather than a
+  hidden global — and the safe façade's `strtok` (SS-147) is *already* in
+  that form (the caller threads `pos: usize`, nothing global is touched), so
+  `strtok_r(s, separators, pos) -> TokenStep` simply delegates to
+  `strings_c23::strtok`. Two tokenizations threading their own `pos` never
+  interfere (proven by interleaving them in the fixture); the separator set
+  may change per call; the input is never mutated — unlike C `strtok_r`,
+  which overwrites each consumed separator with `0x00` (POSIX-006: "the safe
+  native tokenizer remains non-mutating; the façade SHALL document this
+  adaptation"). Differential-checked against host libc `strtok_r`
+  (`test/differential/posix_strtok_r_oracle.py`, 6 same-separator-set cases;
+  the oracle gained a `strtok_r` op with a caller-owned saveptr). No new
+  toolchain slice needed. `scripts/test --backend=both` = 48/48.
 
 ### R0.3 (complete — gate PASS, SS-141..155)
 

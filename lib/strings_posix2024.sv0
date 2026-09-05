@@ -13,15 +13,18 @@
 ///   SS-162  stpcpy / stpncpy -- IMPLEMENTED (this file). POSIX-003.
 ///   SS-163  strlcpy / strlcat -- IMPLEMENTED (this file). POSIX-004.
 ///   SS-164  strnlen -- IMPLEMENTED (this file). POSIX-005.
+///   SS-165  strtok_r -- IMPLEMENTED (this file). POSIX-006.
 module strings_posix2024;
 
 use strings_types::Option;
 use strings_types::EndOffsetResult;
 use strings_types::CopyReport;
 use strings_types::AppendResult;
+use strings_types::TokenStep;
 use strings_bytes::find_slice;
 use strings_cstr::copy_into;
 use strings_cstr::append_into;
+use strings_c23::strtok;
 
 /// First `0x00` in `buf` within `limit`, else `limit` -- the effective end
 /// of a bounded, possibly non-terminated source (local copy of the helper
@@ -175,4 +178,25 @@ pub fn strnlen(s: &[byte], n: usize) -> usize {
     let mut lim: usize = n;
     if lim > avail { lim = avail; }
     return bound_to_nul(s, lim);
+}
+
+/// POSIX-006 (Adapted). Reentrant tokenizer: `TokenStep::Emit(start, end,
+/// next_pos)` gives the next token of the `CStr` payload `s` as
+/// `s[start..end]`; call again with `pos = next_pos` to resume.
+/// `TokenStep::Complete` means no more tokens.
+///
+/// The C `strtok_r` distinction from `strtok` is that its continuation
+/// state lives in a caller-owned `char **saveptr` rather than a hidden
+/// global. The safe façade's `strtok` (SS-147) is *already* in that form --
+/// the caller threads `pos: usize` explicitly and nothing global is
+/// touched -- so `strtok_r` is the same function under the
+/// POSIX-recognizable name (it delegates to `strings_c23::strtok`).
+/// The separator set MAY change between calls (TOK-009), and two
+/// tokenizations that thread their own `pos` never interfere (proven by
+/// interleaving them in the fixture). The safe native tokenizer never
+/// mutates `s` -- unlike C `strtok_r`, which overwrites each consumed
+/// separator with `0x00` (POSIX-006: "the safe native tokenizer remains
+/// non-mutating; the façade SHALL document this adaptation").
+pub fn strtok_r(s: string, separators: string, pos: usize) -> TokenStep {
+    return strtok(s, separators, pos);
 }

@@ -64,6 +64,7 @@
  *   strcspn  bounded read -> length; cstr= s, a= reject set (both NUL-in-window)
  *   strtok   runs the FULL hidden-state sequence in one process (cstr= input,
  *            a= separators, both NUL-in-window); ntokens=<n>, tok<i>=start:end
+ *   strtok_r same as strtok but a caller-owned saveptr, not a global; same output
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too.
@@ -877,6 +878,36 @@ static int op_strtok(const struct req *r) {
     return 0;
 }
 
+/* strtok_r: same as strtok but the continuation state is a caller-owned
+   saveptr, not a hidden global. Tokenizes one string fully; the boundaries
+   must match strtok exactly (it is strtok without the global). */
+static int op_strtok_r(const struct req *r) {
+    if (r->cstr_n < 0) return fail_pre("cstr-missing");
+    if (r->a_n < 0)    return fail_pre("a-missing");
+    if (find_nul(r->cstr, r->cstr_n) < 0) return fail_pre("no-nul-in-window:cstr");
+    if (find_nul(r->a, r->a_n) < 0)       return fail_pre("no-nul-in-window:a");
+
+    static char buf[ORACLE_MAXBYTES + 1];
+    memcpy(buf, r->cstr, (size_t)r->cstr_n);
+    buf[r->cstr_n] = 0;
+
+    printf("precondition=ok\n");
+    long count = 0;
+    char *save = NULL;
+    errno = 0;
+    char *tok = strtok_r(buf, (const char *)r->a, &save);
+    while (tok && count < ORACLE_MAXBYTES) {
+        long start = (long)(tok - buf);
+        long len = (long)strlen(tok);
+        printf("tok%ld=%ld:%ld\n", count, start, start + len);
+        count++;
+        tok = strtok_r(NULL, (const char *)r->a, &save);
+    }
+    printf("ntokens=%ld\n", count);
+    printf("errno=%s\n", errno_name(errno));
+    return 0;
+}
+
 static int op_strlen(const struct req *r) {
     if (r->cstr_n < 0) return fail_pre("cstr-missing");
     /* Bounded window: the argument must contain a NUL within the bytes given,
@@ -930,6 +961,7 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strspn") == 0)  return op_strspn(r);
     if (strcmp(r->fn, "strcspn") == 0) return op_strcspn(r);
     if (strcmp(r->fn, "strtok") == 0)  return op_strtok(r);
+    if (strcmp(r->fn, "strtok_r") == 0) return op_strtok_r(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }
