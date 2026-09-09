@@ -36,6 +36,14 @@
 ///           Future, BL-103/104), so there is no OS message table to read
 ///           -- NEVER a synthesized message, NEVER a libc static borrow.
 ///           Contract: `docs/host-message-capability.md`.
+///   SS-173  strcasecmp_l / strncasecmp_l -- explicit-locale case-fold
+///           adapters (this file). POSIX-007 / POSIX-014 / ASCII-007.
+///           `LocaleId::Posix` -> `LocaleCompare::Ordered` (fixed ASCII
+///           fold); `LocaleId::HostNamed(_)` -> `LocaleCompare::Unsupported`
+///           (never a silent ASCII downgrade). Ambient-locale independence
+///           of the whole safe surface is gated by
+///           `tools/check_locale_independence.py` + `scripts/locale_matrix`;
+///           supported-target manifest is `docs/supported-targets.md`.
 ///   SS-170  ffs / ffsl / ffsll -- XSI explicit-width find-first-set
 ///           adapters, IMPLEMENTED (this file). POSIX-012. Pure bit ops,
 ///           no host dependency: `0` -> `0`; nonzero -> the 1-based index
@@ -53,6 +61,7 @@ use strings_types::TokenStep;
 use strings_types::HostCapability;
 use strings_types::HostMessage;
 use strings_types::MessageWrite;
+use strings_types::LocaleCompare;
 use strings_bytes::find_slice;
 use strings_cstr::copy_into;
 use strings_cstr::append_into;
@@ -287,6 +296,46 @@ pub fn strncasecmp(a: &[byte], b: &[byte], n: usize) -> Ordering {
     if ae < be { return Ordering::Less; }
     if ae > be { return Ordering::Greater; }
     return Ordering::Equal;
+}
+
+/// POSIX Issue 8 `strcasecmp_l` (the `_l` explicit-locale variant of
+/// `strcasecmp`). Case-insensitive comparison of `a` and `b` under the
+/// locale named by `loc` -- and ONLY that locale; no ambient process
+/// locale is read (POSIX-014).
+///
+///   * `LocaleId::Posix` -> `LocaleCompare::Ordered(...)`, the fixed ASCII
+///     fold (`strcasecmp` above; ASCII-007 -- ASCII behaviour ONLY in the
+///     POSIX locale profile).
+///   * `LocaleId::HostNamed(_)` -> `LocaleCompare::Unsupported`: the host
+///     locale-collation capability (SS-U12) is deferred, and a `HostNamed`
+///     request is NEVER answered with the ASCII fold (SPEC B.7).
+fn ord_to_lc(o: Ordering) -> LocaleCompare {
+    match o {
+        Ordering::Less => { return LocaleCompare::Less; },
+        Ordering::Equal => { return LocaleCompare::Equal; },
+        Ordering::Greater => { return LocaleCompare::Greater; },
+    }
+    return LocaleCompare::Unsupported;
+}
+
+pub fn strcasecmp_l(a: string, b: string, loc: LocaleId) -> LocaleCompare {
+    match loc {
+        LocaleId::Posix => { return ord_to_lc(strcasecmp(a, b)); },
+        LocaleId::HostNamed(_name) => { return LocaleCompare::Unsupported; },
+    }
+    return LocaleCompare::Unsupported;
+}
+
+/// POSIX Issue 8 `strncasecmp_l` (the `_l` explicit-locale variant of
+/// `strncasecmp`). Same `loc` contract as `strcasecmp_l`: `LocaleId::Posix`
+/// runs the bounded ASCII fold (`strncasecmp` above), a `HostNamed` locale
+/// is `LocaleCompare::Unsupported` (never a silent ASCII downgrade).
+pub fn strncasecmp_l(a: &[byte], b: &[byte], n: usize, loc: LocaleId) -> LocaleCompare {
+    match loc {
+        LocaleId::Posix => { return ord_to_lc(strncasecmp(a, b, n)); },
+        LocaleId::HostNamed(_name) => { return LocaleCompare::Unsupported; },
+    }
+    return LocaleCompare::Unsupported;
 }
 
 /// POSIX Issue 8 `strcoll_l` (XSI; the `_l` explicit-locale variant of C's

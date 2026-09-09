@@ -451,3 +451,29 @@ pub enum MessageWrite {
     DestinationTooSmall(usize),
     Unavailable,
 }
+
+/* Outcome of an explicit-locale case-insensitive comparison -- `strcasecmp_l`,
+ * `strncasecmp_l` (SPEC POSIX-007 / POSIX-014 / ASCII-007; slice SS-173).
+ * A flat four-variant enum rather than `{ Ordered(Ordering), Unsupported }`:
+ * an enum payload slot holding another enum does not lower on the C backend
+ * (D-7 family), so the three-way result is inlined as its own variants.
+ *
+ *   Less / Equal / Greater -- the fold ran under a supported locale
+ *                     profile. Today that is ONLY `LocaleId::Posix`, whose
+ *                     fold is the fixed ASCII `A`..`Z` <-> `a`..`z` map
+ *                     (ASCII-007) -- byte-deterministic under every host
+ *                     locale (POSIX-014 / ARCH-009).
+ *   Unsupported     -- a `HostNamed` locale: the host locale-collation
+ *                     capability (toolchain slice SS-U12) is deferred, so
+ *                     the fold is NOT available. NEVER silently downgraded
+ *                     to the ASCII fold (SPEC B.7: a
+ *                     `HostNamed("tr_TR.UTF-8")` request must not be
+ *                     answered with an ASCII fold that mis-handles
+ *                     dotless-i).
+ */
+pub enum LocaleCompare {
+    Less,
+    Equal,
+    Greater,
+    Unsupported,
+}

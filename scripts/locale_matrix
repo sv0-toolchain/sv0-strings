@@ -1,0 +1,76 @@
+#!/usr/bin/env bash
+# SS-173 (SPEC POSIX-014 / ARCH-009): behavioural ambient-locale
+# independence. Runs every locale-sensitive-looking fixture through
+# `scripts/test` once per host locale in a matrix that includes the
+# `tr_TR.UTF-8` dotless-i danger case. The fixtures assert EXACT expected
+# values (ASCII fold, fixed offsets, typed fail-closed outcomes), so a
+# result that silently tracked the ambient locale would flip an assertion
+# and fail here. `tools/check_locale_independence.py` is the structural
+# half (no locale/env call in any module).
+#
+# Toolchain: same discovery as scripts/sanitize (SV0_TOOLCHAIN_ROOT, else
+# parent when a submodule, else ../sv0-toolchain). A locale that the host
+# does not provide is SKIPPED with a note (not failed) -- C and POSIX are
+# always present, so the matrix is never empty.
+#
+# Usage: scripts/locale_matrix
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+if [[ -n "${SV0_TOOLCHAIN_ROOT:-}" ]]; then
+  TC="$SV0_TOOLCHAIN_ROOT"
+elif [[ -d "$HERE/../sv0c" && -x "$HERE/../build/sv0-megatu-compiler-native" ]]; then
+  TC="$HERE/.."
+elif [[ -d "$HERE/../sv0-toolchain" ]]; then
+  TC="$HERE/../sv0-toolchain"
+else
+  echo "scripts/locale_matrix: cannot locate sv0-toolchain (set SV0_TOOLCHAIN_ROOT)" >&2
+  exit 2
+fi
+TC="$(cd "$TC" && pwd)"
+export SV0_TOOLCHAIN_ROOT="$TC"
+
+# Fixtures whose result would move if the ambient locale leaked in.
+FIXTURES=(
+  posix_strcasecmp
+  posix_strcasecmp_l
+  posix_l_adapters
+  profile_fail_closed
+  c23_locale_stubs
+  locale_lifecycle
+  posix_error_message
+  c23_search_compare
+  text_length_equality
+)
+
+# C and POSIX are guaranteed; the others are probed.
+CANDIDATE_LOCALES=(C POSIX C.UTF-8 en_US.UTF-8 tr_TR.UTF-8)
+LOCALES=()
+avail="$(locale -a 2>/dev/null || true)"
+for L in "${CANDIDATE_LOCALES[@]}"; do
+  if [[ "$L" == "C" || "$L" == "POSIX" ]] || grep -qixF "$L" <<<"$avail"; then
+    LOCALES+=("$L")
+  else
+    echo "  skip locale $L (not installed on host)"
+  fi
+done
+
+rc=0
+for L in "${LOCALES[@]}"; do
+  echo "== LC_ALL=$L =="
+  args=()
+  for f in "${FIXTURES[@]}"; do args+=("--case=$f"); done
+  if ! env -u LANG -u LC_CTYPE -u LC_COLLATE -u LC_MESSAGES LC_ALL="$L" \
+        ./scripts/test --backend=both "${args[@]}"; then
+    echo "  FAIL under LC_ALL=$L" >&2
+    rc=1
+  fi
+done
+
+if [[ "$rc" -eq 0 ]]; then
+  echo "scripts/locale_matrix: PASS (${#FIXTURES[@]} fixture(s) x ${#LOCALES[@]} locale(s), byte-identical results)"
+else
+  echo "scripts/locale_matrix: FAIL"
+fi
+exit "$rc"

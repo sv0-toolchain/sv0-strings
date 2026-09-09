@@ -16,6 +16,12 @@ python3 tools/check_catalogs.py || fail=1
 echo "== check_posix_matrix (POSIX-001 / 013 / 016 / AC-017) =="
 python3 tools/check_posix_matrix.py || fail=1
 
+echo "== check_locale_independence (POSIX-014 / ARCH-009) =="
+python3 tools/check_locale_independence.py || fail=1
+
+echo "== check_targets (POSIX-015 / DOC-006 fail-closed manifest) =="
+python3 tools/check_targets.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

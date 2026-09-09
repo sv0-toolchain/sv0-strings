@@ -53,3 +53,8 @@ T-LEGACY-ALIASES-001	test/property/legacy_aliases.sv0	LEGACY-002,LEGACY-003,LEGA
 T-COMPILEFAIL-LEGACY-ISOLATION-001	test/compile_fail/legacy_not_in_c23.sv0	LEGACY-001	c	safe		compile-fail	done
 T-POSIX-MATRIX-001	tools/check_posix_matrix.py	POSIX-001,POSIX-013	c	safe		generator	done
 T-POSIX-HEADER-SURFACE-001	test/cases/posix_header_surface.sv0	POSIX-016	c,vm	safe	runtime	compile-pass	done
+T-POSIX-STRCASECMP-L-001	test/property/posix_strcasecmp_l.sv0	POSIX-007,ASCII-007	c,vm	safe	runtime	property	done
+T-PROFILE-FAIL-CLOSED-001	test/property/profile_fail_closed.sv0	SEC-011,POSIX-014	c,vm	safe	runtime	property	done
+T-LOCALE-INDEPENDENCE-001	tools/check_locale_independence.py	POSIX-014,ARCH-009	c	safe		generator	done
+T-LOCALE-MATRIX-001	scripts/locale_matrix	POSIX-014,ARCH-009	c,vm	safe	runtime	tool	done
+T-TARGETS-MANIFEST-001	tools/check_targets.py	POSIX-015	c	safe		generator	done

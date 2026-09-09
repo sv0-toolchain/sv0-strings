@@ -186,6 +186,48 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
   cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
   No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
+- **Ambient-locale independence + supported-target manifest + fail-closed
+  profile suite** (SS-173 / POSIX-014 / POSIX-015 / ASCII-007 / ARCH-009 /
+  SEC-011 / DOC-006): the safe surface is proven to ignore the process
+  locale, and every unwired host service is proven to block (not silently
+  skip) its profile claim.
+  - New `strings_posix2024::strcasecmp_l` / `strncasecmp_l` -> new flat
+    `strings_types::LocaleCompare` (`Less` / `Equal` / `Greater` /
+    `Unsupported`; a nested-enum payload does not lower, D-7 family).
+    `LocaleId::Posix` runs the fixed ASCII fold (ASCII-007 — ASCII
+    behaviour *only* in the POSIX locale); `LocaleId::HostNamed(_)` is
+    `Unsupported`, never a silent ASCII downgrade (SPEC B.7).
+  - `tools/check_locale_independence.py` (in `scripts/check`): no
+    `lib/*.sv0` module calls `setlocale` / `newlocale` / `uselocale` /
+    `getenv` / ..., mentions an `LC_*` / `LANG` name, or includes
+    `<locale.h>`; the `Host-dependent` disposition covers exactly the
+    locale/message symbol set (nothing locale-sensitive silently
+    `Adapted`).
+  - `scripts/locale_matrix` (new CI step): runs 9 locale-sensitive fixtures
+    through `scripts/test --backend=both` under `LC_ALL ∈ {C, POSIX,
+    C.UTF-8, en_US.UTF-8, tr_TR.UTF-8}` — byte-identical results, incl. the
+    Turkish dotless-i case.
+  - `test/property/profile_fail_closed.sv0`: every exported host-dependent
+    entry point (`strcoll` / `strxfrm` / `strerror` / `strcoll_l` /
+    `strxfrm_l` / `strerror_r` / `strerror_l` / `strsignal` /
+    `strcasecmp_l` HostNamed / `strings_locale::open`) returns its typed
+    "unavailable", and the POSIX-locale arm that *does* run returns a real
+    ordering (SEC-011 / POSIX-014).
+  - `tools/catalogs/targets.tsv` + `tools/check_targets.py` (in
+    `scripts/check`) + `docs/supported-targets.md`: the declared supported
+    POSIX targets (`linux-glibc-x86_64`, `darwin-arm64`) with concrete CI
+    evidence; an undeclared target has no evidence so the claim does not
+    extend to it, and the host-locale CX subprofile is capability-gated
+    (SS-U12) and claimed on no target (POSIX-015 framework; full closure
+    R1).
+  `tools/catalogs/tests.tsv` gains `T-POSIX-STRCASECMP-L-001`,
+  `T-PROFILE-FAIL-CLOSED-001`, `T-LOCALE-INDEPENDENCE-001`,
+  `T-LOCALE-MATRIX-001`, `T-TARGETS-MANIFEST-001`. No toolchain change
+  (`strcasecmp_l`/`strncasecmp_l` already in `link.sv0`'s reserved set).
+  `scripts/test --backend=both --dir=test` = 58/58; `scripts/check` PASS;
+  `scripts/sanitize` PASS (48 fixtures); `scripts/locale_matrix` PASS
+  (9 × 5).
+
 - **POSIX.1-2024 Issue 8 function/header matrix closed** (SS-172 /
   POSIX-001 / POSIX-013 / POSIX-016 / AC-017): new
   `tools/check_posix_matrix.py` (dependency-free, no SPEC checkout needed,

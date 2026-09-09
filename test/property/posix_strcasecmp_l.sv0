@@ -1,0 +1,57 @@
+/* SS-173 (SPEC POSIX-007 / POSIX-014 / ASCII-007): explicit-locale
+ * strings_posix2024::strcasecmp_l / strncasecmp_l.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ *   * `LocaleId::Posix` -> `LocaleCompare::{Less,Equal,Greater}` from the
+ *     fixed ASCII fold -- identical to `strcasecmp` / `strncasecmp`, and
+ *     byte-deterministic under every host locale (POSIX-014). ASCII
+ *     behaviour is used ONLY here (ASCII-007).
+ *   * `LocaleId::HostNamed(_)` -> `LocaleCompare::Unsupported` for EVERY
+ *     name, including the SPEC B.7 `"tr_TR.UTF-8"` dotless-i case -- NEVER
+ *     a silent ASCII downgrade.
+ */
+use strings_types::LocaleCompare;
+use strings_posix2024::strcasecmp_l;
+use strings_posix2024::strncasecmp_l;
+use strings_locale::LocaleId;
+
+fn lc(c: LocaleCompare) -> i32 {
+    return match c {
+        LocaleCompare::Less => { 0 - 1 },
+        LocaleCompare::Equal => { 0 },
+        LocaleCompare::Greater => { 1 },
+        LocaleCompare::Unsupported => { 2 },
+    };
+}
+
+fn main() -> i32 {
+    /* ---- Posix subprofile: the ASCII fold runs ---- */
+    if lc(strcasecmp_l("Hello", "hello", LocaleId::Posix)) != 0 { return 1; }
+    if lc(strcasecmp_l("abc", "abd", LocaleId::Posix)) != 0 - 1 { return 2; }
+    if lc(strcasecmp_l("ABD", "abc", LocaleId::Posix)) != 1 { return 3; }
+    if lc(strcasecmp_l("", "", LocaleId::Posix)) != 0 { return 4; }
+    /* dotless-i danger case, but under Posix it is a plain ASCII fold:
+       'i' (105) folds with 'I' (73) -> Equal */
+    if lc(strcasecmp_l("i", "I", LocaleId::Posix)) != 0 { return 5; }
+
+    let ax: [byte; 4] = [65, 66, 67, 88];   /* "ABCX" */
+    let ay: [byte; 4] = [97, 98, 99, 89];   /* "abcY" */
+    if lc(strncasecmp_l(&ax[..], &ay[..], 3, LocaleId::Posix)) != 0 { return 10; }
+    let az: [byte; 4] = [97, 98, 100, 89];  /* "abdY" */
+    if lc(strncasecmp_l(&ax[..], &az[..], 3, LocaleId::Posix)) != 0 - 1 { return 11; }
+    if lc(strncasecmp_l(&ax[..], &az[..], 0, LocaleId::Posix)) != 0 { return 12; }
+
+    /* ---- HostNamed: Unsupported for every name, no ASCII downgrade ---- */
+    if lc(strcasecmp_l("i", "I", LocaleId::HostNamed("tr_TR.UTF-8"))) != 2 { return 20; }
+    if lc(strcasecmp_l("Hello", "hello", LocaleId::HostNamed("en_US.UTF-8"))) != 2 { return 21; }
+    if lc(strcasecmp_l("a", "b", LocaleId::HostNamed(""))) != 2 { return 22; }
+    if lc(strcasecmp_l("a", "b", LocaleId::HostNamed("not-a-locale"))) != 2 { return 23; }
+    if lc(strncasecmp_l(&ax[..], &ay[..], 3, LocaleId::HostNamed("tr_TR.UTF-8"))) != 2 { return 24; }
+    if lc(strncasecmp_l(&ax[..], &ay[..], 3, LocaleId::HostNamed("de_DE.UTF-8"))) != 2 { return 25; }
+
+    /* determinism */
+    if lc(strcasecmp_l("Hello", "hello", LocaleId::Posix)) != 0 { return 30; }
+    if lc(strcasecmp_l("i", "I", LocaleId::HostNamed("tr_TR.UTF-8"))) != 2 { return 31; }
+
+    return 0;
+}
