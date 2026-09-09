@@ -1,0 +1,80 @@
+/* SS-168 (SPEC POSIX-008, POSIX-009, HOST-003): strings_posix2024::strcoll_l
+ * / strxfrm_l / strxfrm_l_size explicit-locale `_l` capability stubs.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * The versioned host-capability ABI (toolchain slice SS-U12) is deferred,
+ * so no `Locale` can be opened -- every `_l` adapter fails closed to
+ * `HostCapability::Unsupported` for EVERY `LocaleId`, on both backends.
+ * This fixture pins the fail-closed behavior directly:
+ *   - `strcoll_l` returns `Unsupported` even for identical strings and for
+ *     strings a bytewise comparator would order -- so a regression that
+ *     silently aliased it to `strings_bytes::compare` would be caught the
+ *     moment it stopped returning `Unsupported` (HOST-004 / SPEC B.7: the
+ *     Turkish `tr_TR.UTF-8` case must never downgrade to an ASCII fold).
+ *   - `strxfrm_l`'s `dst` is provably untouched (no partial key).
+ *   - the outcome is deterministic and identical across every `LocaleId`
+ *     including `Posix` -- no ambient-locale dependence (POSIX-008).
+ *   - `strcoll_l` and `strxfrm_l` agree on the SAME `LocaleId` argument
+ *     (POSIX-009: one explicit locale object shared by both). The HOST-003
+ *     "bytewise compare of two `strxfrm_l` keys has the same sign as
+ *     `strcoll_l`" property holds vacuously while zero locales are
+ *     supported; `docs/l-locale-adapters.md` is the contract for when
+ *     SS-U12 makes a locale openable.
+ */
+use strings_types::HostCapability;
+use strings_locale::LocaleId;
+use strings_posix2024::strcoll_l;
+use strings_posix2024::strxfrm_l;
+use strings_posix2024::strxfrm_l_size;
+
+fn is_unsupported(r: HostCapability) -> bool {
+    return match r {
+        HostCapability::Unsupported => { true },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= strcoll_l (POSIX-008 / HOST-004) ================= */
+    /* identical strings: a bytewise comparator would say Equal. */
+    if is_unsupported(strcoll_l("abc", "abc", LocaleId::Posix)) != true { return 1; }
+    /* differing strings: a bytewise comparator would say Less/Greater. */
+    if is_unsupported(strcoll_l("abc", "abd", LocaleId::Posix)) != true { return 2; }
+    if is_unsupported(strcoll_l("zzz", "aaa", LocaleId::Posix)) != true { return 3; }
+    if is_unsupported(strcoll_l("", "", LocaleId::Posix)) != true { return 4; }
+
+    /* a common host locale name -> still Unsupported (no service). */
+    if is_unsupported(strcoll_l("abc", "abd", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 5; }
+    /* SPEC B.7: a locale whose collation differs from ASCII must never
+       silently fall back to an ASCII/bytewise ordering. */
+    if is_unsupported(strcoll_l("i", "I", LocaleId::HostNamed("tr_TR.UTF-8"))) != true { return 6; }
+    /* empty / nonsense locale names -> Unsupported, no crash. */
+    if is_unsupported(strcoll_l("a", "b", LocaleId::HostNamed(""))) != true { return 7; }
+    if is_unsupported(strcoll_l("a", "b", LocaleId::HostNamed("not-a-locale"))) != true { return 8; }
+
+    /* deterministic: repeated calls with the same args, same outcome. */
+    if is_unsupported(strcoll_l("abc", "abc", LocaleId::Posix)) != true { return 9; }
+    if is_unsupported(strcoll_l("abc", "abd", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 10; }
+
+    /* ================= strxfrm_l (HOST-003 / POSIX-009) ================= */
+    let dst: [byte; 8] = [9, 9, 9, 9, 9, 9, 9, 9];
+    if is_unsupported(strxfrm_l(&mut dst[..], "hello", LocaleId::Posix)) != true { return 20; }
+    /* dst provably untouched -- no partial/synthesized collation key. */
+    if dst[0] != 9 { return 21; }
+    if dst[7] != 9 { return 22; }
+
+    if is_unsupported(strxfrm_l(&mut dst[..], "hello", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 23; }
+    if dst[3] != 9 { return 24; }
+
+    let empty_dst: [byte; 0] = [];
+    if is_unsupported(strxfrm_l(&mut empty_dst[..], "x", LocaleId::Posix)) != true { return 25; }
+
+    /* strcoll_l and strxfrm_l share one explicit LocaleId and agree on it. */
+    if is_unsupported(strxfrm_l(&mut dst[..], "abc", LocaleId::HostNamed("tr_TR.UTF-8"))) != true { return 26; }
+
+    /* ================= strxfrm_l_size ================= */
+    if is_unsupported(strxfrm_l_size("hello", LocaleId::Posix)) != true { return 30; }
+    if is_unsupported(strxfrm_l_size("", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 31; }
+    if is_unsupported(strxfrm_l_size("abc", LocaleId::HostNamed("not-a-locale"))) != true { return 32; }
+
+    return 0;
+}

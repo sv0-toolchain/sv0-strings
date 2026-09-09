@@ -186,6 +186,30 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
   cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
   No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
+- **`strings_posix2024::strcoll_l` / `strxfrm_l` / `strxfrm_l_size`
+  explicit-locale `_l` adapters** (SS-168 / POSIX-008 / POSIX-009 /
+  HOST-003): the POSIX Issue 8 XSI `_l` compare/transform surface. Each
+  takes a `strings_locale::LocaleId` (never an ambient locale — the whole
+  point of the `_l` forms) and returns `HostCapability::Unsupported` for
+  **every** `LocaleId` including `Posix`, on both backends — no `Locale`
+  can be opened while toolchain slice SS-U12 is deferred, so there is no
+  collation service to delegate to. Never degrades to
+  `strings_bytes::compare` or any bytewise/ASCII ordering (HOST-004 / SPEC
+  B.7: the `"tr_TR.UTF-8"` dotless-i case yields a typed "unsupported", not
+  a silent mis-order). `strxfrm_l` leaves `dst` completely untouched — no
+  partial/synthesized key. Callable capability stub, not a
+  `Blocked`/unexported symbol. New `docs/l-locale-adapters.md` is the
+  POSIX-009 / HOST-003 contract the real implementation must satisfy once
+  SS-U12 lands: for any openable `loc`, a bytewise compare of two
+  `strxfrm_l` keys has the same sign as `strcoll_l` of the inputs — a
+  property test that runs **per supported locale** (vacuous while that set
+  is empty; `test/property/posix_l_adapters.sv0` instead pins that
+  `strcoll_l` / `strxfrm_l` fail closed identically for the same
+  `LocaleId`, so they can never disagree). No differential (deliberate
+  stub, like SS-150 / SS-167). `tools/catalogs/tests.tsv`
+  `T-POSIX-L-ADAPTERS-001`. `scripts/test --backend=both --dir=test` =
+  51/51; `scripts/sanitize` PASS (42 fixtures).
+
 - **`strings_locale::open` capability-lifecycle stub** (SS-167 / HOST-001 /
   HOST-002 / HOST-004): `LocaleId` (`Posix` / `HostNamed(string)`) and
   `open(id) -> LocaleOpen` exist and are callable, but return

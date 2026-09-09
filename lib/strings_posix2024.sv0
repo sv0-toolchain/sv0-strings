@@ -16,6 +16,16 @@
 ///   SS-165  strtok_r -- IMPLEMENTED (this file). POSIX-006.
 ///   SS-166  strcasecmp / strncasecmp (POSIX-locale) -- IMPLEMENTED (this
 ///           file). POSIX-007 / POSIX-017 / ASCII-007.
+///   SS-168  strcoll_l / strxfrm_l / strxfrm_l_size -- explicit-locale `_l`
+///           compare/transform adapters, capability STUBS (this file).
+///           POSIX-008 / POSIX-009 / HOST-003. Every call returns
+///           `HostCapability::Unsupported` for EVERY `LocaleId` on both
+///           backends -- the versioned host-capability ABI (toolchain slice
+///           SS-U12) is deferred, so no `Locale` can be opened and there is
+///           no collation service to delegate to. NEVER a bytewise/ASCII
+///           collation substitute (HOST-004 / SPEC B.7). The HOST-003
+///           transform/compare consistency contract these MUST satisfy once
+///           SS-U12 lands is `docs/l-locale-adapters.md`.
 module strings_posix2024;
 
 use strings_types::Option;
@@ -24,6 +34,7 @@ use strings_types::EndOffsetResult;
 use strings_types::CopyReport;
 use strings_types::AppendResult;
 use strings_types::TokenStep;
+use strings_types::HostCapability;
 use strings_bytes::find_slice;
 use strings_cstr::copy_into;
 use strings_cstr::append_into;
@@ -31,6 +42,7 @@ use strings_ascii::compare_ignore_case;
 use strings_ascii::to_lower;
 use strings_cstr::as_bytes;
 use strings_c23::strtok;
+use strings_locale::LocaleId;
 
 /// First `0x00` in `buf` within `limit`, else `limit` -- the effective end
 /// of a bounded, possibly non-terminated source (local copy of the helper
@@ -257,4 +269,64 @@ pub fn strncasecmp(a: &[byte], b: &[byte], n: usize) -> Ordering {
     if ae < be { return Ordering::Less; }
     if ae > be { return Ordering::Greater; }
     return Ordering::Equal;
+}
+
+/// POSIX Issue 8 `strcoll_l` (XSI; the `_l` explicit-locale variant of C's
+/// `strcoll`). Three-way locale-sensitive collation of `a` and `b` under
+/// the locale named by `loc` -- and ONLY that locale: the defining property
+/// of the `_l` forms is that they never consult `LC_COLLATE` or any ambient
+/// process locale (POSIX-008 / HOST-001).
+///
+/// **Always `HostCapability::Unsupported` today**, for EVERY `loc`
+/// including `LocaleId::Posix`. The versioned host-capability ABI with
+/// equivalent VM behavior (toolchain slice SS-U12, SPEC UP-015 / OQ-005) is
+/// deferred, so `strings_locale::open` returns `Unavailable` for every id,
+/// no `Locale` object can be constructed, and there is no collation service
+/// for this adapter to delegate to on either backend. This NEVER degrades
+/// to `strings_bytes::compare` or any bytewise / ASCII ordering: SPEC B.7
+/// requires that a locale whose fold/collation rules differ from ASCII
+/// (e.g. Turkish dotless-i) yield a typed "unsupported", never a silent
+/// mis-ordering (HOST-004). Consistency contract with `strxfrm_l`:
+/// `docs/l-locale-adapters.md`.
+pub fn strcoll_l(a: string, b: string, loc: LocaleId) -> HostCapability {
+    match loc {
+        LocaleId::Posix => {},
+        LocaleId::HostNamed(_name) => {},
+    }
+    return HostCapability::Unsupported;
+}
+
+/// POSIX Issue 8 `strxfrm_l` (XSI). Transform `src` into its collation key
+/// for locale `loc`, writing only within `dst`, such that a plain bytewise
+/// comparison (`strings_bytes::compare`) of two keys produced for the same
+/// `loc` has the SAME SIGN as `strcoll_l` of the two original inputs under
+/// `loc` (HOST-003 / POSIX-009). `loc` is the same explicit `LocaleId`
+/// passed to `strcoll_l`; no ambient locale is read.
+///
+/// **Always `HostCapability::Unsupported` today** (same reason as
+/// `strcoll_l`). `dst` is left completely untouched -- no partial,
+/// truncated, or synthesized key is ever written, so a caller cannot
+/// mistake stale destination bytes for a real collation key.
+pub fn strxfrm_l(dst: &mut [byte], src: string, loc: LocaleId) -> HostCapability {
+    match loc {
+        LocaleId::Posix => {},
+        LocaleId::HostNamed(_name) => {},
+    }
+    return HostCapability::Unsupported;
+}
+
+/// Size query for `strxfrm_l`: the number of bytes a collation key for
+/// `src` under `loc` would occupy. Takes **no** destination -- sv0's
+/// owned-buffer idiom (query size, allocate, transform) replaces C's
+/// "call with a NULL / zero-length destination to learn the size" dance
+/// (mirrors `strings_c23::strxfrm_size`, SS-151).
+///
+/// **Always `HostCapability::Unsupported` today** (same reason as
+/// `strcoll_l` / `strxfrm_l`).
+pub fn strxfrm_l_size(src: string, loc: LocaleId) -> HostCapability {
+    match loc {
+        LocaleId::Posix => {},
+        LocaleId::HostNamed(_name) => {},
+    }
+    return HostCapability::Unsupported;
 }
