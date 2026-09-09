@@ -89,6 +89,26 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   --backend=both` = 28/28. R0.2 deviations D-4 / D-6 / D-7 / D-8 / D-9 are
   registered and change no behavioural result.
 
+### R1 (in progress)
+
+- **Bidirectional traceability + unique-ID audit** (SS-181 / BL-089 /
+  GOV-005): new `tools/check_traceability.py` (dependency-free, in
+  `scripts/check`) enforces all three directions — **forward** (every
+  `tests.tsv` row: unique `T-…` id, existing `path`, ≥ 1 real requirement
+  reference), **orphan** (every `test/**/*.sv0` fixture has a row — nothing
+  runs that traces to nothing), **reverse** (every in-scope F0 / R0.1 /
+  R0.2 / R0.3 / R0.4 requirement covered by a test row, a non-test
+  verification marker, or an explicit `ANNOTATIONS` entry with its real
+  method — **zero uncovered**). 12 previously-uncatalogued fixtures added to
+  `tests.tsv` (`bytes_*`, `ascii_case`, `accel_selection`,
+  `prelude_option_result`, two compile-fail probes); 18 existing rows
+  extended with requirement ids they already cover. 20 requirements carry
+  an explicit non-test annotation (deviation refs D-2/D-3/D-5, owner slices
+  SS-012/SS-013/SS-187, decision records) — see `docs/traceability.md`.
+  Tally: 270 requirements = 193 by test row + 50 by marker + 20 by
+  annotation; 7 R1/Future uncovered (informational). `scripts/check` PASS;
+  `scripts/test --backend=both --dir=test` = 58/58.
+
 ### R0.4 (complete — gate PASS, SS-161..174)
 
 - **R0.4 gate review** (SS-174 / BL-088): **PASS.** `docs/r0.4-gate-review.md`

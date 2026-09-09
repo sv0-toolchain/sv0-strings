@@ -22,6 +22,9 @@ python3 tools/check_locale_independence.py || fail=1
 echo "== check_targets (POSIX-015 / DOC-006 fail-closed manifest) =="
 python3 tools/check_targets.py || fail=1
 
+echo "== check_traceability (BL-089 bidirectional + unique-ID audit) =="
+python3 tools/check_traceability.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

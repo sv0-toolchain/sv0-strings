@@ -3,25 +3,25 @@ T-TYPES-SMOKE-001	test/cases/types_smoke.sv0	MODEL-008,MODEL-009,ARCH-001,UP-019
 T-CATALOG-CHECK-001	tools/check_catalogs.py	TEST-002,TEST-003,GOV-007	c,vm	safe		tool	done
 T-REQ-EXTRACT-001	tools/extract_requirements.py	TEST-001,TEST-003	c,vm	safe		generator	done
 T-STANDARDS-MATRIX-001	tools/standards_matrix.py	C23-001,POSIX-001	c,vm	safe		generator	done
-T-CHECKED-OVERFLOW-001	test/property/checked_overflow.sv0	MODEL-002,SEC-002,BYTE-018	c	safe	runtime	property	done
-T-EMBEDDED-NUL-LEN-001	test/fixtures/regressions/embedded_nul_len.sv0	UP-001,UP-002,TEXT-001,BACKEND-001	c,vm	safe	runtime	red-regression	red
+T-CHECKED-OVERFLOW-001	test/property/checked_overflow.sv0	MODEL-002,SEC-002,BYTE-018,UP-008	c	safe	runtime	property	done
+T-EMBEDDED-NUL-LEN-001	test/fixtures/regressions/embedded_nul_len.sv0	UP-001,UP-002,TEXT-001,BACKEND-001,MODEL-012	c,vm	safe	runtime	red-regression	red
 T-EMBEDDED-NUL-EQ-001	test/fixtures/regressions/embedded_nul_eq.sv0	UP-002,TEXT-003,BACKEND-001	c,vm	safe	runtime	red-regression	red
 T-EMBEDDED-NUL-CONCAT-001	test/fixtures/regressions/embedded_nul_concat.sv0	UP-002,TEXT-005,BACKEND-001	c,vm	safe	runtime	red-regression	red
 T-EMBEDDED-NUL-SUBSTR-001	test/fixtures/regressions/embedded_nul_substr.sv0	UP-002,UP-003,BACKEND-001	c,vm	safe	runtime	red-regression	red
-T-RUNNER-SELFTEST-001	scripts/test	ARCH-011,UP-010,UP-022,UP-027,UP-028	c,vm	safe	runtime,verified,disabled	tool	wip
-T-COMPILEFAIL-NESTED-MODULE-001	test/compile_fail/nested_module.sv0	UP-019,ARCH-001	c	safe		compile-fail	done
+T-RUNNER-SELFTEST-001	scripts/test	ARCH-011,UP-010,UP-022,UP-027,UP-028,BACKEND-006	c,vm	safe	runtime,verified,disabled	tool	wip
+T-COMPILEFAIL-NESTED-MODULE-001	test/compile_fail/nested_module.sv0	UP-019,ARCH-001,ARCH-002,TEST-010	c	safe		compile-fail	done
 T-DOC-FENCE-LINT-001	tools/check_doc_fences.py	MODEL-016,GOV-011	c	safe		tool	done
 T-CI-WORKFLOW-001	.github/workflows/ci.yml	TEST-006,TEST-014,TEST-018	c,vm	safe	runtime	ci	wip
-T-UTF8-VALIDATE-001	test/property/utf8_validate.sv0	TEXT-012,TEXT-013,MODEL-004	c,vm	safe	runtime	property	done
+T-UTF8-VALIDATE-001	test/property/utf8_validate.sv0	TEXT-012,TEXT-013,MODEL-004,MODEL-013,SEC-005	c,vm	safe	runtime	property	done
 T-TEXT-LEN-EQ-001	test/property/text_length_equality.sv0	TEXT-001,TEXT-002,TEXT-003,TEXT-004,TEXT-016	c,vm	safe	runtime	property	done
 T-TEXT-CONCAT-001	test/property/text_concat.sv0	TEXT-005,TEXT-006	c,vm	safe	runtime	property	done
 T-TEXT-SEARCH-SLICE-001	test/property/text_search_slice.sv0	TEXT-007,TEXT-008,TEXT-009,TEXT-010,TEXT-011	c,vm	safe	runtime	property	done
 T-TEXT-FROM-UTF8-001	test/property/text_from_utf8.sv0	TEXT-014,TEXT-015	c,vm	safe	runtime	property	done
-T-CSTR-CONSTRUCT-001	test/property/cstr_construct.sv0	CSTR-001,CSTR-002,CSTR-003,CSTR-004,CSTR-005,CSTR-006,CSTR-007,CSTR-017	c,vm	safe	runtime	property	done
-T-CSTR-OWNED-001	test/property/cstr_owned.sv0	CSTR-008,CSTR-009	c,vm	safe	runtime	property	done
-T-CBUFFER-OPS-001	test/property/cbuffer_ops.sv0	CSTR-010,CSTR-011,CSTR-012,CSTR-013,CSTR-017,CSTR-018	c,vm	safe	runtime	property	done
-T-TOKENIZE-CURSOR-001	test/property/tokenize_cursor.sv0	TOK-001,TOK-002,TOK-003,TOK-004,TOK-005,TOK-006,TOK-007	c,vm	safe	runtime	property	done
-T-OWNED-LIFECYCLE-001	test/property/owned_lifecycle.sv0	UP-013,SEC-008,BACKEND-004	c,vm	safe	runtime	property	done
+T-CSTR-CONSTRUCT-001	test/property/cstr_construct.sv0	CSTR-001,CSTR-002,CSTR-003,CSTR-004,CSTR-005,CSTR-006,CSTR-007,CSTR-017,MODEL-006,SEC-006	c,vm	safe	runtime	property	done
+T-CSTR-OWNED-001	test/property/cstr_owned.sv0	CSTR-008,CSTR-009,MODEL-006	c,vm	safe	runtime	property	done
+T-CBUFFER-OPS-001	test/property/cbuffer_ops.sv0	CSTR-010,CSTR-011,CSTR-012,CSTR-013,CSTR-017,CSTR-018,MODEL-006	c,vm	safe	runtime	property	done
+T-TOKENIZE-CURSOR-001	test/property/tokenize_cursor.sv0	TOK-001,TOK-002,TOK-003,TOK-004,TOK-005,TOK-006,TOK-007,MODEL-007,TEST-011	c,vm	safe	runtime	property	done
+T-OWNED-LIFECYCLE-001	test/property/owned_lifecycle.sv0	UP-013,SEC-008,BACKEND-004,UP-007	c,vm	safe	runtime	property	done
 T-C-ORACLE-001	tools/c_oracle/run_oracle.py	TEST-012,TEST-013	c	safe		tool	done
 T-C23-MEMCPY-FAMILY-001	test/property/c23_memcpy_family.sv0	C23-004,C23-005,C23-018	c,vm	safe	runtime	property	done
 T-C23-SEARCH-COMPARE-001	test/property/c23_search_compare.sv0	C23-006,C23-007	c,vm	safe	runtime	property	done
@@ -50,11 +50,24 @@ T-POSIX-L-ADAPTERS-001	test/property/posix_l_adapters.sv0	POSIX-008,POSIX-009,HO
 T-POSIX-ERROR-MESSAGE-001	test/property/posix_error_message.sv0	POSIX-010,POSIX-011,HOST-005,HOST-006,TEST-016	c,vm	safe	runtime	property	done
 T-POSIX-FFS-001	test/property/posix_ffs.sv0	POSIX-012	c,vm	safe	runtime	property	done
 T-LEGACY-ALIASES-001	test/property/legacy_aliases.sv0	LEGACY-002,LEGACY-003,LEGACY-004	c,vm	safe	runtime	property	done
-T-COMPILEFAIL-LEGACY-ISOLATION-001	test/compile_fail/legacy_not_in_c23.sv0	LEGACY-001	c	safe		compile-fail	done
+T-COMPILEFAIL-LEGACY-ISOLATION-001	test/compile_fail/legacy_not_in_c23.sv0	LEGACY-001,ARCH-002	c	safe		compile-fail	done
 T-POSIX-MATRIX-001	tools/check_posix_matrix.py	POSIX-001,POSIX-013	c	safe		generator	done
 T-POSIX-HEADER-SURFACE-001	test/cases/posix_header_surface.sv0	POSIX-016	c,vm	safe	runtime	compile-pass	done
 T-POSIX-STRCASECMP-L-001	test/property/posix_strcasecmp_l.sv0	POSIX-007,ASCII-007	c,vm	safe	runtime	property	done
 T-PROFILE-FAIL-CLOSED-001	test/property/profile_fail_closed.sv0	SEC-011,POSIX-014,UP-015	c,vm	safe	runtime	property	done
-T-LOCALE-INDEPENDENCE-001	tools/check_locale_independence.py	POSIX-014,ARCH-009	c	safe		generator	done
-T-LOCALE-MATRIX-001	scripts/locale_matrix	POSIX-014,ARCH-009	c,vm	safe	runtime	tool	done
+T-LOCALE-INDEPENDENCE-001	tools/check_locale_independence.py	POSIX-014,ARCH-009,ARCH-008	c	safe		generator	done
+T-LOCALE-MATRIX-001	scripts/locale_matrix	POSIX-014,ARCH-009,TEST-008	c,vm	safe	runtime	tool	done
 T-TARGETS-MANIFEST-001	tools/check_targets.py	POSIX-015	c	safe		generator	done
+T-BYTES-COMPARE-EQUAL-001	test/property/bytes_compare_equal.sv0	BYTE-001,BYTE-002,BYTE-016,UP-004,UP-005	c,vm	safe	runtime	property	done
+T-BYTES-FIND-PREFIX-001	test/property/bytes_find_prefix.sv0	BYTE-011,BYTE-015	c,vm	safe	runtime	property	done
+T-BYTES-FIND-SLICE-001	test/property/bytes_find_slice.sv0	BYTE-012,PERF-002	c,vm	safe	runtime	property	done
+T-BYTES-SPAN-001	test/property/bytes_span.sv0	BYTE-013,BYTE-014	c,vm	safe	runtime	property	done
+T-BYTES-COPY-001	test/property/bytes_copy.sv0	BYTE-003,BYTE-004,BYTE-005,BYTE-006,UP-012,SEC-003	c,vm	safe	runtime	property	done
+T-BYTES-FILL-001	test/property/bytes_fill.sv0	BYTE-009	c,vm	safe	runtime	property	done
+T-BYTES-MOVE-WITHIN-001	test/property/bytes_move_within.sv0	BYTE-007,BYTE-008,TEST-007,SEC-003	c,vm	safe	runtime	property	done
+T-ASCII-CASE-001	test/property/ascii_case.sv0	ASCII-001,ASCII-002,ASCII-003,ASCII-004,ASCII-005,ASCII-006,ASCII-008	c,vm	safe	runtime	property	done
+T-ACCEL-SELECTION-001	test/property/accel_selection.sv0	UP-011,BACKEND-003,ARCH-007	c,vm	safe	runtime	property	done
+T-PRELUDE-OPTION-RESULT-001	test/cases/prelude_option_result.sv0	UP-009,UP-020,UP-021	c,vm	safe	runtime	compile-pass	done
+T-COMPILEFAIL-C23-MEMCPY-OVERLAP-001	test/compile_fail/c23_memcpy_overlap.sv0	C23-004,SEC-004,MODEL-005,TEST-010,MODEL-011	c	safe		compile-fail	done
+T-COMPILEFAIL-FILL-EXPLICIT-001	test/compile_fail/fill_explicit_blocked.sv0	BYTE-010	c	safe		compile-fail	done
+T-TRACEABILITY-001	tools/check_traceability.py	GOV-005	c	safe		generator	done

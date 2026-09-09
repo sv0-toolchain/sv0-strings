@@ -88,7 +88,7 @@ by `test/compile_fail/c23_annex_k_absent.sv0` (C23K-001).
 | C23-001 | R0.3 | `T-STANDARDS-MATRIX-001` |
 | C23-002 | R0.3 | `T-COMPAT-DOC-001` |
 | C23-003 | R0.3 | non-test: Adapter review and examples |
-| C23-004 | R0.3 | `T-C23-MEMCPY-FAMILY-001` |
+| C23-004 | R0.3 | `T-C23-MEMCPY-FAMILY-001`, `T-COMPILEFAIL-C23-MEMCPY-OVERLAP-001` |
 | C23-005 | R0.3 | `T-C23-MEMCPY-FAMILY-001` |
 | C23-006 | R0.3 | `T-C23-SEARCH-COMPARE-001` |
 | C23-007 | R0.3 | `T-C23-SEARCH-COMPARE-001` |
