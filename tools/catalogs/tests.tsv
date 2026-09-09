@@ -51,3 +51,5 @@ T-POSIX-ERROR-MESSAGE-001	test/property/posix_error_message.sv0	POSIX-010,POSIX-
 T-POSIX-FFS-001	test/property/posix_ffs.sv0	POSIX-012	c,vm	safe	runtime	property	done
 T-LEGACY-ALIASES-001	test/property/legacy_aliases.sv0	LEGACY-002,LEGACY-003,LEGACY-004	c,vm	safe	runtime	property	done
 T-COMPILEFAIL-LEGACY-ISOLATION-001	test/compile_fail/legacy_not_in_c23.sv0	LEGACY-001	c	safe		compile-fail	done
+T-POSIX-MATRIX-001	tools/check_posix_matrix.py	POSIX-001,POSIX-013	c	safe		generator	done
+T-POSIX-HEADER-SURFACE-001	test/cases/posix_header_surface.sv0	POSIX-016	c,vm	safe	runtime	compile-pass	done

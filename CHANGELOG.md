@@ -186,6 +186,29 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
   cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
   No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
+- **POSIX.1-2024 Issue 8 function/header matrix closed** (SS-172 /
+  POSIX-001 / POSIX-013 / POSIX-016 / AC-017): new
+  `tools/check_posix_matrix.py` (dependency-free, no SPEC checkout needed,
+  wired into `scripts/check`) asserts every Issue 8 `<string.h>` /
+  `<strings.h>` symbol is classified exactly once — the 22 ISO C
+  `<string.h>` functions POSIX also mandates are carried by their C23 rows,
+  every POSIX addition (`memmem`, `stpcpy`/`stpncpy`, `strl*`, the `_l`
+  family, `strnlen`, `strtok_r`, `strsignal`, ...) has its own row, the 7
+  current `<strings.h>` functions and the 5 removed interfaces are all
+  present, `NULL`/`size_t`/`locale_t` declarations are present, and no
+  symbol is classified twice (POSIX-001 / AC-017). `tools/compat_doc.py`
+  now also renders the POSIX matrix into `docs/compatibility.md` §5,
+  grouped by feature profile — **Base** / **CX** / **XSI** / **Removed
+  (Legacy)** — from the catalog `classification` column, plus a POSIX
+  requirement-coverage table §6 (POSIX-013). New
+  `docs/posix-header-surface.md` documents the `size_t` → `usize`,
+  `NULL` → `Option::None`, `locale_t` → `strings_locale::LocaleId` +
+  capability mappings (POSIX-016), with `test/cases/posix_header_surface.sv0`
+  as the executable half. `tools/catalogs/tests.tsv` `T-POSIX-MATRIX-001` +
+  `T-POSIX-HEADER-SURFACE-001`. `docs/compatibility.md` retitled to cover
+  C23 **and** POSIX. `scripts/test --backend=both --dir=test` = 56/56;
+  `scripts/check` PASS; `scripts/sanitize` PASS (46 fixtures).
+
 - **`strings_legacy` — opt-in deprecated `<strings.h>` aliases** (SS-171 /
   LEGACY-001..004 / AC-018): `bcmp`, `bcopy`, `bzero`, `index`, `rindex`
   (legacy in POSIX Issue 6, removed in Issue 7) as a migration aid, each a

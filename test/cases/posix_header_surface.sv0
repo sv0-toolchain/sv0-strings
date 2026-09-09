@@ -1,0 +1,55 @@
+/* SS-172 compile-pass probe (SPEC POSIX-016): the safe mappings for the
+ * POSIX.1-2024 Issue 8 <string.h> / <strings.h> non-function surface.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Classification prose is docs/posix-header-surface.md; the profile matrix
+ * is docs/compatibility.md section 5. This is the executable half:
+ *   - `size_t` -> `usize`: a bound flows into a POSIX-added façade call and
+ *     a `usize` result flows out (here `strnlen`).
+ *   - `NULL`   -> `Option::None`: the "not found" result of a POSIX search
+ *     (`memmem`) is `None`, never a null pointer.
+ *   - `locale_t` -> `strings_locale::LocaleId`: a locale identity
+ *     constructs and threads through an `_l` adapter (`strcoll_l`), which
+ *     fails closed to a typed `HostCapability` (no unmanaged handle).
+ */
+use strings_types::Option;
+use strings_types::HostCapability;
+use strings_posix2024::strnlen;
+use strings_posix2024::memmem;
+use strings_posix2024::strcoll_l;
+use strings_locale::LocaleId;
+
+fn present(o: Option<usize>) -> bool {
+    return match o {
+        Option::Some(_k) => { true },
+        Option::None => { false },
+    };
+}
+
+fn unsupported(h: HostCapability) -> bool {
+    return match h {
+        HostCapability::Unsupported => { true },
+    };
+}
+
+fn main() -> i32 {
+    /* size_t -> usize: a `usize` bound in, a `usize` length out */
+    let buf: [byte; 6] = [104, 105, 0, 120, 120, 120];   /* "hi\0xxx" */
+    let n: usize = 6;
+    let len: usize = strnlen(&buf[..], n);
+    if len != 2 { return 1; }
+
+    /* NULL -> Option::None for "no match" (POSIX search never yields null) */
+    let hay: [byte; 4] = [1, 2, 3, 4];
+    let needle_hit: [byte; 2] = [2, 3];
+    let needle_miss: [byte; 2] = [9, 9];
+    if present(memmem(&hay[..], &needle_hit[..])) != true { return 2; }
+    if present(memmem(&hay[..], &needle_miss[..])) != false { return 3; }
+
+    /* locale_t -> LocaleId: identity constructs and threads through an
+       `_l` adapter; fail-closed typed result, no raw handle */
+    if unsupported(strcoll_l("a", "b", LocaleId::Posix)) != true { return 4; }
+    if unsupported(strcoll_l("a", "b", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 5; }
+
+    return 0;
+}

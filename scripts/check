@@ -13,6 +13,9 @@ fail=0
 echo "== check_catalogs =="
 python3 tools/check_catalogs.py || fail=1
 
+echo "== check_posix_matrix (POSIX-001 / 013 / 016 / AC-017) =="
+python3 tools/check_posix_matrix.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 
