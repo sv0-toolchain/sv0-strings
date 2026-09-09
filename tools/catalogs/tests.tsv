@@ -45,16 +45,16 @@ T-POSIX-STRL-001	test/property/posix_strl.sv0	POSIX-004	c,vm	safe	runtime	proper
 T-POSIX-STRNLEN-001	test/property/posix_strnlen.sv0	POSIX-005	c,vm	safe	runtime	property	done
 T-POSIX-STRTOK-R-001	test/property/posix_strtok_r.sv0	POSIX-006,TOK-008,TOK-009	c,vm	safe	runtime	property	done
 T-POSIX-STRCASECMP-001	test/property/posix_strcasecmp.sv0	POSIX-007,POSIX-017	c,vm	safe	runtime	property	done
-T-LOCALE-LIFECYCLE-001	test/property/locale_lifecycle.sv0	HOST-001,HOST-002,HOST-004	c,vm	safe	runtime	property	done
+T-LOCALE-LIFECYCLE-001	test/property/locale_lifecycle.sv0	HOST-001,HOST-002,HOST-004,TEST-015	c,vm	safe	runtime	property	done
 T-POSIX-L-ADAPTERS-001	test/property/posix_l_adapters.sv0	POSIX-008,POSIX-009,HOST-003	c,vm	safe	runtime	property	done
-T-POSIX-ERROR-MESSAGE-001	test/property/posix_error_message.sv0	POSIX-010,POSIX-011,HOST-005,HOST-006	c,vm	safe	runtime	property	done
+T-POSIX-ERROR-MESSAGE-001	test/property/posix_error_message.sv0	POSIX-010,POSIX-011,HOST-005,HOST-006,TEST-016	c,vm	safe	runtime	property	done
 T-POSIX-FFS-001	test/property/posix_ffs.sv0	POSIX-012	c,vm	safe	runtime	property	done
 T-LEGACY-ALIASES-001	test/property/legacy_aliases.sv0	LEGACY-002,LEGACY-003,LEGACY-004	c,vm	safe	runtime	property	done
 T-COMPILEFAIL-LEGACY-ISOLATION-001	test/compile_fail/legacy_not_in_c23.sv0	LEGACY-001	c	safe		compile-fail	done
 T-POSIX-MATRIX-001	tools/check_posix_matrix.py	POSIX-001,POSIX-013	c	safe		generator	done
 T-POSIX-HEADER-SURFACE-001	test/cases/posix_header_surface.sv0	POSIX-016	c,vm	safe	runtime	compile-pass	done
 T-POSIX-STRCASECMP-L-001	test/property/posix_strcasecmp_l.sv0	POSIX-007,ASCII-007	c,vm	safe	runtime	property	done
-T-PROFILE-FAIL-CLOSED-001	test/property/profile_fail_closed.sv0	SEC-011,POSIX-014	c,vm	safe	runtime	property	done
+T-PROFILE-FAIL-CLOSED-001	test/property/profile_fail_closed.sv0	SEC-011,POSIX-014,UP-015	c,vm	safe	runtime	property	done
 T-LOCALE-INDEPENDENCE-001	tools/check_locale_independence.py	POSIX-014,ARCH-009	c	safe		generator	done
 T-LOCALE-MATRIX-001	scripts/locale_matrix	POSIX-014,ARCH-009	c,vm	safe	runtime	tool	done
 T-TARGETS-MANIFEST-001	tools/check_targets.py	POSIX-015	c	safe		generator	done

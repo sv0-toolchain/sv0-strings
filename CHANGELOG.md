@@ -89,7 +89,33 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   --backend=both` = 28/28. R0.2 deviations D-4 / D-6 / D-7 / D-8 / D-9 are
   registered and change no behavioural result.
 
-### R0.4 (in progress)
+### R0.4 (complete — gate PASS, SS-161..174)
+
+- **R0.4 gate review** (SS-174 / BL-088): **PASS.** `docs/r0.4-gate-review.md`
+  (SPEC §24.5) — all §24.5 checklist items ✅ with evidence, plus a full
+  POSIX-001..017 / LEGACY-001..004 / HOST-001..006 / ASCII-007 / ARCH-004/005/009 /
+  SEC-011 / UP-015 / TEST-015/016 / DOC-006 requirement→evidence trace. The
+  safe POSIX.1-2024 Issue 8 `<string.h>` / `<strings.h>` façade is complete
+  for R0.4: every Issue 8 symbol classified once by feature profile
+  (`check_posix_matrix.py`), every deterministic POSIX addition has a green
+  `backends=c,vm` fixture + (raw-memory / search) a host-libc differential,
+  every host-locale / host-message adapter is a typed fail-closed capability
+  stub (`profile_fail_closed.sv0`), and no safe module reads the ambient
+  process locale (`check_locale_independence.py` + `scripts/locale_matrix`,
+  `LC_ALL` matrix incl. `tr_TR.UTF-8`). **No new deviation** — D-4..D-9 carry
+  forward (flat `LocaleCompare` is a D-7 manifestation). `scripts/test
+  --backend=both --dir=test` **58/58**; `scripts/check` PASS; `scripts/sanitize`
+  PASS (48 fixtures); `scripts/locale_matrix` PASS (9×5). **Release claim:**
+  C23 core + POSIX **Base** + **deterministic CX** (`memmem`, `stpcpy`/`stpncpy`,
+  `strlcpy`/`strlcat`, `strnlen`, `strtok_r`, `strdup`/`strndup`, POSIX-locale
+  case fold) + **XSI** `ffs`/`ffsl`/`ffsll`, on the C and native-VM backends
+  for `linux-glibc-x86_64` + `darwin-arm64`. **Not claimed (capability-gated,
+  SS-U12 / BL-103-104 deferred):** host-locale / host-message CX
+  (`strcoll_l`, `strxfrm_l`, `strerror_l`, `strsignal`, real `strerror_r`,
+  `strcasecmp_l`/`strncasecmp_l` with `HostNamed`) — each fails closed with a
+  typed value on every target. Deferred out of R0.4 (documented): real host
+  collation/messages (SS-U12 / FFI), POSIX-015 per-target live CI leg (R1),
+  SEC-011 thread-sanitizer (R1), HOST-007 capability manifest (R1).
 
 - **`strings_posix2024::memmem`** (SS-161 / POSIX-002): binary-safe substring
   search — a one-line map to `strings_bytes::find_slice` (SPEC ARCH-004: a
