@@ -49,3 +49,5 @@ T-LOCALE-LIFECYCLE-001	test/property/locale_lifecycle.sv0	HOST-001,HOST-002,HOST
 T-POSIX-L-ADAPTERS-001	test/property/posix_l_adapters.sv0	POSIX-008,POSIX-009,HOST-003	c,vm	safe	runtime	property	done
 T-POSIX-ERROR-MESSAGE-001	test/property/posix_error_message.sv0	POSIX-010,POSIX-011,HOST-005,HOST-006	c,vm	safe	runtime	property	done
 T-POSIX-FFS-001	test/property/posix_ffs.sv0	POSIX-012	c,vm	safe	runtime	property	done
+T-LEGACY-ALIASES-001	test/property/legacy_aliases.sv0	LEGACY-002,LEGACY-003,LEGACY-004	c,vm	safe	runtime	property	done
+T-COMPILEFAIL-LEGACY-ISOLATION-001	test/compile_fail/legacy_not_in_c23.sv0	LEGACY-001	c	safe		compile-fail	done

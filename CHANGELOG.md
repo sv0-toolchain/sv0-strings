@@ -186,6 +186,29 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
   cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
   No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
+- **`strings_legacy` — opt-in deprecated `<strings.h>` aliases** (SS-171 /
+  LEGACY-001..004 / AC-018): `bcmp`, `bcopy`, `bzero`, `index`, `rindex`
+  (legacy in POSIX Issue 6, removed in Issue 7) as a migration aid, each a
+  thin delegation to its modern safe replacement — `bcmp` → `memcmp`
+  (`-> Ordering`; `Ordering::Equal` is the historical "bcmp == 0"),
+  `bcopy` → `memmove` (historical `(src, dst, n)` argument order kept),
+  `bzero` → `memset` with `0` (whole-slice bound), `index` → `strchr`,
+  `rindex` → `strrchr`. Safe `&[byte]` / `&mut [byte]` / `string` types
+  throughout — no raw pointers, lengths bounded by slice capacity
+  (LEGACY-004). The five exist **only** in `strings_legacy`; no
+  conformance-bearing module re-exports them and they add nothing to the
+  POSIX.1-2024 claim (LEGACY-001) — `test/compile_fail/legacy_not_in_c23.sv0`
+  pins `use strings_c23::bcmp;` failing with `E0309`. sv0 has no
+  `deprecated` attribute, so each replacement is documented in the alias's
+  doc comment (LEGACY-003); `docs/legacy-aliases.md` is the collected
+  reference. `test/property/legacy_aliases.sv0` proves observable
+  equivalence to each replacement on the same inputs.
+  `tools/catalogs/tests.tsv` `T-LEGACY-ALIASES-001` +
+  `T-COMPILEFAIL-LEGACY-ISOLATION-001`. No toolchain change (all five
+  already in `link.sv0`'s reserved-C-name set). `scripts/test
+  --backend=both --dir=test` = 55/55; `scripts/check` PASS;
+  `scripts/sanitize` PASS (45 fixtures).
+
 - **`strings_posix2024::ffs` / `ffsl` / `ffsll` XSI find-first-set adapters**
   (SS-170 / POSIX-012): the XSI explicit-width bit-scan surface, a real
   implementation (no host dependency). `0` → `0`; nonzero → the 1-based

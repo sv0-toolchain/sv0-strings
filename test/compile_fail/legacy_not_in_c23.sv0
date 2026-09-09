@@ -1,0 +1,19 @@
+/* SS-171 compile-fail evidence (SPEC LEGACY-001, Appendix A.6).
+ *
+ * EXPECT-FAIL: E0309
+ *
+ * The removed legacy `<strings.h>` interfaces (`bcmp`, `bcopy`, `bzero`,
+ * `index`, `rindex`) exist ONLY under `strings_legacy`. No conformance-
+ * bearing module (`strings_c23`, `strings_posix2024`, `strings_bytes`, ...)
+ * re-exports them, so reaching one without an explicit `use
+ * strings_legacy::...` does not resolve. This probe pins that isolation:
+ * `bcmp` stands in for the whole set; if any of them ever leaked into
+ * `strings_c23` this fixture would start compiling and the compile-fail
+ * gate would flag the regression (LEGACY-001: "SHALL NOT contribute to
+ * conformance").
+ */
+use strings_c23::bcmp;
+
+fn main() -> i32 {
+    return 0;
+}

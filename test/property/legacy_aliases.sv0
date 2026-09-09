@@ -1,0 +1,89 @@
+/* SS-171 (SPEC LEGACY-001..004 / AC-018): strings_legacy::bcmp / bcopy /
+ * bzero / index / rindex -- opt-in deprecated aliases.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Each legacy alias is a thin delegation to its modern safe replacement;
+ * this fixture proves the observable equivalence (LEGACY-002) on the same
+ * inputs, and that safe slice / string types are used throughout
+ * (LEGACY-004 -- there is no raw pointer or unbounded length anywhere
+ * here). The namespace-isolation claim (LEGACY-001, "only reachable via an
+ * explicit `strings_legacy` import") is pinned separately by
+ * `test/compile_fail/legacy_not_in_c23.sv0`.
+ */
+use strings_legacy::bcmp;
+use strings_legacy::bcopy;
+use strings_legacy::bzero;
+use strings_legacy::index;
+use strings_legacy::rindex;
+use strings_c23::memcmp;
+use strings_c23::memmove;
+use strings_c23::strchr;
+use strings_c23::strrchr;
+use strings_c23::ordering_to_c_int;
+use strings_types::Option;
+use strings_types::CopyResult;
+
+fn opt_or(o: Option<usize>, dflt: i32) -> i32 {
+    return match o {
+        Option::Some(v) => { v as i32 },
+        Option::None => { dflt },
+    };
+}
+
+fn copied_or(r: CopyResult, dflt: i32) -> i32 {
+    return match r {
+        CopyResult::Copied(v) => { v as i32 },
+        CopyResult::DestinationTooSmall(_a, _b) => { dflt },
+    };
+}
+
+fn main() -> i32 {
+    /* ---- bcmp == memcmp (LEGACY-002) ---- */
+    let a1: [byte; 4] = [1, 2, 3, 4];
+    let a2: [byte; 4] = [1, 2, 3, 4];
+    let a3: [byte; 4] = [1, 2, 9, 4];
+    if ordering_to_c_int(bcmp(&a1[..], &a2[..], 4)) != ordering_to_c_int(memcmp(&a1[..], &a2[..], 4)) { return 1; }
+    if ordering_to_c_int(bcmp(&a1[..], &a3[..], 4)) != ordering_to_c_int(memcmp(&a1[..], &a3[..], 4)) { return 2; }
+    if ordering_to_c_int(bcmp(&a1[..], &a3[..], 2)) != ordering_to_c_int(memcmp(&a1[..], &a3[..], 2)) { return 3; }
+    /* equal prefix -> Ordering::Equal -> 0 (the historical "bcmp == 0") */
+    if ordering_to_c_int(bcmp(&a1[..], &a3[..], 2)) != 0 { return 4; }
+    if ordering_to_c_int(bcmp(&a1[..], &a3[..], 4)) == 0 { return 5; }
+
+    /* ---- bcopy == memmove, with the historical (src, dst, n) order ---- */
+    let src: [byte; 5] = [10, 20, 30, 40, 50];
+    let dst_b: [byte; 5] = [0, 0, 0, 0, 0];
+    let dst_m: [byte; 5] = [0, 0, 0, 0, 0];
+    let rb: i32 = copied_or(bcopy(&src[..], &mut dst_b[..], 5), 0 - 1);
+    let rm: i32 = copied_or(memmove(&mut dst_m[..], &src[..], 5), 0 - 1);
+    if rb != rm { return 10; }
+    if rb != 5 { return 11; }
+    let mut i: usize = 0;
+    while i < 5
+        loop_invariant(i <= 5)
+    {
+        if dst_b[i] != src[i] { return 12; }
+        if dst_b[i] != dst_m[i] { return 13; }
+        i = i + 1;
+    }
+
+    /* ---- bzero zeroes the whole slice ---- */
+    let z: [byte; 4] = [7, 7, 7, 7];
+    bzero(&mut z[..]);
+    if z[0] != 0 { return 20; }
+    if z[3] != 0 { return 21; }
+    let z0: [byte; 0] = [];
+    bzero(&mut z0[..]);   /* no-op, no crash */
+
+    /* ---- index == strchr, rindex == strrchr (LEGACY-002) ---- */
+    if opt_or(index("hello", 108), 0 - 1) != opt_or(strchr("hello", 108), 0 - 1) { return 30; }  /* 'l' */
+    if opt_or(index("hello", 108), 0 - 1) != 2 { return 31; }
+    if opt_or(rindex("hello", 108), 0 - 1) != opt_or(strrchr("hello", 108), 0 - 1) { return 32; }
+    if opt_or(rindex("hello", 108), 0 - 1) != 3 { return 33; }
+    /* absent byte */
+    if opt_or(index("hello", 122), 0 - 1) != 0 - 1 { return 34; }   /* 'z' not present */
+    if opt_or(rindex("hello", 122), 0 - 1) != 0 - 1 { return 35; }
+    /* terminator position (strchr/index semantics) */
+    if opt_or(index("ab", 0), 0 - 1) != opt_or(strchr("ab", 0), 0 - 1) { return 36; }
+
+    return 0;
+}

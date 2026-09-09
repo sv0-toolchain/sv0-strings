@@ -1,11 +1,92 @@
 /// strings_legacy -- opt-in, deprecated aliases for interfaces removed from
 /// current POSIX `<strings.h>`.
 ///
-/// SPEC.md Section 16.3 and Appendix A.6: bcmp, bcopy, bzero, index, rindex
-/// (legacy in Issue 6, removed in Issue 7). Available only for migration:
-/// requires an explicit import, contributes nothing to POSIX.1-2024
-/// conformance (SPEC LEGACY-001), every item is marked deprecated with its
-/// current replacement, and safe slice / `CStr` types are retained.
+/// SPEC.md Section 16.3 and Appendix A.6: `bcmp`, `bcopy`, `bzero`, `index`,
+/// `rindex` (legacy in Issue 6, removed in Issue 7). Available only for
+/// migration:
 ///
-/// Status: unimplemented (pre-F0). Implementation begins at BL-085 (R0.4).
+///   * they exist ONLY here -- no other safe module re-exports them
+///     (LEGACY-001), and a `use strings_c23::bcmp;` (etc.) does not resolve
+///     (pinned by `test/compile_fail/legacy_not_in_c23.sv0`);
+///   * they contribute NOTHING to this library's POSIX.1-2024 conformance
+///     claim -- `tools/catalogs/standards.tsv` lists all five as `Removed`
+///     and `docs/compatibility.md` counts none of them (LEGACY-001);
+///   * every one is a thin delegation to the modern safe adapter, named in
+///     its doc comment as the replacement (LEGACY-003; sv0 has no
+///     `deprecated` attribute, so the replacement is documented, not
+///     emitted as a compiler warning);
+///   * every one keeps safe `&[byte]` / `&mut [byte]` / `string` types --
+///     the historical `void *` / unbounded-length hazards are gone
+///     (LEGACY-004). `bcopy` / `bzero` still carry an explicit `n` for
+///     source-compatibility, bounded to the slice.
+///
+/// R0.4 progress:
+///   SS-171  bcmp / bcopy / bzero / index / rindex -- IMPLEMENTED (this
+///           file). BL-085 / LEGACY-001..004 / AC-018. Contract:
+///           `docs/legacy-aliases.md`.
 module strings_legacy;
+
+use strings_types::Ordering;
+use strings_types::Option;
+use strings_types::CopyResult;
+use strings_c23::memcmp;
+use strings_c23::memmove;
+use strings_c23::memset;
+use strings_c23::strchr;
+use strings_c23::strrchr;
+
+/// **DEPRECATED** (legacy `<strings.h>`, removed in POSIX Issue 7).
+/// Replacement: `strings_c23::memcmp` (or `strings_bytes::compare` for the
+/// whole-slice form).
+///
+/// Historical `bcmp(a, b, n)` returned zero iff the first `n` bytes are
+/// equal and nonzero otherwise -- an equality test, not a full ordering.
+/// This safe alias delegates to `memcmp`, so `Ordering::Equal` is the
+/// "they match" case and any other result means "they differ"; the extra
+/// `Less` / `Greater` information is a superset of what `bcmp` promised.
+/// The scan is clamped to `min(n, a.len(), b.len())` by `memcmp`.
+pub fn bcmp(a: &[byte], b: &[byte], n: usize) -> Ordering {
+    return memcmp(a, b, n);
+}
+
+/// **DEPRECATED** (legacy `<strings.h>`, removed in POSIX Issue 7).
+/// Replacement: `strings_c23::memmove`.
+///
+/// Historical `bcopy(src, dst, n)` -- note the argument order is the
+/// reverse of `memcpy` / `memmove` -- copied `n` bytes from `src` to `dst`
+/// and was overlap-safe. This safe alias keeps the `(src, dst, n)` order
+/// for source-compatibility and forwards to `memmove` (also overlap-safe),
+/// returning its `CopyResult` (`n` clamped to `min(n, src.len(),
+/// dst.len())`).
+pub fn bcopy(src: &[byte], dst: &mut [byte], n: usize) -> CopyResult {
+    return memmove(dst, src, n);
+}
+
+/// **DEPRECATED** (legacy `<strings.h>`, removed in POSIX Issue 7).
+/// Replacement: `strings_c23::memset` with `0` (or `strings_bytes::fill`).
+///
+/// Historical `bzero(dst, n)` wrote `n` zero bytes. This safe alias zeroes
+/// the whole `dst` slice (its length is the bound -- no separate `n` that
+/// could run past the buffer, LEGACY-004).
+pub fn bzero(dst: &mut [byte]) -> () {
+    memset(dst, 0);
+}
+
+/// **DEPRECATED** (legacy `<strings.h>`, removed in POSIX Issue 7).
+/// Replacement: `strings_c23::strchr`.
+///
+/// Historical `index(s, c)` == `strchr(s, c)`: byte offset of the first `c`
+/// in `s`, or absence. `c == 0` matches the terminator position (same as
+/// `strchr`).
+pub fn index(s: string, c: byte) -> Option<usize> {
+    return strchr(s, c);
+}
+
+/// **DEPRECATED** (legacy `<strings.h>`, removed in POSIX Issue 7).
+/// Replacement: `strings_c23::strrchr`.
+///
+/// Historical `rindex(s, c)` == `strrchr(s, c)`: byte offset of the last
+/// `c` in `s`, or absence.
+pub fn rindex(s: string, c: byte) -> Option<usize> {
+    return strrchr(s, c);
+}
