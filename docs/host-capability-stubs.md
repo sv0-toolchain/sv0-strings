@@ -73,9 +73,14 @@ the enum having exactly one variant right now (`strings_types::HostCapability`).
   delegating wrappers, the same shape as every other adapter in
   `strings_c23` (e.g. `memcpy` → `strings_bytes::copy`).
 - **`strerror`**: implemented once an owned host-error-message capability is
-  wired (SS-169, needs `strings_unsafe_abi`'s host-call primitive, BL-082/083).
-  C23-030's full `i32`-range / typed-adapter-error behavior lands with it
-  (SS-151, BL-110).
+  wired. SS-169 (`docs/host-message-capability.md`) added the POSIX message
+  adapters `strerror_r` / `strerror_l` / `strsignal` and their carriers
+  (`strings_types::MessageWrite` / `HostMessage`) as capability stubs — they
+  still fail closed (`Unavailable`) because sv0 has no FFI / host-call
+  primitive yet (`strings_unsafe_abi` is Future, BL-103 / BL-104). When that
+  primitive lands, `strerror` becomes a thin wrapper over
+  `strerror_l(errnum, LocaleId::Posix)`. C23-030's full `i32`-range /
+  typed-adapter-error behaviour is already pinned (SS-151, BL-110).
 
 Until then, `HostCapability::Unsupported` is the complete and only outcome of
 calling any of these three functions.

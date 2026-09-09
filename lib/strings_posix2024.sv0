@@ -26,6 +26,16 @@
 ///           collation substitute (HOST-004 / SPEC B.7). The HOST-003
 ///           transform/compare consistency contract these MUST satisfy once
 ///           SS-U12 lands is `docs/l-locale-adapters.md`.
+///   SS-169  strerror_r / strerror_l / strsignal -- owned host error /
+///           signal message capability, STUBS (this file). POSIX-010 /
+///           POSIX-011 / HOST-005 / HOST-006. `strerror_r` returns
+///           `MessageWrite::Unavailable` (bounded caller-buffer form,
+///           `dst` untouched); `strerror_l` / `strsignal` return
+///           `HostMessage::Unavailable` (owned-string form). sv0 has no
+///           FFI / host-call primitive yet (`strings_unsafe_abi` is
+///           Future, BL-103/104), so there is no OS message table to read
+///           -- NEVER a synthesized message, NEVER a libc static borrow.
+///           Contract: `docs/host-message-capability.md`.
 module strings_posix2024;
 
 use strings_types::Option;
@@ -35,6 +45,8 @@ use strings_types::CopyReport;
 use strings_types::AppendResult;
 use strings_types::TokenStep;
 use strings_types::HostCapability;
+use strings_types::HostMessage;
+use strings_types::MessageWrite;
 use strings_bytes::find_slice;
 use strings_cstr::copy_into;
 use strings_cstr::append_into;
@@ -329,4 +341,50 @@ pub fn strxfrm_l_size(src: string, loc: LocaleId) -> HostCapability {
         LocaleId::HostNamed(_name) => {},
     }
     return HostCapability::Unsupported;
+}
+
+/// POSIX Issue 8 `strerror_r` (the POSIX, thread-safe form -- NOT the GNU
+/// `char *` return form). Write the host's description of `errnum` into
+/// `dst`, bounded by `dst`'s capacity, and report whether it fit
+/// (POSIX-010). The safe adapter touches **only** `dst` -- it never
+/// returns a pointer into, or copies out of, a libc static / process-global
+/// buffer (POSIX-010 / SEC-011).
+///
+/// **Always `MessageWrite::Unavailable` today**: sv0 has no host-call / FFI
+/// primitive yet (`strings_unsafe_abi` is Future work, BL-103/104), so
+/// there is no OS message table to read. `dst` is left **completely
+/// untouched** -- no partial or synthesized message is ever written. There
+/// is no branch on `errnum`, so the C23-030 "every `i32` is a valid
+/// argument" property is trivially satisfied (every input yields
+/// `Unavailable`).
+pub fn strerror_r(errnum: i32, dst: &mut [byte]) -> MessageWrite {
+    return MessageWrite::Unavailable;
+}
+
+/// POSIX Issue 8 `strerror_l` -- `strerror` under an explicit locale
+/// (POSIX-011 / HOST-005). Returns the message as an **owned** sv0 string,
+/// never a borrow of a libc static (HOST-005). `loc` is an explicit
+/// `strings_locale::LocaleId`; no ambient process locale is read.
+///
+/// **Always `HostMessage::Unavailable` today** (same reason as
+/// `strerror_r`; additionally there is no openable `Locale` while SS-U12
+/// is deferred). Never a synthesized or approximated message. The message
+/// text, once real, is not a stable protocol identifier -- branch on the
+/// `i32` `errnum` (HOST-006).
+pub fn strerror_l(errnum: i32, loc: LocaleId) -> HostMessage {
+    match loc {
+        LocaleId::Posix => {},
+        LocaleId::HostNamed(_name) => {},
+    }
+    return HostMessage::Unavailable;
+}
+
+/// POSIX Issue 8 `strsignal` -- the host's description of signal `signum`
+/// as an **owned** sv0 string (POSIX-011 / HOST-005).
+///
+/// **Always `HostMessage::Unavailable` today** (same reason as
+/// `strerror_r`). No branch on `signum`; the eventual message text is not a
+/// stable protocol identifier -- branch on the `i32` `signum` (HOST-006).
+pub fn strsignal(signum: i32) -> HostMessage {
+    return HostMessage::Unavailable;
 }

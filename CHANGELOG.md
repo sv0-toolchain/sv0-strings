@@ -186,6 +186,34 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
   cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
   No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
+- **`strings_posix2024::strerror_r` / `strerror_l` / `strsignal` owned host
+  message capability** (SS-169 / POSIX-010 / POSIX-011 / HOST-005 /
+  HOST-006): the POSIX Issue 8 error/signal message surface. `strerror_r`
+  is the bounded caller-buffer form → new `strings_types::MessageWrite`
+  (`Written(len)` / `DestinationTooSmall(need)` reserved, `Unavailable`
+  live); `strerror_l` (explicit `LocaleId`) and `strsignal` return the
+  owned-string form → new `strings_types::HostMessage` (`Text(string)`
+  reserved, `Unavailable` live). Every call returns `Unavailable` on both
+  backends — sv0 has no FFI / host-call primitive yet
+  (`strings_unsafe_abi` is Future, BL-103 / BL-104), so there is no OS
+  message table to read. `strerror_r` leaves `dst` **completely untouched**
+  (no partial / synthesized write) and never consults a libc static buffer
+  (POSIX-010 / SEC-011); `strerror_l` / `strsignal` never synthesize or
+  approximate a message (HOST-005). Message text, once real, is not a
+  stable protocol identifier — branch on the `i32` errnum / signum
+  (HOST-006). Callable capability stubs, not `Blocked` symbols. New
+  `docs/host-message-capability.md` is the contract; it also records that
+  `strings_c23::strerror` (SS-150) becomes a thin wrapper over
+  `strerror_l(errnum, LocaleId::Posix)` once the FFI primitive lands.
+  `test/property/posix_error_message.sv0` pins fail-closed across the full
+  `i32` range, zero-length `dst`, every `LocaleId`, and determinism. No
+  differential (deliberate stub, like SS-150 / SS-167 / SS-168).
+  `tools/catalogs/tests.tsv` `T-POSIX-ERROR-MESSAGE-001`. No toolchain
+  change (`strerror_r` / `strerror_l` / `strsignal` already in
+  `link.sv0`'s reserved-C-name set). `scripts/test --backend=both
+  --dir=test` = 52/52; `scripts/check` PASS; `scripts/sanitize` PASS
+  (43 fixtures).
+
 - **`strings_posix2024::strcoll_l` / `strxfrm_l` / `strxfrm_l_size`
   explicit-locale `_l` adapters** (SS-168 / POSIX-008 / POSIX-009 /
   HOST-003): the POSIX Issue 8 XSI `_l` compare/transform surface. Each

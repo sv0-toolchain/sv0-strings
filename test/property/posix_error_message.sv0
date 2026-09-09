@@ -1,0 +1,93 @@
+/* SS-169 (SPEC POSIX-010, POSIX-011, HOST-005, HOST-006):
+ * strings_posix2024::strerror_r / strerror_l / strsignal owned
+ * host error / signal message capability stubs.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * sv0 has no host-call / FFI primitive yet (`strings_unsafe_abi` is Future
+ * work, BL-103/104), so there is no OS message table to read -- every call
+ * fails closed, on both backends. This fixture pins the fail-closed
+ * behaviour directly:
+ *   - `strerror_r` returns `MessageWrite::Unavailable` and leaves `dst`
+ *     provably untouched, for every `errnum` across the full `i32` range
+ *     (0, a POSIX-shaped small positive, far-out-of-range, both type
+ *     edges) and for a zero-length `dst` -- no branch on `errnum` exists
+ *     to misbehave at a boundary, and no libc static buffer is consulted.
+ *   - `strerror_l` / `strsignal` return `HostMessage::Unavailable`, never a
+ *     synthesized or approximated message string (HOST-005).
+ *   - `strerror_l` fails closed for every `LocaleId` including `Posix` --
+ *     no ambient-locale dependence (POSIX-011).
+ *   - the outcome is deterministic (repeated calls, same result).
+ *   - HOST-006: the stable surface a caller branches on is the structured
+ *     `i32` errnum / signum, never message bytes -- there are no message
+ *     bytes to compare here, which the `Unavailable`-only outcome enforces.
+ */
+use strings_types::HostMessage;
+use strings_types::MessageWrite;
+use strings_posix2024::strerror_r;
+use strings_posix2024::strerror_l;
+use strings_posix2024::strsignal;
+use strings_locale::LocaleId;
+
+fn mw_unavailable(r: MessageWrite) -> bool {
+    return match r {
+        MessageWrite::Unavailable => { true },
+        MessageWrite::Written(_n) => { false },
+        MessageWrite::DestinationTooSmall(_n) => { false },
+    };
+}
+
+fn hm_unavailable(r: HostMessage) -> bool {
+    return match r {
+        HostMessage::Unavailable => { true },
+        HostMessage::Text(_s) => { false },
+    };
+}
+
+fn main() -> i32 {
+    /* ================= strerror_r (POSIX-010) ================= */
+    let dst: [byte; 16] = [7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7];
+    if mw_unavailable(strerror_r(0, &mut dst[..])) != true { return 1; }
+    /* dst provably untouched -- no partial / synthesized message. */
+    if dst[0] != 7 { return 2; }
+    if dst[15] != 7 { return 3; }
+
+    if mw_unavailable(strerror_r(22, &mut dst[..])) != true { return 4; }   /* EINVAL-shaped */
+    if dst[8] != 7 { return 5; }
+    if mw_unavailable(strerror_r(1, &mut dst[..])) != true { return 6; }    /* EPERM-shaped */
+    if mw_unavailable(strerror_r(999999, &mut dst[..])) != true { return 7; } /* far out of any real errno */
+    if mw_unavailable(strerror_r(0 - 1, &mut dst[..])) != true { return 8; }  /* negative */
+    if mw_unavailable(strerror_r(2147483647, &mut dst[..])) != true { return 9; }          /* i32::MAX */
+    if mw_unavailable(strerror_r(0 - 2147483647 - 1, &mut dst[..])) != true { return 10; } /* i32::MIN */
+
+    /* zero-length destination -- still Unavailable, no crash, no write. */
+    let empty_dst: [byte; 0] = [];
+    if mw_unavailable(strerror_r(22, &mut empty_dst[..])) != true { return 11; }
+
+    /* deterministic. */
+    if mw_unavailable(strerror_r(0, &mut dst[..])) != true { return 12; }
+    if dst[0] != 7 { return 13; }
+
+    /* ================= strerror_l (POSIX-011 / HOST-005) ================= */
+    if hm_unavailable(strerror_l(0, LocaleId::Posix)) != true { return 20; }
+    if hm_unavailable(strerror_l(22, LocaleId::Posix)) != true { return 21; }
+    if hm_unavailable(strerror_l(22, LocaleId::HostNamed("en_US.UTF-8"))) != true { return 22; }
+    if hm_unavailable(strerror_l(22, LocaleId::HostNamed("tr_TR.UTF-8"))) != true { return 23; }
+    if hm_unavailable(strerror_l(22, LocaleId::HostNamed(""))) != true { return 24; }
+    if hm_unavailable(strerror_l(2147483647, LocaleId::Posix)) != true { return 25; }
+    if hm_unavailable(strerror_l(0 - 2147483647 - 1, LocaleId::Posix)) != true { return 26; }
+    /* deterministic. */
+    if hm_unavailable(strerror_l(22, LocaleId::Posix)) != true { return 27; }
+
+    /* ================= strsignal (POSIX-011 / HOST-005) ================= */
+    if hm_unavailable(strsignal(9)) != true { return 30; }        /* SIGKILL-shaped */
+    if hm_unavailable(strsignal(15)) != true { return 31; }       /* SIGTERM-shaped */
+    if hm_unavailable(strsignal(0)) != true { return 32; }
+    if hm_unavailable(strsignal(999999)) != true { return 33; }
+    if hm_unavailable(strsignal(0 - 1)) != true { return 34; }
+    if hm_unavailable(strsignal(2147483647)) != true { return 35; }
+    if hm_unavailable(strsignal(0 - 2147483647 - 1)) != true { return 36; }
+    /* deterministic. */
+    if hm_unavailable(strsignal(9)) != true { return 37; }
+
+    return 0;
+}

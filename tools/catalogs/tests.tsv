@@ -47,3 +47,4 @@ T-POSIX-STRTOK-R-001	test/property/posix_strtok_r.sv0	POSIX-006,TOK-008,TOK-009	
 T-POSIX-STRCASECMP-001	test/property/posix_strcasecmp.sv0	POSIX-007,POSIX-017	c,vm	safe	runtime	property	done
 T-LOCALE-LIFECYCLE-001	test/property/locale_lifecycle.sv0	HOST-001,HOST-002,HOST-004	c,vm	safe	runtime	property	done
 T-POSIX-L-ADAPTERS-001	test/property/posix_l_adapters.sv0	POSIX-008,POSIX-009,HOST-003	c,vm	safe	runtime	property	done
+T-POSIX-ERROR-MESSAGE-001	test/property/posix_error_message.sv0	POSIX-010,POSIX-011,HOST-005,HOST-006	c,vm	safe	runtime	property	done

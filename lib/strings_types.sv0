@@ -404,3 +404,50 @@ pub enum EndOffsetResult {
     EndAt(usize),
     DestinationTooSmall(usize, usize),
 }
+
+/* Outcome of an OWNED host error / signal message query -- `strerror_l`,
+ * `strsignal` (SPEC HOST-005 / POSIX-011; slice SS-169). A concrete
+ * carrier: a generic `Result` with a `string` Ok slot does not lower on
+ * the C backend (D-4).
+ *
+ *   Text(message)  -- (reserved for the host-call capability, BL-103/104)
+ *                     the host's message as an OWNED sv0 `string`. The
+ *                     caller owns it; it drops with the arena, exactly like
+ *                     any other `string`. It is NEVER a borrow of a libc
+ *                     static buffer, and NEVER a synthesized / approximated
+ *                     message (HOST-005). Its bytes are NOT a stable
+ *                     protocol identifier -- do not compare them across
+ *                     hosts / libc versions / locales; branch on the
+ *                     structured `i32` errnum / signum instead (HOST-006).
+ *   Unavailable    -- R0.4: no host message-capability service is wired on
+ *                     this build (sv0 has no FFI / host-call primitive yet
+ *                     -- `strings_unsafe_abi` is Future). Every call
+ *                     returns this. A typed, inspectable "not available",
+ *                     never a downgrade to an invented string.
+ */
+pub enum HostMessage {
+    Text(string),
+    Unavailable,
+}
+
+/* Outcome of a bounded `strerror_r`-style write into a CALLER-PROVIDED
+ * buffer (SPEC POSIX-010; slice SS-169). C's POSIX `strerror_r` fills a
+ * caller `char[]` and returns `0` / `ERANGE`; the safe adapter reports the
+ * same three cases and, crucially, touches ONLY `dst` -- never a shared
+ * process-global / libc static buffer (POSIX-010, SEC-011).
+ *
+ *   Written(len)            -- (reserved) `dst[0..len]` holds the message
+ *                              (`len` is the message length; no trailing
+ *                              `0x00` is required by this carrier).
+ *   DestinationTooSmall(n)  -- (reserved) the message needs `n` bytes;
+ *                              `dst` is left completely unmodified (no
+ *                              partial / truncated write).
+ *   Unavailable             -- R0.4: no host message service wired (same
+ *                              reason as `HostMessage::Unavailable`).
+ *                              `dst` is untouched.
+ */
+pub enum MessageWrite {
+    Written(usize),
+    DestinationTooSmall(usize),
+    Unavailable,
+}
