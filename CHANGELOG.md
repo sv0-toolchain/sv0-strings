@@ -186,6 +186,28 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   `strncasecmp` (`test/differential/posix_strcasecmp_oracle.py`, 9 + 7
   cases; the oracle process never calls `setlocale`, so `LC_CTYPE` is "C").
   No new toolchain slice needed. `scripts/test --backend=both` = 49/49.
+- **`strings_posix2024::ffs` / `ffsl` / `ffsll` XSI find-first-set adapters**
+  (SS-170 / POSIX-012): the XSI explicit-width bit-scan surface, a real
+  implementation (no host dependency). `0` → `0`; nonzero → the 1-based
+  index of the least-significant set bit. `ffs` takes `i32`, `ffsl` /
+  `ffsll` take `i64` (sv0 `long` and `long long` are both 64-bit); all
+  return `usize` (MODEL-002). Operates on the two's-complement bit pattern,
+  so negatives are well-defined (`ffs(i32::MIN)` = 32). Private `ffs_bits`
+  scans with `>> 1` and stops at the lowest set bit before any
+  shifted-in sign bit can reach position 0, so shift signedness is
+  irrelevant and no `1 << 63` (signed-overflow UB) is ever formed —
+  `scripts/sanitize` clean. `test/property/posix_ffs.sv0` is an exhaustive
+  single-bit sweep (all 32 / 64 positions) plus multi-bit, all-bits-set,
+  and type-minimum cases; `test/differential/posix_ffs_oracle.py`
+  cross-checks all 177 against host libc `ffs`/`ffsl`/`ffsll` (new oracle
+  ops + `bits=` request field). `tools/catalogs/tests.tsv` `T-POSIX-FFS-001`.
+  No toolchain change (`ffs`/`ffsl`/`ffsll` already in `link.sv0`'s
+  reserved-C-name set). **Toolchain note:** `<i64-expr> as usize` currently
+  narrows through a 32-bit `int` temp in the C backend, so `ffs_bits` takes
+  `i64` rather than `usize` and probe values in the fixture are built by
+  doubling, not `1 << k`. `scripts/test --backend=both --dir=test` = 53/53;
+  `scripts/check` PASS; `scripts/sanitize` PASS (44 fixtures).
+
 - **`strings_posix2024::strerror_r` / `strerror_l` / `strsignal` owned host
   message capability** (SS-169 / POSIX-010 / POSIX-011 / HOST-005 /
   HOST-006): the POSIX Issue 8 error/signal message surface. `strerror_r`

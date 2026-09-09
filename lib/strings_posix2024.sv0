@@ -36,6 +36,12 @@
 ///           Future, BL-103/104), so there is no OS message table to read
 ///           -- NEVER a synthesized message, NEVER a libc static borrow.
 ///           Contract: `docs/host-message-capability.md`.
+///   SS-170  ffs / ffsl / ffsll -- XSI explicit-width find-first-set
+///           adapters, IMPLEMENTED (this file). POSIX-012. Pure bit ops,
+///           no host dependency: `0` -> `0`; nonzero -> the 1-based index
+///           of the least-significant set bit. `ffs` takes `i32`, `ffsl` /
+///           `ffsll` take `i64`; all return `usize` (MODEL-002). XSI
+///           subprofile only. Differential-checked vs host libc.
 module strings_posix2024;
 
 use strings_types::Option;
@@ -387,4 +393,56 @@ pub fn strerror_l(errnum: i32, loc: LocaleId) -> HostMessage {
 /// stable protocol identifier -- branch on the `i32` `signum` (HOST-006).
 pub fn strsignal(signum: i32) -> HostMessage {
     return HostMessage::Unavailable;
+}
+
+/// 1-based index of the least-significant set bit of `bits`, or `0` when
+/// `bits` is zero. Scans with `>> 1`: this stops the moment the lowest set
+/// bit reaches position 0, which for a value at position `p` happens after
+/// exactly `p` shifts -- always before any bit shifted in from the top
+/// (whether `0` or a sign copy) can reach position 0 -- so the sign of
+/// `bits` and whether `>>` is arithmetic or logical do not affect the
+/// result. `>> 1` of a negative signed value is implementation-defined (not
+/// UB) and every supported backend arithmetic-shifts; `1 << 63` is never
+/// formed, so there is no signed-overflow UB either (`scripts/sanitize`
+/// stays quiet). Uses `i64` rather than `usize` because the `i64 -> usize`
+/// cast currently narrows through `int` in the C backend.
+fn ffs_bits(bits: i64) -> usize {
+    if bits == 0 {
+        return 0;
+    }
+    let mut v: i64 = bits;
+    let mut pos: usize = 1;
+    while (v & 1) == 0
+        loop_invariant(pos >= 1)
+        loop_invariant(pos <= 64)
+    {
+        v = v >> 1;
+        pos = pos + 1;
+    }
+    return pos;
+}
+
+/// POSIX Issue 8 `ffs` (XSI). Find-first-set: return the 1-based position
+/// of the least-significant set bit of `value`, or `0` if `value` is `0`
+/// (POSIX-012). Operates on the two's-complement bit pattern, so a negative
+/// `value` is well-defined -- `ffs(i32::MIN)` is `32` (`value as i64`
+/// sign-extends; the sign copies land above bit 31, never at or below the
+/// lowest set bit). Result is `usize` (MODEL-002), always in `0..=32`.
+pub fn ffs(value: i32) -> usize {
+    return ffs_bits(value as i64);
+}
+
+/// POSIX Issue 8 `ffsl` (XSI). `ffs` for a `long`-width value: 1-based
+/// position of the least-significant set bit of `value`, or `0` if `value`
+/// is `0` (POSIX-012). Result is `usize`, always in `0..=64`.
+pub fn ffsl(value: i64) -> usize {
+    return ffs_bits(value);
+}
+
+/// POSIX Issue 8 `ffsll` (XSI). `ffs` for a `long long`-width value; in sv0
+/// `long` and `long long` are both 64-bit, so this shares `ffsl`'s
+/// semantics: 1-based position of the least-significant set bit, or `0`
+/// (POSIX-012). Result is `usize`, always in `0..=64`.
+pub fn ffsll(value: i64) -> usize {
+    return ffs_bits(value);
 }

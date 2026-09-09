@@ -67,6 +67,9 @@
  *   strtok_r same as strtok but a caller-owned saveptr, not a global; same output
  *   strcasecmp  normalized ordering (a, b both NUL-in-window; POSIX-locale ASCII fold)
  *   strncasecmp normalized ordering, bounded by n (a, b need NOT contain a NUL)
+ *   ffs / ffsl / ffsll  find-first-set; bits= signed decimal value (its
+ *            two's-complement pattern is what is scanned); ret=i:<1-based
+ *            index of the least-significant set bit, or 0>
  */
 
 /* memccpy is C23 (previously POSIX.1); expose it on the C17 fallback too.
@@ -190,6 +193,8 @@ struct req {
     long n;                   /* explicit count; -1 if absent */
     long cap;                 /* destination capacity; -1 if absent */
     long guard;               /* guard padding; default 8 */
+    long bits;                /* ffs/ffsl/ffsll operand (signed decimal) */
+    int has_bits;             /* 1 when `bits` was provided */
 };
 
 static void req_init(struct req *r) {
@@ -210,6 +215,7 @@ static int req_set(struct req *r, const char *key, const char *val) {
     if (strcmp(key, "b") == 0)    { r->b_n    = parse_hex(val, r->b);    return r->b_n    < 0 ? -1 : 0; }
     if (strcmp(key, "cstr") == 0) { r->cstr_n = parse_hex(val, r->cstr); return r->cstr_n < 0 ? -1 : 0; }
     if (strcmp(key, "value") == 0) return parse_int(val, &r->value);
+    if (strcmp(key, "bits") == 0)  { r->has_bits = 1; return parse_int(val, &r->bits); }
     if (strcmp(key, "n") == 0)     return parse_int(val, &r->n);
     if (strcmp(key, "cap") == 0)   return parse_int(val, &r->cap);
     if (strcmp(key, "guard") == 0) return parse_int(val, &r->guard);
@@ -960,6 +966,31 @@ static int op_strlen(const struct req *r) {
     return 0;
 }
 
+static int op_ffs(const struct req *r) {
+    if (!r->has_bits) return fail_pre("bits-missing");
+    /* every i32 bit pattern is a valid ffs argument */
+    int v = (int)r->bits;
+    printf("precondition=ok\n");
+    printf("ret=i:%d\n", ffs(v));
+    return 0;
+}
+
+static int op_ffsl(const struct req *r) {
+    if (!r->has_bits) return fail_pre("bits-missing");
+    long v = r->bits;
+    printf("precondition=ok\n");
+    printf("ret=i:%d\n", ffsl(v));
+    return 0;
+}
+
+static int op_ffsll(const struct req *r) {
+    if (!r->has_bits) return fail_pre("bits-missing");
+    long long v = (long long)r->bits;
+    printf("precondition=ok\n");
+    printf("ret=i:%d\n", ffsll(v));
+    return 0;
+}
+
 /* ---- dispatch --------------------------------------------------------- */
 
 static int dispatch(const struct req *r) {
@@ -999,6 +1030,9 @@ static int dispatch(const struct req *r) {
     if (strcmp(r->fn, "strcspn") == 0) return op_strcspn(r);
     if (strcmp(r->fn, "strtok") == 0)  return op_strtok(r);
     if (strcmp(r->fn, "strtok_r") == 0) return op_strtok_r(r);
+    if (strcmp(r->fn, "ffs") == 0)   return op_ffs(r);
+    if (strcmp(r->fn, "ffsl") == 0)  return op_ffsl(r);
+    if (strcmp(r->fn, "ffsll") == 0) return op_ffsll(r);
     printf("precondition=FAILED:unknown-fn\n");
     return 0;
 }

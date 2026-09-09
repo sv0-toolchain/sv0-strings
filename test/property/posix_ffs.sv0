@@ -1,0 +1,83 @@
+/* SS-170 (SPEC POSIX-012): strings_posix2024::ffs / ffsl / ffsll --
+ * XSI explicit-width find-first-set adapters.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * Pure bit ops, no host dependency: `0` -> `0`; nonzero -> the 1-based
+ * index of the least-significant set bit. This fixture is an EXHAUSTIVE
+ * single-bit sweep (all 32 positions for `ffs`, all 64 for `ffsl` /
+ * `ffsll`) plus multi-bit "lowest bit wins", all-bits-set, and the
+ * two's-complement type minimums (only the sign bit set). The same cases
+ * are cross-checked against host libc by
+ * `test/differential/posix_ffs_oracle.py`.
+ *
+ * Probe values are built with a doubling accumulator, never a literal
+ * `1 << k` (in C the result of `1 << k` keeps the 32-bit type of the
+ * literal). The 32-bit sweep doubles an unsigned `usize` (wraps cleanly);
+ * the 64-bit sweep doubles an `i64` but stops before forming `1 << 63`
+ * (that would be signed-overflow UB and trip `scripts/sanitize`) -- bit 63
+ * is checked with the `i64::MIN` literal.
+ */
+use strings_posix2024::ffs;
+use strings_posix2024::ffsl;
+use strings_posix2024::ffsll;
+
+fn main() -> i32 {
+    /* zero -> zero */
+    if ffs(0) != 0 { return 1; }
+    if ffsl(0) != 0 { return 2; }
+    if ffsll(0) != 0 { return 3; }
+
+    /* exhaustive single-bit sweep, ffs: bit k set -> k + 1 */
+    let mut probe: usize = 1;
+    let mut k: usize = 0;
+    while k < 32
+        loop_invariant(k <= 32)
+    {
+        let want: usize = k + 1;
+        if ffs(probe as i32) != want { return 100 + (k as i32); }
+        probe = probe + probe;
+        k = k + 1;
+    }
+
+    /* exhaustive single-bit sweep, ffsl / ffsll: bit j set -> j + 1,
+       for j in 0..=62 (bit 63 handled below) */
+    let mut probe64: i64 = 1;
+    let mut j: usize = 0;
+    while j < 63
+        loop_invariant(j <= 63)
+    {
+        let want64: usize = j + 1;
+        if ffsl(probe64) != want64 { return 4; }
+        if ffsll(probe64) != want64 { return 5; }
+        if j + 1 < 63 {
+            probe64 = probe64 + probe64;
+        }
+        j = j + 1;
+    }
+    /* bit 63: only the sign bit set (i64::MIN) -> 64 */
+    if ffsl(0 - 9223372036854775807 - 1) != 64 { return 6; }
+    if ffsll(0 - 9223372036854775807 - 1) != 64 { return 7; }
+
+    /* multi-bit: the LOWEST set bit wins */
+    if ffs(12) != 3 { return 10; }              /* 0b1100        -> bit 2 -> 3 */
+    if ffs(96) != 6 { return 11; }              /* 0b1100000     -> bit 5 -> 6 */
+    if ffs(1024) != 11 { return 12; }
+    if ffsl(12) != 3 { return 13; }
+    if ffsll(12) != 3 { return 14; }
+
+    /* negative / all-bits: -2 = ...11111110 -> bit 1 -> 2; -1 -> bit 0 -> 1 */
+    if ffs(0 - 2) != 2 { return 20; }
+    if ffsl(0 - 2) != 2 { return 21; }
+    if ffsll(0 - 2) != 2 { return 22; }
+    if ffs(0 - 1) != 1 { return 23; }
+    if ffsl(0 - 1) != 1 { return 24; }
+    if ffsll(0 - 1) != 1 { return 25; }
+
+    /* type minimum: only the sign bit is set */
+    if ffs(0 - 2147483647 - 1) != 32 { return 30; }               /* i32::MIN -> 32 */
+
+    /* deterministic */
+    if ffs(96) != 6 { return 40; }
+
+    return 0;
+}
