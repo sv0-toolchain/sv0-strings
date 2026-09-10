@@ -71,3 +71,4 @@ T-PRELUDE-OPTION-RESULT-001	test/cases/prelude_option_result.sv0	UP-009,UP-020,U
 T-COMPILEFAIL-C23-MEMCPY-OVERLAP-001	test/compile_fail/c23_memcpy_overlap.sv0	C23-004,SEC-004,MODEL-005,TEST-010,MODEL-011	c	safe		compile-fail	done
 T-COMPILEFAIL-FILL-EXPLICIT-001	test/compile_fail/fill_explicit_blocked.sv0	BYTE-010	c	safe		compile-fail	done
 T-TRACEABILITY-001	tools/check_traceability.py	GOV-005	c	safe		generator	done
+T-FIXTURE-PROVENANCE-001	tools/check_fixture_provenance.py	TEST-004,TEST-006	c,vm	safe		tool	done

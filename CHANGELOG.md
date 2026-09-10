@@ -91,6 +91,27 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Fixture provenance / digest + baseline-category inventory** (SS-182 /
+  BL-090 / TEST-004 / TEST-006): populated `tools/catalogs/fixtures.tsv`
+  against the schema `check_catalogs.py` already reserved — one row per
+  runnable `test/**/*.sv0` fixture (58) recording `id` / `provenance`
+  (owning slice + SPEC clauses + external standard reference) / `standard`
+  / `generator` (`hand`, `hand (seeded PRNG)`, `hand (differential
+  <driver>)`, …) / `input_sha1` / `expected_sha1` / `unit` / `path`. New
+  `tools/check_fixture_provenance.py` (dependency-free, in `scripts/check`):
+  `input_sha1` must equal the fixture file's actual SHA-1 (a silent edit
+  flips the gate red), `expected_sha1` is a 40-hex digest of the expected
+  observable (`exit:<n>` / `diag:<needle>`), the row set is exactly the
+  runnable `.sv0` set **and** the `.sv0` subset of `tests.tsv` (catalogs in
+  lockstep), and `standard` / `generator` / differential-driver paths are
+  validated. New `tools/catalogs/baselines.tsv` (`category` / `path` /
+  `note`, 93 rows) classifies fixtures by baseline input shape; the checker
+  fails closed unless every required class — empty, one-byte, embedded-nul,
+  high-bit, exact-capacity, zero-capacity, boundary — is claimed by ≥ 1
+  existing fixture. `docs/fixture-provenance.md` is the companion; new
+  `tests.tsv` row `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006.
+  `scripts/check` PASS; `scripts/test --backend=both --dir=test` = 58/58.
+
 - **Bidirectional traceability + unique-ID audit** (SS-181 / BL-089 /
   GOV-005): new `tools/check_traceability.py` (dependency-free, in
   `scripts/check`) enforces all three directions — **forward** (every
