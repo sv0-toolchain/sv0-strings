@@ -28,6 +28,9 @@ python3 tools/check_traceability.py || fail=1
 echo "== check_fixture_provenance (TEST-004 schema / TEST-006 baseline inventory) =="
 python3 tools/check_fixture_provenance.py || fail=1
 
+echo "== check_fuzz_budget (TEST-017 fuzz evidence manifest + budget) =="
+python3 tools/check_fuzz_budget.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

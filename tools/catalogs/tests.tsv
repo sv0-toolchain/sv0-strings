@@ -72,3 +72,5 @@ T-COMPILEFAIL-C23-MEMCPY-OVERLAP-001	test/compile_fail/c23_memcpy_overlap.sv0	C2
 T-COMPILEFAIL-FILL-EXPLICIT-001	test/compile_fail/fill_explicit_blocked.sv0	BYTE-010	c	safe		compile-fail	done
 T-TRACEABILITY-001	tools/check_traceability.py	GOV-005	c	safe		generator	done
 T-FIXTURE-PROVENANCE-001	tools/check_fixture_provenance.py	TEST-004,TEST-006	c,vm	safe		tool	done
+T-BYTES-FUZZ-001	test/fuzz/bytes_fuzz.sv0	TEST-017,UP-011,SEC-001,BYTE-002,BYTE-012	c,vm	safe	runtime	fuzz	done
+T-FUZZ-BUDGET-001	tools/check_fuzz_budget.py	TEST-017	c,vm	safe		tool	done

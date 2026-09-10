@@ -1,0 +1,3 @@
+id	fixture	paths	backends	seed	rounds	min_rounds	invariants	oracle
+FZ-C23-SLICE-001	test/fuzz/c23_fuzz.sv0	pure	c,vm	2246311	160	160	memcpy/memmove content + tail preservation + failure atomicity; memchr first-match / genuine-absence; memcmp and strncmp sign vs an independent linear reference	in-fixture linear reference
+FZ-BYTES-DISPATCH-001	test/fuzz/bytes_fuzz.sv0	pure,accelerated	c,vm	777211	200	128	find dispatch path == pure linear scan (UP-011); compare/equal consistency (BYTE-002); find_slice == naive substring search; span_in / span_not_in + first-byte complementarity; copy Copied / DestinationTooSmall + tail untouched	in-fixture linear reference

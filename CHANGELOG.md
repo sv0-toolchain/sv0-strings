@@ -91,6 +91,35 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Pure + accelerated fuzz budget + evidence manifest** (SS-183 / BL-091 /
+  TEST-017): new seeded fuzz fixture `test/fuzz/bytes_fuzz.sv0` (200
+  rounds, Lehmer MINSTD PRNG, cross-backend deterministic) drives the
+  `strings_bytes` safe API on **both dispatch paths** — the
+  accelerator-selecting entry point `strings_bytes::find` and the pure
+  algorithm behind it — and asserts, for every constructible input, that
+  `find` returns exactly what an independent in-fixture linear scan
+  returns (the UP-011 "no accelerator ⇒ identical observable" property),
+  plus `compare`/`equal` consistency (BYTE-002), `find_slice` vs naive
+  search, `span_in`/`span_not_in` + first-byte complementarity, and `copy`
+  Copied/DestinationTooSmall + tail-untouched. New
+  `tools/catalogs/fuzz.tsv` evidence manifest (`id` / `fixture` / `paths` /
+  `backends` / `seed` / `rounds` / `min_rounds` / `invariants` / `oracle`)
+  + `tools/check_fuzz_budget.py` (in `scripts/check`): every
+  `test/fuzz/*.sv0` has exactly one manifest row; the fixture's `ROUNDS`
+  and `state` seed literals are pinned to the manifest; `rounds >=
+  min_rounds >= 1` (the recorded budget cannot silently regress); the
+  manifest `paths` union must cover both `pure` and `accelerated`.
+  `c23_fuzz.sv0` catalogued as `FZ-C23-SLICE-001` (160 rounds, floor 160);
+  total recorded budget 360 iterations × {C, native VM}. `bytes_fuzz.sv0`
+  also runs under ASan/UBSan via `scripts/sanitize`. `docs/fuzz-evidence.md`
+  is the companion and carries the crash-minimisation procedure (failing
+  exit = `ROUND*K + CHECK` → isolate → reduce → freeze as a
+  `test/fixtures/regressions/` red). 0 failures this cycle; 0 regression
+  fixtures required. New `tests.tsv` rows `T-BYTES-FUZZ-001`,
+  `T-FUZZ-BUDGET-001`. `scripts/check` PASS; `scripts/test --backend=both
+  --dir=test` = 59/59; `scripts/sanitize` PASS (49); `scripts/locale_matrix`
+  PASS.
+
 - **Fixture provenance / digest + baseline-category inventory** (SS-182 /
   BL-090 / TEST-004 / TEST-006): populated `tools/catalogs/fixtures.tsv`
   against the schema `check_catalogs.py` already reserved — one row per

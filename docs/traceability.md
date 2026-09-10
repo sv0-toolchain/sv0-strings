@@ -19,9 +19,10 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `PERF-009`,
 
 ## Coverage tally (270 requirements)
 
-- **194** covered by a `tests.tsv` row (73 rows total; SS-182 added
-  `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006).
-- **49** covered by a non-test verification marker in the requirement's own
+- **195** covered by a `tests.tsv` row (75 rows total; SS-182 added
+  `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006, SS-183 added
+  `T-BYTES-FUZZ-001` / `T-FUZZ-BUDGET-001` → TEST-017).
+- **48** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).
 - **20** covered by an explicit `ANNOTATIONS` entry in

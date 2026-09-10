@@ -1,5 +1,6 @@
 category	path	note
 boundary	test/fixtures/regressions/embedded_nul_substr.sv0	F-EMBEDDED-NUL-SUBSTR-001 (SS-009)
+boundary	test/fuzz/bytes_fuzz.sv0	F-BYTES-FUZZ-001 (SS-183) slice lens 0..16, needle sweeps
 boundary	test/fuzz/c23_fuzz.sv0	F-C23-FUZZ-001 (SS-154)
 boundary	test/property/bytes_copy.sv0	F-BYTES-COPY-001 (SS-105)
 boundary	test/property/bytes_fill.sv0	F-BYTES-FILL-001 (SS-106)
@@ -28,6 +29,7 @@ embedded-nul	test/fixtures/regressions/embedded_nul_concat.sv0	F-EMBEDDED-NUL-CO
 embedded-nul	test/fixtures/regressions/embedded_nul_eq.sv0	F-EMBEDDED-NUL-EQ-001 (SS-009)
 embedded-nul	test/fixtures/regressions/embedded_nul_len.sv0	F-EMBEDDED-NUL-LEN-001 (SS-009)
 embedded-nul	test/fixtures/regressions/embedded_nul_substr.sv0	F-EMBEDDED-NUL-SUBSTR-001 (SS-009)
+embedded-nul	test/fuzz/bytes_fuzz.sv0	F-BYTES-FUZZ-001 (SS-183) alphabet 0..5 includes 0x00
 embedded-nul	test/property/bytes_compare_equal.sv0	F-BYTES-COMPARE-EQUAL-001 (SS-101)
 embedded-nul	test/property/c23_c21_030.sv0	F-C23-C21-030-001 (SS-151)
 embedded-nul	test/property/c23_memcpy_family.sv0	F-C23-MEMCPY-FAMILY-001 (SS-142)
@@ -38,6 +40,7 @@ embedded-nul	test/property/posix_memmem.sv0	F-POSIX-MEMMEM-001 (SS-161)
 embedded-nul	test/property/posix_strnlen.sv0	F-POSIX-STRNLEN-001 (SS-164)
 embedded-nul	test/property/text_concat.sv0	F-TEXT-CONCAT-001 (SS-123)
 embedded-nul	test/property/text_length_equality.sv0	F-TEXT-LENGTH-EQUALITY-001 (SS-122)
+empty	test/fuzz/bytes_fuzz.sv0	F-BYTES-FUZZ-001 (SS-183) ak/bk can be 0
 empty	test/fuzz/c23_fuzz.sv0	F-C23-FUZZ-001 (SS-154)
 empty	test/property/bytes_compare_equal.sv0	F-BYTES-COMPARE-EQUAL-001 (SS-101)
 empty	test/property/bytes_find_prefix.sv0	F-BYTES-FIND-PREFIX-001 (SS-102)
@@ -70,11 +73,13 @@ exact-capacity	test/property/c23_strcpy_family.sv0	F-C23-STRCPY-FAMILY-001 (SS-1
 exact-capacity	test/property/cbuffer_ops.sv0	F-CBUFFER-OPS-001 (SS-128)
 exact-capacity	test/property/posix_stpcpy.sv0	F-POSIX-STPCPY-001 (SS-162)
 exact-capacity	test/property/posix_strl.sv0	F-POSIX-STRL-001 (SS-163)
+high-bit	test/fuzz/bytes_fuzz.sv0	F-BYTES-FUZZ-001 (SS-183) dst content is full 0..255
 high-bit	test/fuzz/c23_fuzz.sv0	F-C23-FUZZ-001 (SS-154)
 high-bit	test/property/ascii_case.sv0	F-ASCII-CASE-001 (SS-109)
 high-bit	test/property/text_from_utf8.sv0	F-TEXT-FROM-UTF8-001 (SS-125)
 high-bit	test/property/text_search_slice.sv0	F-TEXT-SEARCH-SLICE-001 (SS-124)
 high-bit	test/property/utf8_validate.sv0	F-UTF8-VALIDATE-001 (SS-121)
+one-byte	test/fuzz/bytes_fuzz.sv0	F-BYTES-FUZZ-001 (SS-183) single-byte slices in the sweep
 one-byte	test/fuzz/c23_fuzz.sv0	F-C23-FUZZ-001 (SS-154)
 one-byte	test/property/ascii_case.sv0	F-ASCII-CASE-001 (SS-109)
 one-byte	test/property/bytes_find_prefix.sv0	F-BYTES-FIND-PREFIX-001 (SS-102)
