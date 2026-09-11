@@ -46,6 +46,9 @@ python3 tools/check_complexity_benchmarks.py || fail=1
 echo "== check_consumer_rehearsal (TEST-018 offline clean-checkout rehearsal shape) =="
 python3 tools/check_consumer_rehearsal.py || fail=1
 
+echo "== check_acceptance (BL-097 acceptance-scenario evidence binding, AC-001..036) =="
+python3 tools/check_acceptance.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

@@ -18,7 +18,7 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 
 ## Coverage tally (270 requirements)
 
-- **207** covered by a `tests.tsv` row (82 rows total; SS-182 added
+- **207** covered by a `tests.tsv` row (83 rows total; SS-182 added
   `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006, SS-183 added
   `T-BYTES-FUZZ-001` / `T-FUZZ-BUDGET-001` → TEST-017, SS-184 added
   `T-GATE-POLICY-001` → BACKEND-009 / TEST-020, SS-185 added
@@ -31,7 +31,10 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
   SS-188 added `T-CONSUMER-REHEARSAL-001` / `T-CONSUMER-REHEARSAL-SHAPE-001`
   — TEST-018 was already test-covered via `T-CI-WORKFLOW-001`, so the
   tally is unchanged, but that row is now genuinely `done` rather than
-  `wip`).
+  `wip`; SS-189 added `T-ACCEPTANCE-001` → GOV-007, already test-covered
+  via `T-CATALOG-CHECK-001` — this slice's value is the new
+  `tools/catalogs/acceptance.tsv` binding table for AC-001..036, not a
+  requirement-tally change).
 - **45** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).

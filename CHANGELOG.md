@@ -91,6 +91,34 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Acceptance-scenario evidence binding** (SS-189 / BL-097 /
+  AC-001..036): new `tools/catalogs/acceptance.tsv` — one row per SPEC
+  §23 acceptance scenario, `status` ∈ {`bound`, `deferred`,
+  `toolchain-evidence`, `spec-unavailable`} — collects every AC citation
+  scattered across fixture headers, gate-review docs,
+  `docs/f0-deviations.md`, and `CHANGELOG.md` since F0 into one audited
+  table for the first time. 22 scenarios `bound` to real `tests.tsv`
+  evidence or a deviation anchor, 2 `deferred` to a named `todo` owner
+  slice (AC-025 → SS-191, AC-035 → SS-013), 1 `toolchain-evidence` (AC-024
+  — the borrow-checker diagnostics live in sv0c, with this repo's own
+  `c23_memcpy_overlap.sv0` cited as the consumer-side proof), and 11
+  `spec-unavailable` (AC-002/003/004/007/010/011/013/014/015/022/023 —
+  genuinely never cited anywhere in this checkout; the SPEC text is
+  private and not part of it). New `tools/check_acceptance.py`
+  (dependency-free, in `scripts/check`): validates the table's shape (all
+  36 ids, valid status vocabulary, evidence tokens that actually resolve)
+  and — the real teeth — re-scans every catalog, fixture, module, doc, and
+  the changelog for an `AC-\d+` token and asserts **none** of those
+  citations is left `spec-unavailable`; a scenario this repo demonstrably
+  knows something about must be properly bound, never punted.
+  `docs/acceptance-scenarios.md` is the companion, including the handoff
+  note for closing the 11 `spec-unavailable` rows once SPEC access is
+  available. New `tests.tsv` row `T-ACCEPTANCE-001` → GOV-007 (already
+  test-covered via `T-CATALOG-CHECK-001`; this slice's value is the new
+  binding table, not a requirement-tally change). `scripts/check` PASS;
+  `scripts/test --backend=both --dir=test` = 59/59 (no fixture/lib
+  change this slice).
+
 - **Offline clean-checkout consumer rehearsal** (SS-188 / BL-096 /
   TEST-018): new `scripts/consumer_rehearsal` (CI step, needs the
   toolchain) drives two representative fixtures through 8 combinations —

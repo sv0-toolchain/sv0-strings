@@ -1,0 +1,37 @@
+id	status	evidence	note
+AC-001	bound	T-EMBEDDED-NUL-LEN-001,T-EMBEDDED-NUL-EQ-001,T-EMBEDDED-NUL-CONCAT-001,T-EMBEDDED-NUL-SUBSTR-001	SS-009 embedded-NUL RED regressions: length/equality/concat/substr all honour a byte value past an embedded U+0000.
+AC-002	spec-unavailable	-	AC-002 text lives in SPEC Section 23, not present in this checkout ($SV0_STRINGS_SPEC unset / project-specs is private). No fixture, doc, or checklist row in this repo cites it, so no evidence can be responsibly assigned without the SPEC.
+AC-003	spec-unavailable	-	AC-003 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-004	spec-unavailable	-	AC-004 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-005	bound	T-TEXT-SEARCH-SLICE-001	SS-124: `slice_bytes` rejects a non-boundary / end-past-len / start>end / start==end-mid-scalar request with a typed error, no OOB read.
+AC-006	bound	T-TEXT-FROM-UTF8-001	SS-125: `from_utf8` on an invalid corpus reports `Invalid` with the exact `valid_up_to`.
+AC-007	spec-unavailable	-	AC-007 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-008	bound	T-CSTR-CONSTRUCT-001	SS-126: a non-UTF-8 `CString`'s `as_bytes` round-trips exactly while `to_text` reports `Invalid`.
+AC-009	bound	T-POSIX-STRL-001	SS-163: `strlcpy` size-bounded copy + truncation report.
+AC-010	spec-unavailable	-	AC-010 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-011	spec-unavailable	-	AC-011 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-012	bound	T-POSIX-STRCASECMP-001	SS-166: `strcasecmp` result asserted by SIGN only (`ordering_to_c_int`), never an exact magnitude; an accented byte (0xE9) is not folded, proving locale-independence.
+AC-013	spec-unavailable	-	AC-013 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-014	spec-unavailable	-	AC-014 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-015	spec-unavailable	-	AC-015 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-016	bound	T-COMPAT-DOC-001	`compat_doc.py` asserts every requirement row resolves to a covering fixture, a non-test verification method, an explicit vacuity note, or a tracked deferral -- none silently unaddressed (docs/compatibility.md).
+AC-017	bound	T-POSIX-MATRIX-001	SS-172: POSIX.1-2024 Issue 8 header-surface matrix; every symbol classified exactly once, no double classification.
+AC-018	bound	T-LEGACY-ALIASES-001	SS-171: `bcmp`/`bcopy`/`bzero`/`index`/`rindex` proven observably equivalent to their modern safe replacements.
+AC-019	bound	T-CONTRACT-MATRIX-001	SS-185: contract-mode matrix -- an unsupported (backend, mode) combination is recorded distinctly and never counted as a pass.
+AC-020	bound	T-ACCEL-MATRIX-001	SS-186: every declared accelerator capability has a dispatcher proven identical to its pure reference.
+AC-021	bound	T-RUNNER-SELFTEST-001,T-CONSUMER-REHEARSAL-001	SS-010 staging-runner v1 plus SS-188's workspace/installed rehearsal.
+AC-022	spec-unavailable	-	AC-022 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-023	spec-unavailable	-	AC-023 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
+AC-024	toolchain-evidence	sv0c 6ba93e3 (SS-U03d); sv0-strings T-COMPILEFAIL-C23-MEMCPY-OVERLAP-001	The borrow-checker diagnostic classes (E0322/E0323) are implemented and unit-tested in sv0c's own diagnostics corpus (a different repo, not this one's tests.tsv); this repo's consumer-side proof that E0323 actually fires on real library code is `c23_memcpy_overlap.sv0`.
+AC-025	deferred	owner slice SS-191 (todo)	Evidence digest / exception / approval verification is SS-191's own deliverable; cannot be bound before that slice lands.
+AC-026	bound	docs/f0-deviations.md#D-3	Deviation D-3 (BACKEND-008 / UP-017): a contract clause the backend cannot lower emits a stable `model-only` note and `sv0 verify` is the enforcement (Decision 3A, permanent).
+AC-027	bound	T-POSIX-STRL-001	SS-163: `strlcat` writes nothing when the destination has no `0x00` within `dstsize` bytes; `usize` overflow checked before any write.
+AC-028	bound	T-POSIX-STRCASECMP-001	SS-166: `strncasecmp` bounded, NUL-stopping fold; large `n` clamps safely (guard-page fixture).
+AC-029	bound	T-C23-HEADER-SURFACE-001	SS-152: the non-function C23 `<string.h>` surface (BL-109).
+AC-030	bound	T-CONSUMER-REHEARSAL-001	SS-188: the offline installed-mode rehearsal (fresh `git clone --local`, no network).
+AC-031	bound	T-PRELUDE-OPTION-RESULT-001	Decision B (2026-09-02, docs/f0-deviations.md context): sv0-strings ships library-local `strings_types::Option<T>`/`Result<T,E>` with scalar payloads, verified C + native VM; the sv0c-side generic-monomorphization investigation (SS-U06/SS-U07) is the toolchain-side half.
+AC-032	bound	T-RUNNER-SELFTEST-001,T-CONSUMER-REHEARSAL-001	SS-010's `--dir`/`--case` staging plus SS-188's forward/reverse `lib/*.sv0` order sweep.
+AC-033	bound	docs/f0-deviations.md#D-2	Deviation D-2 (UP-025 / ARCH-014): `pub` cross-module enforcement is a deferred F0 deviation (no-op for the flat all-`pub` library), scheduled post-M5 stream F; the tractable half (nested `module a::b;` rejection, E0310) is done.
+AC-034	bound	T-CONTRACT-MATRIX-001,T-CONSUMER-REHEARSAL-001	SS-011's original runner contract-mode identity, superseded by SS-185's full matrix; SS-188 re-exercises it under the offline rehearsal.
+AC-035	deferred	owner slice SS-013 (todo)	Package-owned serialized comparison + injected mismatch (BACKEND-009 / TEST-021) is SS-013's own deliverable.
+AC-036	bound	T-CONSUMER-REHEARSAL-001	SS-188's forward/reverse `lib/*.sv0` staging-order sweep is the sv0-strings-side evidence; the toolchain-side project-discovery path-order corpus (compiler-level, UP-026) is owner slice SS-012 (todo) and is the deeper, complementary half.

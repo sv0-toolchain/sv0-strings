@@ -81,3 +81,4 @@ T-ACCEL-MATRIX-001	tools/check_accel_matrix.py	BACKEND-003,ARCH-007,UP-011	c,vm	
 T-COMPLEXITY-BENCH-001	tools/check_complexity_benchmarks.py	PERF-001,PERF-003,PERF-004,PERF-005,PERF-006,PERF-008,PERF-009,SEC-007,MODEL-014	c,vm	safe		tool	done
 T-CONSUMER-REHEARSAL-001	scripts/consumer_rehearsal	TEST-018	c,vm	safe	runtime	tool	done
 T-CONSUMER-REHEARSAL-SHAPE-001	tools/check_consumer_rehearsal.py	TEST-018	c,vm	safe		tool	done
+T-ACCEPTANCE-001	tools/check_acceptance.py	GOV-007	c,vm	safe		tool	done
