@@ -91,6 +91,39 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Exception schema + evidence-storage audit** (SS-191 / BL-099 /
+  AC-025 / GOV-009 / GOV-010): new `tools/catalogs/exceptions.tsv` — the
+  GOV-010 release-exception schema, `requirement` / `approver` /
+  `rationale` / `expiration` / `status` (`open` or `permanent`), covering
+  every currently-registered gap: `UP-026`/`TEST-005`/`TEST-021` (owned by
+  todo slices SS-012/SS-013), `PERF-007` (no host-locale service yet),
+  `UP-025` (deviation D-2, post-M5), `UP-006` (deviation D-5, partial),
+  `PERF-004` (deviation D-10, two allocations not one), and `BACKEND-008`
+  (deviation D-3, `permanent` — a sound architectural decision, not a
+  gap). New `tools/check_exceptions.py` (dependency-free, in
+  `scripts/check`): every row is well-formed (real requirement id,
+  identifiable approver, a real rationale, an expiration or `permanent`
+  reasoning); a fixed **non-waivable safety set**
+  (`SEC-001`/`002`/`003`/`004`/`005`/`006`/`008`, `UP-001`..`UP-005` — the
+  core out-of-bounds / checked-arithmetic / UTF-8-validity / termination
+  guarantees) may **never** appear as an exception — a hard failure, no
+  override; and — importing `check_traceability.py`'s own `ANNOTATIONS`
+  dict directly — every entry naming a `(todo)`-owned requirement must
+  have a matching, `open` exceptions.tsv row, so an informal "todo" note
+  buried in a different checker's source can no longer stand in for a
+  real, dated exception record. Closes GOV-009's third leg (evidence is
+  already immutable + content-addressed since SS-190): every
+  `tools/catalogs/*.tsv` file is asserted git-tracked, so every commit's
+  evidence snapshot is retained in repository history forever, not
+  dependent on GitHub Actions' bounded artifact-retention window.
+  `docs/exceptions-and-evidence-audit.md` is the companion. `AC-025`
+  flipped from `deferred` to `bound` in `tools/catalogs/acceptance.tsv`
+  now that this slice's own evidence exists. New `tests.tsv` row
+  `T-EXCEPTIONS-001` → GOV-009 / GOV-010. `scripts/check` PASS;
+  `scripts/test --backend=both --dir=test` = 59/59 (no fixture/lib change
+  this slice); `--self-test`, `scripts/contract_matrix`,
+  `scripts/consumer_rehearsal`, `scripts/sanitize` all PASS.
+
 - **Immutable, content-addressed release manifest** (SS-190 / BL-098 /
   BACKEND-007 / GOV-002): new `scripts/release_manifest` (a CI step;
   regenerates on every run, no toolchain build required — only git

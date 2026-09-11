@@ -23,7 +23,7 @@ AC-021	bound	T-RUNNER-SELFTEST-001,T-CONSUMER-REHEARSAL-001	SS-010 staging-runne
 AC-022	spec-unavailable	-	AC-022 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
 AC-023	spec-unavailable	-	AC-023 text lives in SPEC Section 23, not present in this checkout. No citation anywhere in this repo.
 AC-024	toolchain-evidence	sv0c 6ba93e3 (SS-U03d); sv0-strings T-COMPILEFAIL-C23-MEMCPY-OVERLAP-001	The borrow-checker diagnostic classes (E0322/E0323) are implemented and unit-tested in sv0c's own diagnostics corpus (a different repo, not this one's tests.tsv); this repo's consumer-side proof that E0323 actually fires on real library code is `c23_memcpy_overlap.sv0`.
-AC-025	deferred	owner slice SS-191 (todo)	Evidence digest / exception / approval verification is SS-191's own deliverable; cannot be bound before that slice lands.
+AC-025	bound	T-EXCEPTIONS-001	SS-191: tools/catalogs/exceptions.tsv (GOV-010 schema) + tools/check_exceptions.py verify recomputed evidence-storage guarantees, that no non-waivable safety requirement is waived, and that every registered exception carries an approver, rationale, and expiration.
 AC-026	bound	docs/f0-deviations.md#D-3	Deviation D-3 (BACKEND-008 / UP-017): a contract clause the backend cannot lower emits a stable `model-only` note and `sv0 verify` is the enforcement (Decision 3A, permanent).
 AC-027	bound	T-POSIX-STRL-001	SS-163: `strlcat` writes nothing when the destination has no `0x00` within `dstsize` bytes; `usize` overflow checked before any write.
 AC-028	bound	T-POSIX-STRCASECMP-001	SS-166: `strncasecmp` bounded, NUL-stopping fold; large `n` clamps safely (guard-page fixture).

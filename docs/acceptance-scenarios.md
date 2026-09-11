@@ -28,9 +28,11 @@ collection, plus a checker that keeps it honest going forward.
 | `toolchain-evidence` | the feature lives in **sv0c** (a different repo), evidenced there by commit; this repo's own consumer-side proof, when one exists, is also listed |
 | `spec-unavailable` | no citation of this AC exists **anywhere in this checkout** — assigning evidence without the SPEC text would be guessing |
 
-22 scenarios are `bound`, 2 `deferred` (AC-025 → SS-191, AC-035 → SS-013),
-1 `toolchain-evidence` (AC-024, sv0c's borrow-checker diagnostics — this
-repo's own `c23_memcpy_overlap.sv0` fixture is listed alongside it as the
+23 scenarios are `bound` (SS-191 flipped AC-025 to `bound` once its own
+`tools/catalogs/exceptions.tsv` + `tools/check_exceptions.py` landed), 1
+`deferred` (AC-035 → SS-013, still `todo`), 1 `toolchain-evidence`
+(AC-024, sv0c's borrow-checker diagnostics — this repo's own
+`c23_memcpy_overlap.sv0` fixture is listed alongside it as the
 consumer-side proof), and 11 `spec-unavailable` (AC-002/003/004/007/010/
 011/013/014/015/022/023 — genuinely never cited in this checkout).
 

@@ -52,6 +52,9 @@ python3 tools/check_acceptance.py || fail=1
 echo "== check_release_manifest (BACKEND-007 / GOV-002 content-addressed manifest) =="
 python3 tools/check_release_manifest.py || fail=1
 
+echo "== check_exceptions (GOV-009 / GOV-010 exception schema + evidence-storage audit) =="
+python3 tools/check_exceptions.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

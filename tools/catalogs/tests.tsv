@@ -84,3 +84,4 @@ T-CONSUMER-REHEARSAL-SHAPE-001	tools/check_consumer_rehearsal.py	TEST-018	c,vm	s
 T-ACCEPTANCE-001	tools/check_acceptance.py	GOV-007	c,vm	safe		tool	done
 T-RELEASE-MANIFEST-001	scripts/release_manifest	BACKEND-007,GOV-002	c,vm	safe		tool	done
 T-RELEASE-MANIFEST-SHAPE-001	tools/check_release_manifest.py	BACKEND-007,GOV-002	c,vm	safe		tool	done
+T-EXCEPTIONS-001	tools/check_exceptions.py	GOV-009,GOV-010	c,vm	safe		tool	done
