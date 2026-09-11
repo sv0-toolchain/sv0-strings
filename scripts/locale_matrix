@@ -48,8 +48,19 @@ FIXTURES=(
 CANDIDATE_LOCALES=(C POSIX C.UTF-8 en_US.UTF-8 tr_TR.UTF-8)
 LOCALES=()
 avail="$(locale -a 2>/dev/null || true)"
+
+# `locale -a` spellings vary by libc: glibc reports `en_US.utf8`, the
+# canonical name is `en_US.UTF-8`, C.UTF-8 may be `C.utf8`. Canonicalise
+# both sides (lowercase, drop `-`) before comparing. `LC_ALL=en_US.UTF-8`
+# still works at runtime -- glibc normalises the requested name.
+avail_canon="$(printf '%s\n' "$avail" | tr 'A-Z' 'a-z' | tr -d '-')"
+locale_present() {
+  local want; want="$(printf '%s' "$1" | tr 'A-Z' 'a-z' | tr -d '-')"
+  grep -qxF "$want" <<<"$avail_canon"
+}
+
 for L in "${CANDIDATE_LOCALES[@]}"; do
-  if [[ "$L" == "C" || "$L" == "POSIX" ]] || grep -qixF "$L" <<<"$avail"; then
+  if [[ "$L" == "C" || "$L" == "POSIX" ]] || locale_present "$L"; then
     LOCALES+=("$L")
   else
     echo "  skip locale $L (not installed on host)"
@@ -63,7 +74,7 @@ done
 if [[ -n "${SV0_STRINGS_REQUIRE_LOCALES:-}" ]]; then
   miss=0
   for L in $SV0_STRINGS_REQUIRE_LOCALES; do
-    if ! grep -qixF "$L" <<<"$avail"; then
+    if ! locale_present "$L"; then
       echo "scripts/locale_matrix: FAIL -- required locale '$L' is not installed (SV0_STRINGS_REQUIRE_LOCALES)" >&2
       miss=1
     fi

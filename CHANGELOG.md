@@ -113,7 +113,13 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   sanitizer is a hard failure, not a skip) and
   `SV0_STRINGS_REQUIRE_LOCALES="en_US.UTF-8 tr_TR.UTF-8"` (a missing
   required locale is a hard failure), and `locale-gen` lost its `|| true`;
-  `scripts/sanitize` / `scripts/locale_matrix` honour those envs.
+  `scripts/sanitize` / `scripts/locale_matrix` honour those envs. The
+  new hard requirement surfaced a latent gap: `scripts/locale_matrix`'s
+  availability probe matched `locale -a` spellings exactly, so glibc's
+  `en_US.utf8` never matched the canonical `en_US.UTF-8` and CI had been
+  **silently testing only `C` + `POSIX`**. The probe now canonicalises both
+  sides (lowercase, drop `-`), so CI genuinely runs all five locales
+  (`C`, `POSIX`, `C.UTF-8`, `en_US.UTF-8`, `tr_TR.UTF-8`).
   `docs/release-audit.md` is the human-readable audit (hard-fail
   guarantees, the 7 enumerated non-normative soft signals, no-flaky-retry
   policy). New `tests.tsv` row `T-GATE-POLICY-001` → BACKEND-009 /
