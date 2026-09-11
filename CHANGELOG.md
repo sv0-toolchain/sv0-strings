@@ -91,6 +91,37 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Fail-closed release audit + gate-policy hard-fail lint** (SS-184 /
+  BL-092 / BACKEND-009 / TEST-020): new `tools/check_gate_policy.py` (in
+  `scripts/check`) scans the gate scripts + CI workflow for soft signals —
+  a printed `skip`, `|| true`, `detect_leaks=0`, `xfail`,
+  `continue-on-error`, an `advisory` leg, a `rerun` — and fails unless
+  each is covered by a `tools/catalogs/gate_policy.tsv` row with
+  `normative = no` and a rationale ≥ 40 chars; a soft signal with no row,
+  or a row that matches nothing, is an error. `xfail` /
+  `continue-on-error` are banned outright. It also asserts statically that
+  the runner's VM-leg mismatch branch still sets `ok=0` (hard-fail, never
+  advisory) and that `scripts/test --self-test` wires the new
+  `injected_mismatch_probe`. That probe points the runner at an
+  expected-exit table claiming the wrong VM exit for `types_smoke.sv0`,
+  asserts the runner turns **red**, then asserts the correct table is
+  **green** — proving the VM leg is genuinely hard-failing
+  (BACKEND-009 injected-mismatch test). The `dup_main_probe` is promoted
+  from `xfail` to a hard assertion (SS-U09's `E0302` guard landed).
+  `scripts/test` gains an `SV0_STRINGS_EXPECT` override (used only by the
+  probe). CI now sets `SV0_STRINGS_REQUIRE_SANITIZERS=1` (a missing
+  sanitizer is a hard failure, not a skip) and
+  `SV0_STRINGS_REQUIRE_LOCALES="en_US.UTF-8 tr_TR.UTF-8"` (a missing
+  required locale is a hard failure), and `locale-gen` lost its `|| true`;
+  `scripts/sanitize` / `scripts/locale_matrix` honour those envs.
+  `docs/release-audit.md` is the human-readable audit (hard-fail
+  guarantees, the 7 enumerated non-normative soft signals, no-flaky-retry
+  policy). New `tests.tsv` row `T-GATE-POLICY-001` → BACKEND-009 /
+  TEST-020; `T-RUNNER-SELFTEST-001` extended with BACKEND-009 and marked
+  done. `scripts/check` PASS; `scripts/test --backend=both --dir=test` =
+  59/59; `--self-test` 2 probes green; `scripts/sanitize` PASS;
+  `scripts/locale_matrix` PASS (incl. `SV0_STRINGS_REQUIRE_LOCALES`).
+
 - **Pure + accelerated fuzz budget + evidence manifest** (SS-183 / BL-091 /
   TEST-017): new seeded fuzz fixture `test/fuzz/bytes_fuzz.sv0` (200
   rounds, Lehmer MINSTD PRNG, cross-backend deterministic) drives the

@@ -47,7 +47,9 @@ NC="$TC/build/sv0-megatu-compiler-native"
 VC="$TC/build/sv0-megatu-vm-native"
 RT="$TC/sv0c/runtime"
 RUN_SV0B="$TC/sv0vm/scripts/run_sv0b.sml"
-EXPECT="$HERE/test/expectations.tsv"
+# SV0_STRINGS_EXPECT overrides the expected-exit table (used only by the
+# --self-test injected-mismatch probe; the real gate never sets it).
+EXPECT="${SV0_STRINGS_EXPECT:-$HERE/test/expectations.tsv}"
 
 BACKEND=c
 CONTRACT_MODE=runtime
@@ -225,11 +227,10 @@ run_one() {
 }
 
 # ---- duplicate-main negative probe (ARCH-011, UP-026) ----
-# Two files each defining `fn main` MUST be a stable diagnostic. Today the
-# native compiler silently keeps the last one by filename order and emits a
-# working binary (docs/BUGS.md #4, slice SS-U09). Reported as xfail so
-# --self-test stays green while tracking the gap; flip to a hard assertion
-# when SS-U09 lands.
+# Two files each defining a top-level `fn main` directly in the project dir
+# MUST be a stable diagnostic. SS-U09 landed the root-dir dup-entry guard
+# (sv0c: E0302), so this is now a HARD assertion: a silent accept fails
+# --self-test.
 dup_main_probe() {
   local s; s="$(mktemp -d)"; mkdir -p "$s/lib"
   cp "$HERE"/lib/*.sv0 "$s/lib/"
@@ -237,10 +238,34 @@ dup_main_probe() {
   printf 'fn main() -> i32 { return 1; }\n' > "$s/main_two.sv0"
   if "$NC" --project "$s" > "$s/o.c" 2> "$s/e"; then
     rm -rf "$s"
-    log "  xfail <dup-main probe>   two 'main' entries accepted silently (SS-U09 / BUGS.md #4)"
-    return 0
+    log "  FAIL  <dup-main probe>   two 'main' entries accepted silently (regression of SS-U09)"
+    return 1
   fi
   rm -rf "$s"; log "  ok    <dup-main probe>   build rejected as expected"; return 0
+}
+
+# ---- injected VM-mismatch probe (BACKEND-009 / TEST-020) ----
+# Proves the VM leg is HARD-failing, not advisory: point the runner at an
+# expected-exit table that deliberately claims the wrong VM exit for a
+# known-green fixture and assert the runner turns red; then assert the
+# unmodified table is green. If the VM leg were advisory this probe would
+# pass in both directions -- which is itself the failure.
+injected_mismatch_probe() {
+  local bad; bad="$(mktemp)"
+  printf 'path\tc_exit\tvm_exit\tnote\n' > "$bad"
+  printf 'test/cases/types_smoke.sv0\t0\t9\tINJECTED wrong vm_exit\n' >> "$bad"
+  if SV0_STRINGS_EXPECT="$bad" "$0" --backend=vm --case=types_smoke.sv0 -q >/dev/null 2>&1; then
+    rm -f "$bad"
+    log "  FAIL  <injected-mismatch probe>   runner stayed green on a wrong VM exit (VM leg is not hard-failing)"
+    return 1
+  fi
+  rm -f "$bad"
+  if ! "$0" --backend=vm --case=types_smoke.sv0 -q >/dev/null 2>&1; then
+    log "  FAIL  <injected-mismatch probe>   runner red on the correct VM exit (control failed)"
+    return 1
+  fi
+  log "  ok    <injected-mismatch probe>   wrong VM exit -> red, correct -> green"
+  return 0
 }
 
 [[ -x "$NC" ]] || { echo "scripts/test: missing $NC — build the toolchain first" >&2; exit 2; }
@@ -274,6 +299,7 @@ for t in "${TARGETS[@]}"; do
 done
 if [[ "$SELFTEST" -eq 1 ]]; then
   dup_main_probe || fails=$(( fails + 1 ))
+  injected_mismatch_probe || fails=$(( fails + 1 ))
 fi
 
 n="${#TARGETS[@]}"

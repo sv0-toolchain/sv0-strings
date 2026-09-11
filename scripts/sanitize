@@ -43,6 +43,13 @@ done
 # Probe sanitizer support once.
 SAN="-fsanitize=address,undefined -fno-sanitize-recover=all"
 if ! echo 'int main(void){return 0;}' | "$CC" $STD $SAN -x c - -o /dev/null 2>/dev/null; then
+  # SS-184 (TEST-020): a skip must never hide missing sanitizer evidence in
+  # a release run. CI sets SV0_STRINGS_REQUIRE_SANITIZERS -- then no-ASan is
+  # a HARD failure. Local dev without the sanitizers still skips cleanly.
+  if [[ -n "${SV0_STRINGS_REQUIRE_SANITIZERS:-}" ]]; then
+    echo "scripts/sanitize: FAIL -- $CC has no -fsanitize=address,undefined and SV0_STRINGS_REQUIRE_SANITIZERS is set" >&2
+    exit 1
+  fi
   echo "scripts/sanitize: SKIP -- $CC has no -fsanitize=address,undefined"
   exit 0
 fi

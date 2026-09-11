@@ -89,14 +89,20 @@ jobs:
         working-directory: sv0-strings
         env:
           SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+          # SS-184 (TEST-020): a missing sanitizer is a hard failure in CI,
+          # never a silent skip.
+          SV0_STRINGS_REQUIRE_SANITIZERS: "1"
         run: ./scripts/sanitize
 
       - name: "scripts/locale_matrix (POSIX-014 ambient-locale independence)"
         working-directory: sv0-strings
         env:
           SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+          # SS-184 (TEST-020): these locales must be present -- a missing one
+          # is a hard failure, not a skipped normative leg.
+          SV0_STRINGS_REQUIRE_LOCALES: "en_US.UTF-8 tr_TR.UTF-8"
         run: |
-          sudo locale-gen en_US.UTF-8 tr_TR.UTF-8 || true
+          sudo locale-gen en_US.UTF-8 tr_TR.UTF-8
           ./scripts/locale_matrix
 
       - name: Upload run record

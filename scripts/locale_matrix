@@ -56,6 +56,21 @@ for L in "${CANDIDATE_LOCALES[@]}"; do
   fi
 done
 
+# SS-184 (TEST-020): in release evidence a "skip" must never hide a missing
+# normative leg. When SV0_STRINGS_REQUIRE_LOCALES is set (CI does), every
+# locale it names MUST be present -- a missing one is a HARD failure, not a
+# skip. Local dev leaves it unset and keeps the best-effort behaviour.
+if [[ -n "${SV0_STRINGS_REQUIRE_LOCALES:-}" ]]; then
+  miss=0
+  for L in $SV0_STRINGS_REQUIRE_LOCALES; do
+    if ! grep -qixF "$L" <<<"$avail"; then
+      echo "scripts/locale_matrix: FAIL -- required locale '$L' is not installed (SV0_STRINGS_REQUIRE_LOCALES)" >&2
+      miss=1
+    fi
+  done
+  [[ "$miss" -eq 0 ]] || exit 1
+fi
+
 rc=0
 for L in "${LOCALES[@]}"; do
   echo "== LC_ALL=$L =="
