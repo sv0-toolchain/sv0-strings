@@ -6,6 +6,27 @@ semantic versioning per SPEC.md Section 26.
 
 ## [Unreleased]
 
+### Changed
+
+- Post-`v1.0.0` documentation consolidation: `docs/README.md` rewritten
+  from its Sep-3 pre-F0 snapshot (6 of 28 docs listed) into a complete,
+  categorized index of every doc under `docs/`. Merged four docs that
+  documented one narrative arc across sequential slices — the SS-150 C23
+  locale/message stub pattern, the SS-167 `strings_locale::open` lifecycle,
+  the SS-168 `_l` adapters, and the SS-169 host error/signal message
+  adapters (`docs/host-capability-stubs.md`, `docs/locale-capability.md`,
+  `docs/l-locale-adapters.md`, `docs/host-message-capability.md`) — into a
+  single `docs/locale-and-host-capabilities.md`, removing repeated
+  "stub, not `Blocked`" and "unblock path" boilerplate. Every live
+  cross-reference (`lib/strings_locale.sv0`, `lib/strings_posix2024.sv0`,
+  `test/property/locale_lifecycle.sv0`, `test/property/posix_l_adapters.sv0`,
+  `docs/compatibility.md` (regenerated via `tools/compat_doc.py`),
+  `docs/posix-header-surface.md`, `docs/r0.3-gate-review.md`,
+  `docs/r0.4-gate-review.md`) repointed at the merged doc; historical
+  `CHANGELOG.md` entries predating this merge are left as-written. No
+  requirement/test/evidence catalog changed; `scripts/check` and
+  `scripts/test --backend=both --dir=test` (59/59) both green.
+
 ## [1.0.0] - 2026-09-11
 
 R1 gate PASS (SS-192, `docs/r1-gate-review.md`) — the full release ladder

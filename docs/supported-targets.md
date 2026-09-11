@@ -67,6 +67,6 @@ The deterministic functions hold no shared mutable state and are
 re-entrant. The capability-gated adapters return a capability error rather
 than touch any process-global (`setlocale` / `uselocale` / a libc static
 buffer), so they are trivially thread-safe in their current fail-closed
-form; the real implementations must preserve that (`docs/locale-capability.md`
-§3, `docs/host-message-capability.md` §4). A dedicated thread-sanitizer run
+form; the real implementations must preserve that (`docs/locale-and-host-capabilities.md`
+§3, `docs/locale-and-host-capabilities.md` §4). A dedicated thread-sanitizer run
 is an R0.4/R1 follow-up where the host toolchain provides one.

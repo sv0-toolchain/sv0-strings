@@ -137,7 +137,7 @@ carried by their C23 rows in section 2 and are not repeated here.
 | `locale_t` | `<string.h>` | Host-dependent |
 | `size_t` | `<string.h>` | Adapted |
 
-Safe-façade mapping: `size_t` -> `usize`, `NULL` -> `Option::None` / absence, `locale_t` -> `strings_locale::LocaleId` + the capability lifecycle (`docs/locale-capability.md`, `docs/posix-header-surface.md`).
+Safe-façade mapping: `size_t` -> `usize`, `NULL` -> `Option::None` / absence, `locale_t` -> `strings_locale::LocaleId` + the capability lifecycle (`docs/locale-and-host-capabilities.md`, `docs/posix-header-surface.md`).
 
 ### 5.1 Base
 

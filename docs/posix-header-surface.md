@@ -13,7 +13,7 @@ Closes SPEC **POSIX-016** (the POSIX header catalog includes `NULL`,
 |---|---|---|
 | `size_t` | every bounded interface (`n`, capacities, offsets) | `usize` (SPEC MODEL-002); a `usize` bound flows in and a `usize` result flows out, no narrowing |
 | `NULL` | `memchr` / `strchr` / `strstr` / ... "not found"; `strtok` no-more-tokens; `strerror_r` size probe | `strings_types::Option::None` (absence) -- a safe search never yields a null or dangling pointer, so there is nothing for `NULL` to name |
-| `locale_t` | `strcoll_l`, `strxfrm_l`, `strerror_l`, `strcasecmp_l`, `strncasecmp_l` | `strings_locale::LocaleId` (`Posix` / `HostNamed(string)`) as the stable identity, plus the capability lifecycle (`strings_locale::open` -> `LocaleOpen`); `docs/locale-capability.md` |
+| `locale_t` | `strcoll_l`, `strxfrm_l`, `strerror_l`, `strcasecmp_l`, `strncasecmp_l` | `strings_locale::LocaleId` (`Posix` / `HostNamed(string)`) as the stable identity, plus the capability lifecycle (`strings_locale::open` -> `LocaleOpen`); `docs/locale-and-host-capabilities.md` |
 
 There is no `<string.h>` / `<strings.h>` include in the safe surface, so
 `size_t` / `NULL` are not textual tokens a program can name -- they are
@@ -35,7 +35,7 @@ C's `locale_t` is an opaque handle from `newlocale(3)` that a program must
   `strcasecmp_l` / `strncasecmp_l` take a `LocaleId` and fail closed
   (`HostCapability::Unsupported` / `HostMessage::Unavailable`) rather than
   leak an unmanaged handle. Lifetime, ownership, and thread-safety of the
-  eventual `Locale` are specified in `docs/locale-capability.md` §3.
+  eventual `Locale` are specified in `docs/locale-and-host-capabilities.md` §3.
 
 ## 3. Feature profiles (POSIX-013)
 

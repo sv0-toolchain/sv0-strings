@@ -25,7 +25,7 @@
 ///           no collation service to delegate to. NEVER a bytewise/ASCII
 ///           collation substitute (HOST-004 / SPEC B.7). The HOST-003
 ///           transform/compare consistency contract these MUST satisfy once
-///           SS-U12 lands is `docs/l-locale-adapters.md`.
+///           SS-U12 lands is `docs/locale-and-host-capabilities.md`.
 ///   SS-169  strerror_r / strerror_l / strsignal -- owned host error /
 ///           signal message capability, STUBS (this file). POSIX-010 /
 ///           POSIX-011 / HOST-005 / HOST-006. `strerror_r` returns
@@ -35,7 +35,7 @@
 ///           FFI / host-call primitive yet (`strings_unsafe_abi` is
 ///           Future, BL-103/104), so there is no OS message table to read
 ///           -- NEVER a synthesized message, NEVER a libc static borrow.
-///           Contract: `docs/host-message-capability.md`.
+///           Contract: `docs/locale-and-host-capabilities.md`.
 ///   SS-173  strcasecmp_l / strncasecmp_l -- explicit-locale case-fold
 ///           adapters (this file). POSIX-007 / POSIX-014 / ASCII-007.
 ///           `LocaleId::Posix` -> `LocaleCompare::Ordered` (fixed ASCII
@@ -354,7 +354,7 @@ pub fn strncasecmp_l(a: &[byte], b: &[byte], n: usize, loc: LocaleId) -> LocaleC
 /// requires that a locale whose fold/collation rules differ from ASCII
 /// (e.g. Turkish dotless-i) yield a typed "unsupported", never a silent
 /// mis-ordering (HOST-004). Consistency contract with `strxfrm_l`:
-/// `docs/l-locale-adapters.md`.
+/// `docs/locale-and-host-capabilities.md`.
 pub fn strcoll_l(a: string, b: string, loc: LocaleId) -> HostCapability {
     match loc {
         LocaleId::Posix => {},

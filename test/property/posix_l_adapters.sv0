@@ -18,7 +18,7 @@
  *     (POSIX-009: one explicit locale object shared by both). The HOST-003
  *     "bytewise compare of two `strxfrm_l` keys has the same sign as
  *     `strcoll_l`" property holds vacuously while zero locales are
- *     supported; `docs/l-locale-adapters.md` is the contract for when
+ *     supported; `docs/locale-and-host-capabilities.md` is the contract for when
  *     SS-U12 makes a locale openable.
  */
 use strings_types::HostCapability;

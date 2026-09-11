@@ -205,7 +205,7 @@ def build() -> str:
     w("")
     w("Safe-façade mapping: `size_t` -> `usize`, `NULL` -> `Option::None` / "
       "absence, `locale_t` -> `strings_locale::LocaleId` + the capability "
-      "lifecycle (`docs/locale-capability.md`, `docs/posix-header-surface.md`).")
+      "lifecycle (`docs/locale-and-host-capabilities.md`, `docs/posix-header-surface.md`).")
     w("")
 
     for b in ("base", "cx", "xsi", "legacy"):

@@ -13,7 +13,7 @@
 ///           SPEC UP-015 / OQ-005) -- until it lands, `open` fails closed
 ///           for every locale, so no locale-sensitive comparison exists to
 ///           silently downgrade. Lifecycle contract:
-///           `docs/locale-capability.md`.
+///           `docs/locale-and-host-capabilities.md`.
 module strings_locale;
 
 /// SPEC §17.1: the locale a caller asks for. `Posix` is the named "C" /
@@ -55,7 +55,7 @@ pub enum LocaleOpen {
 /// locale-sensitive operation can be reached, so nothing can silently
 /// downgrade (HOST-001 / HOST-004).
 ///
-/// Ownership / thread-safety / backend support: `docs/locale-capability.md`.
+/// Ownership / thread-safety / backend support: `docs/locale-and-host-capabilities.md`.
 pub fn open(id: LocaleId) -> LocaleOpen {
     match id {
         LocaleId::Posix => {},

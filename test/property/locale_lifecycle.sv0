@@ -7,7 +7,7 @@
  * `Opened(Locale)` arm, so no `Locale` object can exist, so no
  * locale-sensitive comparison exists to silently downgrade to ASCII or
  * bytewise (HOST-001 / HOST-004). This fixture pins that. Lifecycle
- * contract prose: docs/locale-capability.md.
+ * contract prose: docs/locale-and-host-capabilities.md.
  */
 use strings_locale::LocaleId;
 use strings_locale::LocaleOpen;
