@@ -13,24 +13,25 @@ all IDs unique.**
 | **reverse** | every in-scope requirement (**F0 / R0.1 / R0.2 / R0.3 / R0.4**) is covered by a test row, a non-test verification marker in its own note, or an explicit annotation; **zero** uncovered | `check_traceability.py` |
 
 R1 / Future requirements are allowed to be uncovered (their covering slices
-are SS-182…192 and the Future backlog); the checker lists them for
-information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `PERF-009`,
-`TEXT-017`.
+are SS-188…192 and the Future backlog); the checker lists them for
+information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 
 ## Coverage tally (270 requirements)
 
-- **198** covered by a `tests.tsv` row (79 rows total; SS-182 added
+- **207** covered by a `tests.tsv` row (80 rows total; SS-182 added
   `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006, SS-183 added
   `T-BYTES-FUZZ-001` / `T-FUZZ-BUDGET-001` → TEST-017, SS-184 added
   `T-GATE-POLICY-001` → BACKEND-009 / TEST-020, SS-185 added
   `T-CONTRACT-MATRIX-001` / `T-CONTRACT-MATRIX-RUN-001` → TEST-019 /
   UP-028, SS-186 added `T-ACCEL-MATRIX-001` — BACKEND-003 / ARCH-007 /
-  UP-011 were already test-covered, so the tally is unchanged but the
-  matrix itself found and fixed a real orphaned-capability gap).
-- **46** covered by a non-test verification marker in the requirement's own
+  UP-011 were already test-covered, so the tally was unchanged but the
+  matrix itself found and fixed a real orphaned-capability gap; SS-187
+  added `T-COMPLEXITY-BENCH-001` → PERF-001/003/004/005/006/008/009,
+  SEC-007, MODEL-014 — moving all nine off the `ANNOTATIONS` deferral).
+- **45** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).
-- **20** covered by an explicit `ANNOTATIONS` entry in
+- **13** covered by an explicit `ANNOTATIONS` entry in
   `check_traceability.py` — each gives the real verification method and why
   a fixture row is not the right vehicle:
 
@@ -46,7 +47,7 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `PERF-009`,
 | GOV-004 | decision register — `docs/audit/2026-08-30.md` + `docs/f0-deviations.md` |
 | GOV-006 | change record — per-slice `CHANGELOG.md` entries |
 | LIC-001 | release gate for **SS-192** — `LICENSE-APACHE` + `LICENSE-MIT` present, dual-license decision in `README.md` |
-| PERF-001 / PERF-003 / PERF-004 / PERF-005 / PERF-006 / SEC-007 / MODEL-014 / UP-014 | owner slice **SS-187** (R1) — reproducible benchmarks / operation-count / allocation-counter / complexity evidence; behavioural halves covered today by `T-C23-FUZZ-001`, `T-SANITIZE-001` (`-O1`), the tier-2 VM byte-parity gate, and per-adapter complexity doc comments |
+| UP-014 | owner slice **SS-187** (R1, partial) — optimized generated-code + VM trace inspection; the behavioural half is covered today by `T-SANITIZE-001` (`-O1` + ASan/UBSan) and the tier-2 VM byte-parity gate |
 | PERF-007 | **N/A at R0.4** — no locale transform runs; revisit with the real service |
 
 ## New this slice

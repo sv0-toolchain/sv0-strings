@@ -158,8 +158,16 @@ pub fn clone_owned(value: string) -> ConcatResult {
 /// followed by the payload of `b`, followed by exactly one terminator.
 /// `len(a) + len(b)` and then `+ 1` for the terminator are checked for
 /// `usize` overflow BEFORE any allocation; on `LengthOverflow` nothing is
-/// allocated and both inputs are unchanged (they are immutable handles). One
-/// `string_concat` chain builds the result.
+/// allocated and both inputs are unchanged (they are immutable handles).
+///
+/// PERF-004 / deviation D-10 (`docs/f0-deviations.md`): this is TWO
+/// `string_concat` calls (join, then append the terminator), not one --
+/// sv0 has no 3-ary string-construction primitive. The count is a small
+/// constant, independent of input size, and both calls happen only after
+/// the overflow check above passes; the literal "at most once" allocation
+/// count is not met, but nothing proportional to input size or a retry
+/// loop is added. `clone_owned` (single-input append) needs only one call
+/// and is fully compliant.
 pub fn concat(a: string, b: string) -> ConcatResult {
     let sum: CheckedUsize = checked_add(string_len(a), string_len(b));
     let payload_len: usize = match sum {

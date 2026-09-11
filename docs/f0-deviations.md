@@ -252,6 +252,41 @@ automatic. TOK-002/003/004/005 are behavioural and pass cross-backend.
 **Schedule.** Revisit with D-7 / D-8 (struct lowering) and the post-M5
 multi-module linker (cross-module struct-param resolution).
 
+## D-10 — `strings_cstr::concat` allocates twice, not once (SS-127 / SS-187, PERF-004)
+
+**SPEC.** PERF-004: "`CString` concatenation SHALL allocate at most once
+after checking the final lengths."
+
+**What the toolchain does.** `string_concat` is a binary runtime primitive
+(the only string-construction-from-parts primitive sv0 has); there is no
+3-ary or N-ary form, and no dynamically-sized byte-buffer allocator a
+library module can build into and convert in one step (`CBuffer` wraps
+caller-provided, already-allocated storage — D-8 — it does not allocate).
+
+**What sv0-strings does.** `strings_cstr::concat(a, b)` (SS-127) checks
+`len(a) + len(b)` and then `+ 1` for the terminator for `usize` overflow
+**fully before any allocation** (PERF-004's "after checking the final
+length" half holds exactly), then builds the result with two primitive
+calls: `string_concat(a, b)` (join the payloads) followed by
+`string_concat(joined, "\0")` (append the terminator) — **two allocations**,
+not one. `strings_cstr::clone_owned` (a single-input append) needs only one
+`string_concat` call and is fully compliant; `strings_text::concat` (the
+2-part, no-terminator case) is also fully compliant at one allocation.
+
+**Why sound (bounded, not proportional).** The two-allocation count is a
+small constant independent of input size — never `O(segments)` — and both
+calls happen only after the pre-allocation overflow check passes, so no
+partially-sized or retried allocation occurs and `LengthOverflow` still
+allocates nothing. The SPEC intent (avoid an allocate-per-segment builder
+pattern) is preserved; the literal "at most once" count is not.
+
+**Schedule.** A true single-allocation 3-part join needs a new runtime
+primitive (an N-ary `string_concat` or a dynamically-sized owned-buffer
+builder) — a Track U toolchain change, the same shape as SS-U12 (host
+capability ABI) and SS-U18 (reserved-name extension): out of scope for a
+library-only slice. Tracked as a deferred toolchain follow-up; revisit
+alongside the next Track U window.
+
 ## SPEC-deferred (not decisions — the SPEC's own ladder)
 
 - **SS-U11** (`fill_explicit` non-elision primitive, UP-014) — SPEC-deferred to

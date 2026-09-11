@@ -1,0 +1,8 @@
+id	requirements	operation	complexity_class	method	evidence	notes
+CB-001	PERF-001	strings_bytes::compare,equal,find,rfind,starts_with,ends_with	O(n) time, O(1) space	source-inspection	T-BYTES-COMPARE-EQUAL-001,T-BYTES-FIND-PREFIX-001	single left/right-to-left scan; starts_with/ends_with bounded by needle length
+CB-002	PERF-002	strings_bytes::find_slice	O(n*m) worst case, O(1) space	source-inspection	T-BYTES-FIND-SLICE-001	naive scan; adversarial repeated-prefix fixture pins the bound; R1 linear-time replacement planned
+CB-003	PERF-003	strings_cstr::len	O(1) time after O(n) one-time validation	source-inspection	T-CSTR-CONSTRUCT-001	stored-length read, never rescans
+CB-004	PERF-004	strings_cstr::clone_owned,strings_cstr::concat	clone_owned: 1 allocation (compliant); concat: 2 allocations (deviation D-10)	source-inspection	T-CSTR-OWNED-001	overflow checked fully before either allocation; count is a bounded constant, not proportional to input size
+CB-005	PERF-005	strings_tokenize::next	O(n*m) time, O(1) space (m = separator-set size)	source-inspection	T-TOKENIZE-CURSOR-001	per-byte linear separator-set membership check; no 256-bit table at R1
+CB-006	PERF-006	strings_c23::strlen,strings_posix2024::memmem,strings_posix2024::strnlen,strings_posix2024::strcasecmp,strings_posix2024::strncasecmp	O(n), no redundant full scan	source-inspection	T-C23-STRLEN-001,T-POSIX-MEMMEM-001,T-POSIX-STRNLEN-001,T-POSIX-STRCASECMP-001	sampled compat-adapter audit; strncasecmp is 2 linear passes (NUL-stop then compare), still O(n)
+CB-009	PERF-009	release gate policy (cross-backend timing)	n/a	policy	docs/complexity.md#perf-009-no-cross-backend-speed-gate	no gate script measures or compares wall-clock time between backends; parity is defined by result equality only

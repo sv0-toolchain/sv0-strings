@@ -91,6 +91,39 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Complexity + reproducible benchmark evidence** (SS-187 / BL-095 /
+  PERF-001..009): `docs/complexity.md` extended with source-inspected
+  algorithm + Big-O sections for PERF-003 (`strings_cstr::len` O(1) after
+  one-time O(n) validation), PERF-004 (allocation-count audit), PERF-005
+  (tokenization O(n·m), m = separator-set size, no 256-bit table at R1),
+  PERF-006 (a 5-adapter compat scan audit — no redundant full scan found),
+  PERF-008 (the manifest schema itself), and PERF-009 (explicit policy:
+  no release gate compares backend wall-clock speed; parity is result
+  equality only). **Found a real gap**: `strings_cstr::concat` performs
+  **two** `string_concat` allocations (join, then append the terminator),
+  not the "at most once" PERF-004 requires — sv0 has no 3-ary
+  string-construction primitive, so a genuine single-allocation join isn't
+  buildable in the library today. Registered as new deviation **D-10** in
+  `docs/f0-deviations.md` (the overflow check still runs fully before
+  either allocation; the count is a bounded constant, not proportional to
+  input size; a real fix needs a new Track U runtime primitive, deferred).
+  `strings_cstr::clone_owned` (single-input append) is confirmed
+  compliant at one allocation. New `tools/catalogs/complexity_benchmarks.tsv`
+  (the PERF-008 manifest: operation, complexity class, method, evidence)
+  + `tools/check_complexity_benchmarks.py` (dependency-free, in
+  `scripts/check`): every owned PERF-00X has a row and a matching
+  `docs/complexity.md` section; `source-inspection` rows' evidence must
+  name real `tests.tsv` ids (no runtime profiling hooks exist in this
+  codebase, so "measured" wall-clock numbers are deliberately not used —
+  see PERF-009). New `tests.tsv` row `T-COMPLEXITY-BENCH-001` →
+  PERF-001/003/004/005/006/008/009, SEC-007, MODEL-014 — all nine move
+  from `check_traceability`'s `ANNOTATIONS` deferral to real test-row
+  coverage (7 annotation entries removed). `scripts/check` PASS;
+  `scripts/test --backend=both --dir=test` = 59/59 (behaviour unchanged —
+  this slice is audit + one doc-comment edit, no algorithm change);
+  `--self-test` green; `scripts/contract_matrix` PASS; `scripts/sanitize`
+  PASS.
+
 - **Pure / accelerated full equivalence matrix** (SS-186 / BL-094 /
   BACKEND-003 / ARCH-007 / AC-020): new `tools/check_accel_matrix.py`
   (dependency-free, in `scripts/check`) re-derives the live capability

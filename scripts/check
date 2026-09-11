@@ -40,6 +40,9 @@ python3 tools/check_contract_matrix.py || fail=1
 echo "== check_accel_matrix (BACKEND-003 / ARCH-007 / AC-020 pure/accelerated equivalence) =="
 python3 tools/check_accel_matrix.py || fail=1
 
+echo "== check_complexity_benchmarks (PERF-008 benchmark evidence schema) =="
+python3 tools/check_complexity_benchmarks.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

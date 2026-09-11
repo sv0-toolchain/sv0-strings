@@ -73,23 +73,9 @@ ANNOTATIONS: dict[str, str] = {
     "LIC-001": "release gate for SS-192 — `LICENSE-APACHE` + `LICENSE-MIT` are "
                "present and the dual-license decision is recorded in "
                "`README.md`; the maintainer sign-off is bound at R1 tag.",
-    "PERF-001": "owner slice SS-187 (R1) — operation-count benchmarks with full "
-                "metadata. Complexity is argued per-adapter in doc comments "
-                "today (e.g. `strlen` O(1) source-inspected).",
-    "PERF-003": "owner slice SS-187 (R1) — instrumented scan count.",
-    "PERF-004": "owner slice SS-187 (R1) — allocation counter.",
-    "PERF-005": "owner slice SS-187 (R1) — operation-count benchmark.",
-    "PERF-006": "owner slice SS-187 (R1) — call / scan instrumentation. "
-                "`T-SANITIZE-001` builds the generated C at `-O1` today.",
     "PERF-007": "N/A at R0.4 — no locale transform runs (every host-locale "
                 "adapter is a fail-closed stub); revisit with the real service "
                 "(`docs/r0.4-gate-review.md`).",
-    "SEC-007": "owner slice SS-187 (R1) — complexity benchmarks + adversarial "
-               "inputs. Adversarial coverage today: `T-C23-FUZZ-001` "
-               "(160-round seeded slice-op sweep) + `scripts/sanitize`.",
-    "MODEL-014": "owner slice SS-187 (R1) — constructor/mutation complexity "
-                 "benchmarks. The invariant half is `T-CSTR-CONSTRUCT-001` / "
-                 "`T-CBUFFER-OPS-001` (MODEL-006).",
     "UP-014": "owner slice SS-187 (R1) — optimized generated-code + VM trace "
               "inspection. `T-SANITIZE-001` (`-O1` + ASan/UBSan) and the "
               "tier-2 VM byte-parity gate cover the behavioural half.",
