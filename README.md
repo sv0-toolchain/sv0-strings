@@ -1,5 +1,9 @@
 # sv0-strings
 
+[![CI](https://github.com/sv0-toolchain/sv0-strings/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sv0-toolchain/sv0-strings/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/badge/release-v1.0.0-blue)](docs/r1-gate-review.md)
+[![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-informational)](#license)
+
 A safe strings library for the [sv0](https://github.com/sv4u/sv0-toolchain)
 programming language: sv0-native byte, UTF-8 text, and C-string abstractions,
 plus semantically compatible façades for ISO C23 `<string.h>` and
@@ -34,6 +38,45 @@ content-addressed release manifest). See
 | **R0.4** | POSIX.1-2024 façade (Issue 8 additions, deterministic POSIX-locale policy) and host locale/error/signal capabilities. | ✅ complete ([gate review](docs/r0.4-gate-review.md)) |
 | **R1** | Stable cross-backend release: full forward/reverse traceability, fuzz/sanitizer/leak/allocation-failure evidence, offline clean-checkout rehearsal, acceptance-scenario evidence binding, immutable release manifest. | ✅ complete ([gate review](docs/r1-gate-review.md)) — **tagged `v1.0.0`** |
 | **Future** | Optional exact C ABI, additional locales, Unicode algorithms, optimizations. | not started |
+
+## Quick example
+
+Every fallible operation returns a typed result instead of relying on a
+sentinel, an exception, or C-style undefined behavior. `strings_text::concat`
+checks `len_bytes(a) + len_bytes(b)` for overflow before allocating and hands
+back a `ConcatResult` the caller must match on:
+
+```sv0
+use strings_types::ConcatResult;
+use strings_text::concat;
+
+fn greet(name: string) -> string {
+    return match concat("Hello, ", name) {
+        ConcatResult::Joined(s) => s,
+        ConcatResult::LengthOverflow => "Hello, stranger",
+    };
+}
+```
+
+Byte-level operations are equally explicit about their domain — bytes, not
+text — and never decode or assume encoding:
+
+```sv0
+use strings_types::Ordering;
+use strings_bytes::compare;
+
+fn first_is_smaller(a: &[byte], b: &[byte]) -> bool {
+    return match compare(a, b) {
+        Ordering::Less => true,
+        Ordering::Equal => false,
+        Ordering::Greater => false,
+    };
+}
+```
+
+More worked examples, including every C23/POSIX façade adapter, are the
+`test/property/*.sv0` fixtures — each one is a runnable specification for the
+function(s) it names in its header comment.
 
 ## Toolchain enablement
 
@@ -92,6 +135,54 @@ docs/                  compatibility, security (safe-UB audit), complexity,
                        traceability, gate reviews, and this release's
                        evidence indexes
 ```
+
+## Modules
+
+Every module is flat and `pub` (no nested submodules yet — see the `pub`
+cross-module deviation in `tools/catalogs/exceptions.tsv`). Sections below
+are grouped by what a consumer is most likely to reach for first.
+
+| module | provides |
+|---|---|
+| `strings_types` | shared value types every other module returns: `Ordering`, result/report enums, `CStr`/`CString`/`CBuffer`, `TokenCursor` |
+| `strings_bytes` | safe operations over arbitrary byte slices — compare, equal, copy, move, fill, find, span, prefix/suffix — no text decoding |
+| `strings_text` | UTF-8-preserving operations over owned `string` and borrowed views — length, equality, concat, search, slicing, validation |
+| `strings_ascii` | deterministic, locale-independent ASCII case operations (`to_lower`, `to_upper`, case-insensitive compare) |
+| `strings_cstr` | validated borrowed `CStr`, owned `CString`, and bounded mutable `CBuffer` for NUL-terminated interop |
+| `strings_tokenize` | explicit-state, reentrant tokenization — no module-global continuation state, input never mutated |
+| `strings_checked` | checked unsigned size arithmetic used by every module ahead of allocation or addressing |
+| `strings_locale` | explicit locale capability lifecycle (`LocaleId`, `Locale`, `open`, `compare`, `transform`) — no ambient process locale |
+| `strings_c23` | safe compatibility façade for ISO C23 `<string.h>` |
+| `strings_posix2024` | safe compatibility façade for POSIX.1-2024 Issue 8 `<string.h>`/`<strings.h>`, including `_l` locale variants |
+| `strings_legacy` | opt-in, deprecated `<strings.h>` migration aliases (`bcmp`, `bcopy`, `bzero`, `index`, `rindex`) |
+| `strings_unsafe_abi` | **Future**, feature-gated exact C ABI surface; never imported by a safe module, excluded from the default build |
+
+See [`docs/README.md`](docs/README.md) for the full documentation index,
+and each module's own header doc comment in `lib/` for its section of the
+governing spec.
+
+## Development
+
+```bash
+git clone --recurse-submodules git@github.com:sv0-toolchain/sv0-toolchain.git
+cd sv0-toolchain/sv0-strings
+scripts/check                              # dependency-free gate: catalogs, traceability, policy, generated-doc drift
+scripts/test --backend=both --dir=test     # full fixture corpus on the C backend and the native sv0 VM
+```
+
+`scripts/check` needs no toolchain build and runs in seconds; `scripts/test`
+and `scripts/sanitize` need a built `sv0c`/`sv0vm` from the sibling
+`sv0-toolchain` checkout (this repo is normally cloned as its submodule, not
+standalone). `scripts/contract_matrix` and `scripts/consumer_rehearsal` are
+the two slower cross-backend/cross-mode rehearsals run in CI
+(`.github/workflows/ci.yml`); run them locally before touching anything that
+affects staging, linking, or contract-mode selection.
+
+Every requirement traces to a `tools/catalogs/tests.tsv` row, a non-test
+verification marker, or an explicit annotation in
+`tools/check_traceability.py` — a new function needs one of the three before
+`scripts/check` will pass. New requirement IDs are assigned in the governing
+SPEC, not invented locally.
 
 ## Release evidence
 

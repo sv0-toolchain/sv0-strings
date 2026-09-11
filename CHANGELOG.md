@@ -26,6 +26,15 @@ semantic versioning per SPEC.md Section 26.
   `CHANGELOG.md` entries predating this merge are left as-written. No
   requirement/test/evidence catalog changed; `scripts/check` and
   `scripts/test --backend=both --dir=test` (59/59) both green.
+- `README.md` extended to standard library-README shape: CI/release/license
+  badges; a "Quick example" section with two compilable `sv0` snippets
+  (`strings_text::concat`'s `ConcatResult` match, `strings_bytes::compare`'s
+  `Ordering` match) verified against real syntax in
+  `test/property/text_concat.sv0` / `bytes_compare_equal.sv0`; a "Modules"
+  table summarizing all 12 `lib/strings_*.sv0` modules; and a "Development"
+  section (clone-as-submodule, `scripts/check`/`scripts/test` quick start,
+  what needs a built toolchain vs. what doesn't, the traceability
+  obligation for new functions).
 
 ## [1.0.0] - 2026-09-11
 
