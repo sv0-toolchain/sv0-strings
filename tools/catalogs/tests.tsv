@@ -82,3 +82,5 @@ T-COMPLEXITY-BENCH-001	tools/check_complexity_benchmarks.py	PERF-001,PERF-003,PE
 T-CONSUMER-REHEARSAL-001	scripts/consumer_rehearsal	TEST-018	c,vm	safe	runtime	tool	done
 T-CONSUMER-REHEARSAL-SHAPE-001	tools/check_consumer_rehearsal.py	TEST-018	c,vm	safe		tool	done
 T-ACCEPTANCE-001	tools/check_acceptance.py	GOV-007	c,vm	safe		tool	done
+T-RELEASE-MANIFEST-001	scripts/release_manifest	BACKEND-007,GOV-002	c,vm	safe		tool	done
+T-RELEASE-MANIFEST-SHAPE-001	tools/check_release_manifest.py	BACKEND-007,GOV-002	c,vm	safe		tool	done

@@ -49,6 +49,9 @@ python3 tools/check_consumer_rehearsal.py || fail=1
 echo "== check_acceptance (BL-097 acceptance-scenario evidence binding, AC-001..036) =="
 python3 tools/check_acceptance.py || fail=1
 
+echo "== check_release_manifest (BACKEND-007 / GOV-002 content-addressed manifest) =="
+python3 tools/check_release_manifest.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

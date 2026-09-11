@@ -1,0 +1,104 @@
+#!/usr/bin/env bash
+# SS-190 (SPEC BL-098 / BACKEND-007 / GOV-002): immutable, content-addressed
+# release manifest.
+#
+# Captures, as of the moment it runs: the exact sv0-strings / sv0-toolchain
+# / sv0c / sv0vm revisions, the host C compiler version, the supported
+# target list (tools/catalogs/targets.tsv), and a SHA-256 digest of every
+# evidence catalog under tools/catalogs/ -- then computes one further
+# SHA-256 over that whole body: the "manifest-digest", the content address
+# for this release snapshot (BACKEND-007's "release evidence schema").
+#
+# Unlike scripts/contract_matrix / scripts/consumer_rehearsal, this script
+# does NOT drift-fail against the checked-in file: the *-head revision
+# fields are EXPECTED to change on every commit (that is the point -- the
+# manifest documents "true as of generation time", like a lockfile). What
+# must never drift is INTERNAL self-consistency: every catalog-digest row
+# must equal the live SHA-256 of its file, and manifest-digest must equal
+# SHA-256 of the rows above it -- `tools/check_release_manifest.py` (in
+# `scripts/check`, dependency-free) gates exactly that, on every commit,
+# without needing the toolchain this script itself only optionally uses
+# (only for the sv0-toolchain/sv0c/sv0vm git metadata; no build required).
+#
+# Usage: scripts/release_manifest        (regenerates + overwrites)
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+if [[ -n "${SV0_TOOLCHAIN_ROOT:-}" ]]; then
+  TC="$SV0_TOOLCHAIN_ROOT"
+elif [[ -d "$HERE/../sv0c" ]]; then
+  TC="$HERE/.."
+elif [[ -d "$HERE/../sv0-toolchain" ]]; then
+  TC="$HERE/../sv0-toolchain"
+else
+  TC=""
+fi
+[[ -n "$TC" ]] && TC="$(cd "$TC" && pwd)"
+
+sha256() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "$1" | cut -d' ' -f1
+  else
+    shasum -a 256 "$1" | cut -d' ' -f1
+  fi
+}
+sha256_stdin() {
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | cut -d' ' -f1
+  else
+    shasum -a 256 | cut -d' ' -f1
+  fi
+}
+
+sv0strings_head="$(git rev-parse HEAD)"
+sv0toolchain_head="unknown"
+sv0c_head="unknown"
+sv0vm_head="unknown"
+if [[ -n "$TC" && -d "$TC/.git" ]]; then
+  sv0toolchain_head="$(git -C "$TC" rev-parse HEAD 2>/dev/null || echo unknown)"
+  [[ -d "$TC/sv0c/.git" || -f "$TC/sv0c/.git" ]] && \
+    sv0c_head="$(git -C "$TC/sv0c" rev-parse HEAD 2>/dev/null || echo unknown)"
+  [[ -d "$TC/sv0vm/.git" || -f "$TC/sv0vm/.git" ]] && \
+    sv0vm_head="$(git -C "$TC/sv0vm" rev-parse HEAD 2>/dev/null || echo unknown)"
+fi
+
+cc_version="$(cc --version 2>&1 | head -1 | tr -s ' \t')"
+[[ -z "$cc_version" ]] && cc_version="unknown"
+
+targets="$(tail -n +2 tools/catalogs/targets.tsv | cut -f1 | paste -sd, -)"
+
+CATALOG="tools/catalogs/release_manifest.tsv"
+
+declare -a ROWS=()
+ROWS+=("sv0-strings-head	$sv0strings_head")
+ROWS+=("sv0-toolchain-head	$sv0toolchain_head")
+ROWS+=("sv0c-head	$sv0c_head")
+ROWS+=("sv0vm-head	$sv0vm_head")
+ROWS+=("cc-version	$cc_version")
+ROWS+=("supported-targets	$targets")
+
+while IFS= read -r f; do
+  name="$(basename "$f")"
+  [[ "$name" == "release_manifest.tsv" ]] && continue
+  ROWS+=("catalog-digest:$name	$(sha256 "$f")")
+done < <(find tools/catalogs -maxdepth 1 -name '*.tsv' | sort)
+
+BODY="$(printf '%s\n' "${ROWS[@]}")"
+manifest_digest="$(printf '%s' "$BODY" | sha256_stdin)"
+ROWS+=("manifest-digest	$manifest_digest")
+
+{
+  printf 'component\tvalue\n'
+  printf '%s\n' "${ROWS[@]}"
+} > "$CATALOG"
+
+echo "scripts/release_manifest: wrote $CATALOG"
+echo "  sv0-strings-head    $sv0strings_head"
+echo "  sv0-toolchain-head  $sv0toolchain_head"
+echo "  sv0c-head           $sv0c_head"
+echo "  sv0vm-head          $sv0vm_head"
+echo "  cc-version          $cc_version"
+echo "  supported-targets   $targets"
+echo "  catalogs digested   $(( ${#ROWS[@]} - 7 ))"
+echo "  manifest-digest     $manifest_digest"

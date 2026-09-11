@@ -117,10 +117,24 @@ jobs:
           SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
         run: ./scripts/consumer_rehearsal
 
+      - name: "scripts/release_manifest (BL-098 / BACKEND-007 / GOV-002 content-addressed manifest)"
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: ./scripts/release_manifest
+
       - name: Upload run record
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: ci-results
           path: sv0-strings/ci-results.tsv
+          if-no-files-found: ignore
+
+      - name: Upload release manifest
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-manifest
+          path: sv0-strings/tools/catalogs/release_manifest.tsv
           if-no-files-found: ignore

@@ -91,6 +91,31 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Immutable, content-addressed release manifest** (SS-190 / BL-098 /
+  BACKEND-007 / GOV-002): new `scripts/release_manifest` (a CI step;
+  regenerates on every run, no toolchain build required — only git
+  metadata) captures the exact `sv0-strings` / `sv0-toolchain` / `sv0c` /
+  `sv0vm` revisions, the host C compiler version, the supported-target
+  list, and a SHA-256 digest of every evidence catalog under
+  `tools/catalogs/` into `tools/catalogs/release_manifest.tsv`, then a
+  further SHA-256 over that whole body — the `manifest-digest` — as the
+  content address for the snapshot. Unlike `scripts/contract_matrix` /
+  `scripts/consumer_rehearsal`, the recorded revision fields are expected
+  to change on every commit (a lockfile, not an invariant); what
+  `tools/check_release_manifest.py` (dependency-free, in `scripts/check`)
+  gates on every commit instead is **self-consistency**: every
+  `catalog-digest:<name>` row must equal the live SHA-256 of
+  `tools/catalogs/<name>` (a catalog edited without regenerating the
+  manifest is caught immediately), and `manifest-digest` must equal
+  SHA-256 of the exact body above it (catches a hand-edit to the manifest
+  itself). CI uploads the manifest as a build artifact on every run,
+  `if: always()`. `docs/release-manifest.md` is the companion. New
+  `tests.tsv` rows `T-RELEASE-MANIFEST-001`, `T-RELEASE-MANIFEST-SHAPE-001`
+  → BACKEND-007 / GOV-002. `scripts/check` PASS; `scripts/test
+  --backend=both --dir=test` = 59/59 (no fixture/lib change this slice);
+  `--self-test`, `scripts/contract_matrix`, `scripts/consumer_rehearsal`,
+  `scripts/sanitize` all PASS.
+
 - **Acceptance-scenario evidence binding** (SS-189 / BL-097 /
   AC-001..036): new `tools/catalogs/acceptance.tsv` — one row per SPEC
   §23 acceptance scenario, `status` ∈ {`bound`, `deferred`,
