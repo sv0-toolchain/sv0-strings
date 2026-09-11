@@ -91,6 +91,31 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Pure / accelerated full equivalence matrix** (SS-186 / BL-094 /
+  BACKEND-003 / ARCH-007 / AC-020): new `tools/check_accel_matrix.py`
+  (dependency-free, in `scripts/check`) re-derives the live capability
+  surface straight from source — every `pub fn ACCEL_CAP_X() -> i32`
+  declaration in `strings_types.sv0`, and every
+  `accel_available(ACCEL_CAP_X())` call site (with its enclosing `pub fn`
+  dispatcher) across `lib/*.sv0` — and requires
+  `tools/catalogs/accel_matrix.tsv`'s `dispatchers` set to match exactly;
+  a capability with zero live dispatchers must be explicit
+  `status=reserved` with a rationale, never silently absent. **Found and
+  fixed a real gap this surfaced**: `ACCEL_CAP_SUBSTRING` was declared at
+  R0.1 but nothing ever dispatched through it — `strings_bytes::find_slice`
+  was a bare pure implementation. Split into `find_slice_pure` (unchanged
+  algorithm) plus a `find_slice` dispatcher matching the `find`/`find_pure`
+  pattern (SS-110); behaviourally identical today (no accelerator exists
+  at R1), and now genuinely testable "with acceleration on" once one
+  lands. All 3 declared capabilities (`ACCEL_CAP_BYTE_SEARCH`,
+  `ACCEL_CAP_CASE_FOLD`, `ACCEL_CAP_SUBSTRING`) are `wired`, each with a
+  named `equivalence_evidence` fixture (`T-ACCEL-SELECTION-001`,
+  `T-BYTES-FUZZ-001`, `T-ASCII-CASE-001`, `T-BYTES-FIND-SLICE-001`).
+  `docs/accel-matrix.md` is the companion. New `tests.tsv` row
+  `T-ACCEL-MATRIX-001` → BACKEND-003 / ARCH-007 / UP-011. `scripts/check`
+  PASS; `scripts/test --backend=both --dir=test` = 59/59; `--self-test`
+  green; `scripts/contract_matrix` PASS; `scripts/sanitize` PASS.
+
 - **Contract-mode capability matrix** (SS-185 / BL-093 / TEST-019 /
   UP-028 / AC-019): new `scripts/contract_matrix` (CI step; needs the
   toolchain) actually exercises every (backend, contract-mode)

@@ -19,12 +19,14 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `PERF-009`,
 
 ## Coverage tally (270 requirements)
 
-- **198** covered by a `tests.tsv` row (78 rows total; SS-182 added
+- **198** covered by a `tests.tsv` row (79 rows total; SS-182 added
   `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006, SS-183 added
   `T-BYTES-FUZZ-001` / `T-FUZZ-BUDGET-001` → TEST-017, SS-184 added
   `T-GATE-POLICY-001` → BACKEND-009 / TEST-020, SS-185 added
   `T-CONTRACT-MATRIX-001` / `T-CONTRACT-MATRIX-RUN-001` → TEST-019 /
-  UP-028).
+  UP-028, SS-186 added `T-ACCEL-MATRIX-001` — BACKEND-003 / ARCH-007 /
+  UP-011 were already test-covered, so the tally is unchanged but the
+  matrix itself found and fixed a real orphaned-capability gap).
 - **46** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).

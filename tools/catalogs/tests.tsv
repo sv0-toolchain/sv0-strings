@@ -77,3 +77,4 @@ T-FUZZ-BUDGET-001	tools/check_fuzz_budget.py	TEST-017	c,vm	safe		tool	done
 T-GATE-POLICY-001	tools/check_gate_policy.py	BACKEND-009,TEST-020	c,vm	safe		tool	done
 T-CONTRACT-MATRIX-001	tools/check_contract_matrix.py	TEST-019,UP-028	c,vm	safe	runtime,verified,disabled	tool	done
 T-CONTRACT-MATRIX-RUN-001	scripts/contract_matrix	TEST-019,UP-028	c,vm	safe	runtime,verified,disabled	tool	done
+T-ACCEL-MATRIX-001	tools/check_accel_matrix.py	BACKEND-003,ARCH-007,UP-011	c,vm	safe		tool	done

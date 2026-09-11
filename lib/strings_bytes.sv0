@@ -17,8 +17,10 @@
 ///           exported; neither backend guarantees non-elision. Evidence +
 ///           unblock path: docs/fill-explicit-blocked.md. Never alias to `fill`.
 ///
-/// SS-110: accelerable ops dispatch through `accel_available` (SPEC UP-011);
-/// no accelerator exists at R0.1 so the pure path is always selected.
+/// SS-110 / SS-186: accelerable ops dispatch through `accel_available`
+/// (SPEC UP-011) -- `find` (ACCEL_CAP_BYTE_SEARCH) and `find_slice`
+/// (ACCEL_CAP_SUBSTRING). No accelerator exists at R1 so the pure path is
+/// always selected; see `docs/accel-matrix.md` (SPEC BACKEND-003).
 ///
 /// Slice length is read with `slice_len(s)` (sv0doc type-system/rules.md
 /// §2.2.1; the `sl.len()` method sugar is a later ergonomic slice).
@@ -31,6 +33,7 @@ use strings_types::CopyResult;
 use strings_types::MoveResult;
 use strings_types::accel_available;
 use strings_types::ACCEL_CAP_BYTE_SEARCH;
+use strings_types::ACCEL_CAP_SUBSTRING;
 
 /// BYTE-001 (F0): lexicographic unsigned-byte comparison. Returns
 /// `Ordering::Equal` iff both slices have the same length and every byte is
@@ -166,13 +169,14 @@ fn slice_match_at(hay: &[byte], off: usize, needle: &[byte], nlen: usize) -> boo
 /// or `Option::None`. An empty needle returns `Option::Some(0)`; a needle
 /// longer than the haystack returns `Option::None`.
 ///
-/// Algorithm: naive left-to-right scan. It tries each start offset
-/// `0 ..= haystack.len() - needle.len()` and compares byte-by-byte, stopping
-/// at the first mismatch. Time is O(n * m) worst case (n = haystack length,
-/// m = needle length) on adversarial repeated-prefix inputs, O(1) auxiliary
-/// storage. This is the F0 reference implementation; an R1 replacement with a
-/// linear-time algorithm is planned. See `docs/complexity.md` (PERF-002).
-pub fn find_slice(haystack: &[byte], needle: &[byte]) -> Option<usize> {
+/// Algorithm: naive left-to-right scan (the Tier-1 semantic reference). It
+/// tries each start offset `0 ..= haystack.len() - needle.len()` and
+/// compares byte-by-byte, stopping at the first mismatch. Time is O(n * m)
+/// worst case (n = haystack length, m = needle length) on adversarial
+/// repeated-prefix inputs, O(1) auxiliary storage. This is the F0
+/// reference implementation; an R1 replacement with a linear-time
+/// algorithm is planned. See `docs/complexity.md` (PERF-002).
+fn find_slice_pure(haystack: &[byte], needle: &[byte]) -> Option<usize> {
     let hlen: usize = slice_len(haystack);
     let nlen: usize = slice_len(needle);
     if nlen == 0 { return Option::Some(0); }
@@ -188,6 +192,18 @@ pub fn find_slice(haystack: &[byte], needle: &[byte]) -> Option<usize> {
         s = s + 1;
     }
     return Option::None;
+}
+
+/// SS-186 (SPEC BACKEND-003 / ARCH-007 / UP-011): dispatches through the
+/// accelerator harness (`ACCEL_CAP_SUBSTRING`, declared since R0.1 but
+/// unwired until this slice -- see `docs/accel-matrix.md`). No substring
+/// accelerator is registered at R1, so `find_slice` == `find_slice_pure`.
+pub fn find_slice(haystack: &[byte], needle: &[byte]) -> Option<usize> {
+    if accel_available(ACCEL_CAP_SUBSTRING()) != true {
+        return find_slice_pure(haystack, needle);
+    }
+    /* Tier-2 accelerated substring search plugs in here; none at R1. */
+    return find_slice_pure(haystack, needle);
 }
 
 /// True iff byte `b` appears anywhere in `set`. Linear scan (BYTE-016/017:

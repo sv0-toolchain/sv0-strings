@@ -1,0 +1,4 @@
+capability	tag_id	dispatchers	pure_reference	equivalence_evidence	status
+ACCEL_CAP_BYTE_SEARCH	1	strings_bytes::find	strings_bytes::find_pure	T-ACCEL-SELECTION-001,T-BYTES-FUZZ-001	wired
+ACCEL_CAP_CASE_FOLD	2	strings_ascii::to_lower,strings_ascii::to_upper	strings_ascii::to_lower_pure,strings_ascii::to_upper_pure	T-ASCII-CASE-001	wired
+ACCEL_CAP_SUBSTRING	3	strings_bytes::find_slice	strings_bytes::find_slice_pure	T-BYTES-FIND-SLICE-001,T-BYTES-FUZZ-001	wired
