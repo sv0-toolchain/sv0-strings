@@ -34,6 +34,9 @@ python3 tools/check_fuzz_budget.py || fail=1
 echo "== check_gate_policy (BACKEND-009 hard-fail lint / TEST-020 fail-closed audit) =="
 python3 tools/check_gate_policy.py || fail=1
 
+echo "== check_contract_matrix (TEST-019 / UP-028 / AC-019 contract-mode matrix shape) =="
+python3 tools/check_contract_matrix.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 

@@ -105,6 +105,12 @@ jobs:
           sudo locale-gen en_US.UTF-8 tr_TR.UTF-8
           ./scripts/locale_matrix
 
+      - name: "scripts/contract_matrix (BL-093 / TEST-019 / UP-028 contract-mode matrix)"
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: ./scripts/contract_matrix
+
       - name: Upload run record
         if: always()
         uses: actions/upload-artifact@v4

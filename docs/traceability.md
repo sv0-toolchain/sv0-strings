@@ -15,14 +15,16 @@ all IDs unique.**
 R1 / Future requirements are allowed to be uncovered (their covering slices
 are SS-182…192 and the Future backlog); the checker lists them for
 information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `PERF-009`,
-`TEST-019`, `TEXT-017`.
+`TEXT-017`.
 
 ## Coverage tally (270 requirements)
 
-- **197** covered by a `tests.tsv` row (76 rows total; SS-182 added
+- **198** covered by a `tests.tsv` row (78 rows total; SS-182 added
   `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006, SS-183 added
   `T-BYTES-FUZZ-001` / `T-FUZZ-BUDGET-001` → TEST-017, SS-184 added
-  `T-GATE-POLICY-001` → BACKEND-009 / TEST-020).
+  `T-GATE-POLICY-001` → BACKEND-009 / TEST-020, SS-185 added
+  `T-CONTRACT-MATRIX-001` / `T-CONTRACT-MATRIX-RUN-001` → TEST-019 /
+  UP-028).
 - **46** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).

@@ -75,3 +75,5 @@ T-FIXTURE-PROVENANCE-001	tools/check_fixture_provenance.py	TEST-004,TEST-006	c,v
 T-BYTES-FUZZ-001	test/fuzz/bytes_fuzz.sv0	TEST-017,UP-011,SEC-001,BYTE-002,BYTE-012	c,vm	safe	runtime	fuzz	done
 T-FUZZ-BUDGET-001	tools/check_fuzz_budget.py	TEST-017	c,vm	safe		tool	done
 T-GATE-POLICY-001	tools/check_gate_policy.py	BACKEND-009,TEST-020	c,vm	safe		tool	done
+T-CONTRACT-MATRIX-001	tools/check_contract_matrix.py	TEST-019,UP-028	c,vm	safe	runtime,verified,disabled	tool	done
+T-CONTRACT-MATRIX-RUN-001	scripts/contract_matrix	TEST-019,UP-028	c,vm	safe	runtime,verified,disabled	tool	done

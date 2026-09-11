@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# SS-185 (SPEC BL-093 / TEST-019 / UP-028 / AC-019): the contract-mode
+# capability matrix. Runs a small representative fixture set through
+# `scripts/test` for every (backend, contract-mode) combination -- C/VM x
+# runtime/verified/disabled -- and records the EFFECTIVE outcome of each:
+#
+#   pass         the build+run succeeded and matched the expected exit.
+#   unsupported  the backend reported the mode as unsupported (VM project
+#                mode has no --contract-mode selector -- SPEC OQ-012 /
+#                UP-028 / docs/BUGS.md #6); NEVER counted as a pass.
+#   fail         a real mismatch -- this is a hard gate failure.
+#
+# UP-028 requires every project run to record its effective contract mode;
+# this script is that record, checked into tools/catalogs/contract_matrix.tsv
+# and re-verified on every CI run (a drift between the recorded matrix and
+# the live behaviour is a hard failure, not a silent update).
+# `tools/check_contract_matrix.py` (in scripts/check, no toolchain needed)
+# validates the catalog's shape and that no row claims `fail`; THIS script
+# is what actually exercises the toolchain and can flip a row.
+#
+# Toolchain discovery: same as scripts/sanitize.
+# Usage: scripts/contract_matrix [--write]
+#   --write   overwrite tools/catalogs/contract_matrix.tsv with the live
+#             result (default: compare against it and fail on any drift).
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+WRITE=0
+[[ "${1:-}" == "--write" ]] && WRITE=1
+
+CATALOG="tools/catalogs/contract_matrix.tsv"
+FIXTURES=(types_smoke.sv0 checked_overflow.sv0)
+MODES=(runtime verified disabled)
+BACKENDS=(c vm)
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+fixtures_csv="$(IFS=,; echo "${FIXTURES[*]}")"
+
+declare -a OUT_ROWS=()
+overall_fail=0
+
+for mode in "${MODES[@]}"; do
+  for backend in "${BACKENDS[@]}"; do
+    rec="$tmp/rec_${backend}_${mode}.tsv"
+    args=()
+    for f in "${FIXTURES[@]}"; do args+=("--case=$f"); done
+    ./scripts/test --backend="$backend" --contract-mode="$mode" "${args[@]}" \
+      --record="$rec" -q >"$tmp/log_${backend}_${mode}" 2>&1
+    run_rc=$?
+
+    # Classify every recorded row for this backend leg.
+    result="pass"
+    n=0
+    while IFS=$'\t' read -r _case leg _emitter _mode want got; do
+      [[ "$leg" == "$backend" ]] || continue
+      n=$((n + 1))
+      if [[ "$got" == "MODE_UNSUPPORTED" ]]; then
+        [[ "$result" == "fail" ]] || result="unsupported"
+      elif [[ "$got" == "$want" ]]; then
+        : # pass; leave result as-is unless already unsupported/fail
+      else
+        result="fail"
+      fi
+    done < "$rec"
+
+    if [[ "$n" -eq 0 ]]; then
+      result="fail"   # the record file must have one row per fixture
+    fi
+    # A driver-level EMIT_FAIL/CC_FAIL/etc that still returns run_rc!=0 for
+    # an otherwise-"pass" classification is also a hard failure.
+    if [[ "$result" == "pass" && "$run_rc" -ne 0 ]]; then
+      result="fail"
+    fi
+
+    [[ "$result" == "fail" ]] && overall_fail=1
+
+    note="-"
+    if [[ "$result" == "unsupported" ]]; then
+      note="VM project mode has no --contract-mode selector (SPEC OQ-012 / UP-028 / docs/BUGS.md #6)"
+    fi
+    OUT_ROWS+=("$backend	$mode	$result	$fixtures_csv	$note")
+    echo "  $backend / $mode -> $result"
+  done
+done
+
+NEW_CONTENT="backend	mode	result	fixtures	note
+$(printf '%s\n' "${OUT_ROWS[@]}")
+"
+
+if [[ "$WRITE" -eq 1 ]]; then
+  printf '%s' "$NEW_CONTENT" > "$CATALOG"
+  echo "scripts/contract_matrix: wrote $CATALOG"
+else
+  if [[ ! -f "$CATALOG" ]]; then
+    echo "scripts/contract_matrix: FAIL -- $CATALOG does not exist (run with --write once)" >&2
+    overall_fail=1
+  elif ! diff -q <(printf '%s' "$NEW_CONTENT") "$CATALOG" >/dev/null 2>&1; then
+    echo "scripts/contract_matrix: FAIL -- live result differs from the checked-in $CATALOG" >&2
+    diff <(printf '%s' "$NEW_CONTENT") "$CATALOG" >&2 || true
+    overall_fail=1
+  fi
+fi
+
+if [[ "$overall_fail" -ne 0 ]]; then
+  echo "scripts/contract_matrix: FAIL"
+  exit 1
+fi
+echo "scripts/contract_matrix: PASS (${#BACKENDS[@]} backend(s) x ${#MODES[@]} mode(s), 0 unexplained unsupported, 0 fail)"

@@ -1,0 +1,7 @@
+backend	mode	result	fixtures	note
+c	runtime	pass	types_smoke.sv0,checked_overflow.sv0	-
+vm	runtime	pass	types_smoke.sv0,checked_overflow.sv0	-
+c	verified	pass	types_smoke.sv0,checked_overflow.sv0	-
+vm	verified	unsupported	types_smoke.sv0,checked_overflow.sv0	VM project mode has no --contract-mode selector (SPEC OQ-012 / UP-028 / docs/BUGS.md #6)
+c	disabled	pass	types_smoke.sv0,checked_overflow.sv0	-
+vm	disabled	unsupported	types_smoke.sv0,checked_overflow.sv0	VM project mode has no --contract-mode selector (SPEC OQ-012 / UP-028 / docs/BUGS.md #6)

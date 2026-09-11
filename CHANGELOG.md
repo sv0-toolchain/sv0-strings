@@ -91,6 +91,31 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Contract-mode capability matrix** (SS-185 / BL-093 / TEST-019 /
+  UP-028 / AC-019): new `scripts/contract_matrix` (CI step; needs the
+  toolchain) actually exercises every (backend, contract-mode)
+  combination — `c`/`vm` × `runtime`/`verified`/`disabled` — against two
+  representative fixtures, classifies each leg from `scripts/test
+  --record`'s own sentinel (`MODE_UNSUPPORTED` vs a numeric exit code, so
+  "unsupported" can never be silently reclassified as "pass"), and fails
+  on any drift from the checked-in `tools/catalogs/contract_matrix.tsv`
+  (`--write` regenerates it deliberately). Recorded matrix: C is `pass` in
+  all three modes; the native VM project path is `pass` at `runtime` and
+  **`unsupported`** at `verified`/`disabled` (it has no `--contract-mode`
+  selector — SPEC OQ-012 / UP-028, `docs/BUGS.md` #6, resolved
+  2026-09-02) — never counted as a pass (AC-019). New
+  `tools/check_contract_matrix.py` (dependency-free, in `scripts/check`)
+  validates the catalog's shape: exactly 6 rows, no duplicates, `result`
+  ∈ {pass, unsupported, fail}, a checked-in `fail` is itself an error, and
+  every `unsupported` row carries a ≥ 20-char explanatory note.
+  `docs/contract-mode-matrix.md` is the companion. `scripts/contract_matrix`
+  added to `check_gate_policy.py`'s scanned gate files (1 new waived probe
+  guard). New `tests.tsv` rows `T-CONTRACT-MATRIX-001`,
+  `T-CONTRACT-MATRIX-RUN-001` → TEST-019 / UP-028. `scripts/check` PASS;
+  `scripts/test --backend=both --dir=test` = 59/59; `--self-test` green;
+  `scripts/contract_matrix` PASS (0 fail, 2 explained unsupported);
+  `scripts/sanitize` / `scripts/locale_matrix` PASS.
+
 - **Fail-closed release audit + gate-policy hard-fail lint** (SS-184 /
   BL-092 / BACKEND-009 / TEST-020): new `tools/check_gate_policy.py` (in
   `scripts/check`) scans the gate scripts + CI workflow for soft signals —
