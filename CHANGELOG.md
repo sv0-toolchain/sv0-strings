@@ -102,8 +102,8 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   slice (AC-025 → SS-191, AC-035 → SS-013), 1 `toolchain-evidence` (AC-024
   — the borrow-checker diagnostics live in sv0c, with this repo's own
   `c23_memcpy_overlap.sv0` cited as the consumer-side proof), and 11
-  `spec-unavailable` (AC-002/003/004/007/010/011/013/014/015/022/023 —
-  genuinely never cited anywhere in this checkout; the SPEC text is
+  `spec-unavailable` (11 scenarios with no citation anywhere in this
+  checkout, listed in `tools/catalogs/acceptance.tsv`; the SPEC text is
   private and not part of it). New `tools/check_acceptance.py`
   (dependency-free, in `scripts/check`): validates the table's shape (all
   36 ids, valid status vocabulary, evidence tokens that actually resolve)
