@@ -70,9 +70,6 @@ ANNOTATIONS: dict[str, str] = {
                "discrepancies; `docs/f0-deviations.md` is the decision log.",
     "GOV-006": "change record — per-slice `CHANGELOG.md` entries document every "
                "material change to public semantics / errors / dispositions.",
-    "LIC-001": "release gate for SS-192 — `LICENSE-APACHE` + `LICENSE-MIT` are "
-               "present and the dual-license decision is recorded in "
-               "`README.md`; the maintainer sign-off is bound at R1 tag.",
     "PERF-007": "N/A at R0.4 — no locale transform runs (every host-locale "
                 "adapter is a fail-closed stub); revisit with the real service "
                 "(`docs/r0.4-gate-review.md`).",

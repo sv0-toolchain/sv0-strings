@@ -1,10 +1,17 @@
 # Changelog
 
 All notable changes to `sv0-strings` are recorded here. The format follows
-[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the library will use
-semantic versioning per SPEC.md Section 26 once F0 is reached.
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/); the library uses
+semantic versioning per SPEC.md Section 26.
 
 ## [Unreleased]
+
+## [1.0.0] - 2026-09-11
+
+R1 gate PASS (SS-192, `docs/r1-gate-review.md`) — the full release ladder
+F0 through R1 is complete, on both the C backend and the native sv0 VM.
+Every entry below (F0 through R1) shipped as part of this first tagged
+release; nothing in this changelog predates `v1.0.0`.
 
 ### Added
 
@@ -89,7 +96,36 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   --backend=both` = 28/28. R0.2 deviations D-4 / D-6 / D-7 / D-8 / D-9 are
   registered and change no behavioural result.
 
-### R1 (in progress)
+### R1 (complete — gate PASS, SS-181..192, tagged `v1.0.0`)
+
+- **Approve + tag R1** (SS-192 / BL-100 / SPEC §24.6 / DOC-007 / LIC-005):
+  the release capstone. New `docs/r1-gate-review.md` — the full sign-off,
+  indexing every R1 evidence dimension (traceability, fixture provenance,
+  fuzz budget, gate policy, contract-mode matrix, pure/accel equivalence,
+  complexity benchmarks, offline rehearsal, acceptance scenarios, release
+  manifest, exceptions) and closing LIC-001/002/003/004/005 + DOC-007
+  explicitly: LIC-002 via a single root-level dual-license declaration
+  every file inherits (the SPEC text's own "carry or inherit"
+  alternative); LIC-004 confirmed N/A (`tools/catalogs/provenance.tsv` is
+  intentionally empty — no third-party corpus is vendored); LIC-005 and
+  DOC-007 both satisfied at the tag. New `tools/check_release_readiness.py`
+  (dependency-free, in `scripts/check`): asserts `LICENSE-APACHE` /
+  `LICENSE-MIT` exist, `CHANGELOG.md` has a real dated release section
+  (not just `[Unreleased]`), `README.md` names the same version, and
+  `docs/r1-gate-review.md` exists and references every release-evidence
+  catalog. `README.md` fully rewritten from its stale pre-F0 "nothing
+  implemented yet" status to the shipped `v1.0.0` reality (release
+  ladder, toolchain-enablement summary, real `scripts/test` consumption
+  instructions, a release-evidence index). `LIC-001` moved off
+  `check_traceability.py`'s `ANNOTATIONS` deferral — "maintainer sign-off
+  bound at R1 tag" is now this slice's own `T-RELEASE-READINESS-001` row.
+  `CHANGELOG.md`'s `[Unreleased]` becomes `[1.0.0] - 2026-09-11`; the
+  stale "LIC-002..LIC-005 remain open" closing note is corrected. New
+  `tests.tsv` row `T-RELEASE-READINESS-001` → DOC-007 / LIC-005 / LIC-001.
+  `scripts/check` PASS; `scripts/test --backend=both --dir=test` = 59/59
+  (no fixture/lib change this slice); `--self-test`,
+  `scripts/contract_matrix`, `scripts/consumer_rehearsal`,
+  `scripts/sanitize` all PASS. **Tagged `v1.0.0`.**
 
 - **Exception schema + evidence-storage audit** (SS-191 / BL-099 /
   AC-025 / GOV-009 / GOV-010): new `tools/catalogs/exceptions.tsv` — the
@@ -967,5 +1003,17 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
   R0.1 library implementation (Track L) proceeds on that basis. **R0.1 byte +
   ASCII core is complete** (`docs/r0.1-gate-review.md`); `fill_explicit`
   remains Blocked (BYTE-010, `docs/fill-explicit-blocked.md`).
-- LIC-002..LIC-005 (per-file SPDX, standards-text provenance, third-party
-  fixture provenance, release-artifact notices) remain open.
+- LIC-002..LIC-005 closed at the R1 tag (SS-192, `docs/r1-gate-review.md`):
+  LIC-002 (SPDX/REUSE-style lint) via a single root-level dual-license
+  declaration every file inherits (the "inherit" alternative the
+  requirement's own text allows, appropriate for a single-license-family
+  repository this size); LIC-003 (provenance/licensing review) — standards
+  wording is paraphrased throughout, spot-checked at the R1 review; LIC-004
+  (third-party fixture provenance) — `tools/catalogs/provenance.tsv` is
+  intentionally empty, because no third-party corpus is vendored into this
+  repository (every fixture is hand-authored per
+  `tools/catalogs/fixtures.tsv`; every differential oracle queries the live
+  host libc rather than a checked-in corpus); LIC-005 (release-artifact
+  audit) — `LICENSE-APACHE` / `LICENSE-MIT` / `README.md` / `CHANGELOG.md`
+  are all present at the tag, and no third-party dependency notice is
+  needed because none is vendored.

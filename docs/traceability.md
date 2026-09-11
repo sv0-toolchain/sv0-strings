@@ -18,7 +18,7 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 
 ## Coverage tally (270 requirements)
 
-- **211** covered by a `tests.tsv` row (86 rows total; SS-182 added
+- **214** covered by a `tests.tsv` row (87 rows total; SS-182 added
   `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006, SS-183 added
   `T-BYTES-FUZZ-001` / `T-FUZZ-BUDGET-001` → TEST-017, SS-184 added
   `T-GATE-POLICY-001` → BACKEND-009 / TEST-020, SS-185 added
@@ -36,11 +36,14 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
   `tools/catalogs/acceptance.tsv` binding table for AC-001..036, not a
   requirement-tally change; SS-190 added `T-RELEASE-MANIFEST-001` /
   `T-RELEASE-MANIFEST-SHAPE-001` → BACKEND-007 / GOV-002; SS-191 added
-  `T-EXCEPTIONS-001` → GOV-009 / GOV-010).
-- **41** covered by a non-test verification marker in the requirement's own
+  `T-EXCEPTIONS-001` → GOV-009 / GOV-010; SS-192 added
+  `T-RELEASE-READINESS-001` → DOC-007 / LIC-005 / LIC-001 — LIC-001 moved
+  off the `ANNOTATIONS` deferral, its "maintainer sign-off bound at R1
+  tag" now a real evidence link).
+- **39** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).
-- **13** covered by an explicit `ANNOTATIONS` entry in
+- **12** covered by an explicit `ANNOTATIONS` entry in
   `check_traceability.py` — each gives the real verification method and why
   a fixture row is not the right vehicle:
 
@@ -55,7 +58,6 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 | TEST-005 / TEST-021 | owner slice **SS-013** (todo) — serialized fixture-ID digest + injected-mismatch gate |
 | GOV-004 | decision register — `docs/audit/2026-08-30.md` + `docs/f0-deviations.md` |
 | GOV-006 | change record — per-slice `CHANGELOG.md` entries |
-| LIC-001 | release gate for **SS-192** — `LICENSE-APACHE` + `LICENSE-MIT` present, dual-license decision in `README.md` |
 | UP-014 | owner slice **SS-187** (R1, partial) — optimized generated-code + VM trace inspection; the behavioural half is covered today by `T-SANITIZE-001` (`-O1` + ASan/UBSan) and the tier-2 VM byte-parity gate |
 | PERF-007 | **N/A at R0.4** — no locale transform runs; revisit with the real service |
 

@@ -55,6 +55,9 @@ python3 tools/check_release_manifest.py || fail=1
 echo "== check_exceptions (GOV-009 / GOV-010 exception schema + evidence-storage audit) =="
 python3 tools/check_exceptions.py || fail=1
 
+echo "== check_release_readiness (BL-100 / SPEC 24.6 / DOC-007 / LIC-005 release capstone) =="
+python3 tools/check_release_readiness.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 
