@@ -18,7 +18,7 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 
 ## Coverage tally (270 requirements)
 
-- **207** covered by a `tests.tsv` row (80 rows total; SS-182 added
+- **207** covered by a `tests.tsv` row (82 rows total; SS-182 added
   `T-FIXTURE-PROVENANCE-001` → TEST-004 / TEST-006, SS-183 added
   `T-BYTES-FUZZ-001` / `T-FUZZ-BUDGET-001` → TEST-017, SS-184 added
   `T-GATE-POLICY-001` → BACKEND-009 / TEST-020, SS-185 added
@@ -27,7 +27,11 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
   UP-011 were already test-covered, so the tally was unchanged but the
   matrix itself found and fixed a real orphaned-capability gap; SS-187
   added `T-COMPLEXITY-BENCH-001` → PERF-001/003/004/005/006/008/009,
-  SEC-007, MODEL-014 — moving all nine off the `ANNOTATIONS` deferral).
+  SEC-007, MODEL-014 — moving all nine off the `ANNOTATIONS` deferral;
+  SS-188 added `T-CONSUMER-REHEARSAL-001` / `T-CONSUMER-REHEARSAL-SHAPE-001`
+  — TEST-018 was already test-covered via `T-CI-WORKFLOW-001`, so the
+  tally is unchanged, but that row is now genuinely `done` rather than
+  `wip`).
 - **45** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).

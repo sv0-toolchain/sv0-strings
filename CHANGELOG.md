@@ -91,6 +91,33 @@ semantic versioning per SPEC.md Section 26 once F0 is reached.
 
 ### R1 (in progress)
 
+- **Offline clean-checkout consumer rehearsal** (SS-188 / BL-096 /
+  TEST-018): new `scripts/consumer_rehearsal` (CI step, needs the
+  toolchain) drives two representative fixtures through 8 combinations —
+  consumer mode `workspace` (the in-place dev checkout) vs `installed` (a
+  fresh, offline `git clone --local` of this repo's own committed `HEAD`
+  into a scratch directory — `--local` reads `.git` directly and never
+  touches the network), × `lib/*.sv0` staging order `forward`/`reverse`
+  (the sv0-strings-side analogue of the SS-U09 path-order class of bug),
+  × backend `c`/`vm` — all reusing the same already-built toolchain (no
+  rebuild). All 8 combinations pass; the result is checked into
+  `tools/catalogs/consumer_rehearsal.tsv` and any drift from a future run
+  is a hard failure (`--write` regenerates deliberately, same pattern as
+  `scripts/contract_matrix`). New `tools/check_consumer_rehearsal.py`
+  (dependency-free, in `scripts/check`): validates the catalog shape (8
+  rows, no dup/missing combo, a checked-in `fail` is itself a gate error)
+  and statically scans `scripts/consumer_rehearsal` for a network-fetching
+  command (`curl`, `wget`, a bare `http(s)://`, `git clone`/`fetch`/`pull`
+  without `--local`) — the same static-scan discipline `check_gate_policy.py`
+  (SS-184) uses for soft signals, applied here to "no network access".
+  `docs/consumer-rehearsal.md` is the companion. `T-CI-WORKFLOW-001`
+  flipped `wip` → `done` now that TEST-006/014/018, everything it names,
+  is implemented in the live workflow. New `tests.tsv` rows
+  `T-CONSUMER-REHEARSAL-001`, `T-CONSUMER-REHEARSAL-SHAPE-001` → TEST-018.
+  `scripts/check` PASS; `scripts/test --backend=both --dir=test` = 59/59;
+  `--self-test` green; `scripts/contract_matrix` PASS;
+  `scripts/consumer_rehearsal` PASS (8/8); `scripts/sanitize` PASS.
+
 - **Complexity + reproducible benchmark evidence** (SS-187 / BL-095 /
   PERF-001..009): `docs/complexity.md` extended with source-inspected
   algorithm + Big-O sections for PERF-003 (`strings_cstr::len` O(1) after

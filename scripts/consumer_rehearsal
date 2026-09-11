@@ -1,0 +1,164 @@
+#!/usr/bin/env bash
+# SS-188 (SPEC BL-096 / TEST-018 / AC-021 / AC-030 / AC-032 / AC-034 /
+# AC-036): offline clean-checkout consumer rehearsal.
+#
+# Proves sv0-strings is genuinely self-contained and order-insensitive, by
+# driving the SAME already-built toolchain (no rebuild, no network) against
+# TWO consumer modes, TWO lib-staging orders, and BOTH backends:
+#
+#   mode "workspace"  -- the in-place dev checkout (this directory), the
+#                        normal path every other gate script already uses.
+#   mode "installed"  -- a FRESH `git clone --local` of this repo's own
+#                        HEAD into a scratch directory. `--local` never
+#                        touches the network (it hardlinks/copies from the
+#                        `.git` on disk), so this is the offline half: it
+#                        proves the checked-in tree alone (no untracked
+#                        build artifact, no absolute dev-machine path, no
+#                        file outside git) is sufficient to build and pass.
+#
+#   order "forward"/"reverse" -- `lib/*.sv0` staged in ascending vs
+#                        descending filename order, catching the class of
+#                        bug SS-U09 fixed upstream (a result that silently
+#                        depended on directory-traversal / copy order).
+#
+# 2 modes x 2 orders x 2 backends = 8 combinations, each run against the
+# same representative fixtures used by scripts/contract_matrix. Every
+# combination MUST produce the same (correct) result; any divergence is a
+# hard failure. Like scripts/contract_matrix, the result is checked into
+# tools/catalogs/consumer_rehearsal.tsv and any drift is a hard failure
+# unless --write is passed to regenerate deliberately.
+#
+# Toolchain discovery: same as scripts/sanitize / scripts/contract_matrix.
+# Usage: scripts/consumer_rehearsal [--write]
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+if [[ -n "${SV0_TOOLCHAIN_ROOT:-}" ]]; then
+  TC="$SV0_TOOLCHAIN_ROOT"
+elif [[ -d "$HERE/../sv0c" && -x "$HERE/../build/sv0-megatu-compiler-native" ]]; then
+  TC="$HERE/.."
+elif [[ -d "$HERE/../sv0-toolchain" ]]; then
+  TC="$HERE/../sv0-toolchain"
+else
+  echo "scripts/consumer_rehearsal: cannot locate sv0-toolchain (set SV0_TOOLCHAIN_ROOT)" >&2
+  exit 2
+fi
+TC="$(cd "$TC" && pwd)"
+NC="$TC/build/sv0-megatu-compiler-native"
+RT="$TC/sv0c/runtime"
+SV0="$TC/scripts/sv0"
+[[ -x "$NC" ]] || { echo "scripts/consumer_rehearsal: missing $NC -- build the toolchain first" >&2; exit 2; }
+[[ -x "$SV0" ]] || { echo "scripts/consumer_rehearsal: missing $SV0 driver" >&2; exit 2; }
+
+WRITE=0
+[[ "${1:-}" == "--write" ]] && WRITE=1
+
+CATALOG="tools/catalogs/consumer_rehearsal.tsv"
+FIXTURES=(test/cases/types_smoke.sv0 test/property/checked_overflow.sv0)
+MODES=(workspace installed)
+ORDERS=(forward reverse)
+BACKENDS=(c vm)
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+# "installed" mode: a fresh, OFFLINE (--local touches no network), read-only
+# clone of this repo's own committed HEAD -- proves the checked-in tree
+# alone builds and passes, with nothing borrowed from the dev worktree.
+CLONE="$tmp/installed-clone"
+if ! GIT_TERMINAL_PROMPT=0 git clone --quiet --local --no-hardlinks "$HERE" "$CLONE" \
+     >"$tmp/clone.log" 2>&1; then
+  echo "scripts/consumer_rehearsal: FAIL -- local clone of HEAD failed" >&2
+  cat "$tmp/clone.log" >&2
+  exit 1
+fi
+
+libdir_for() { [[ "$1" == "workspace" ]] && echo "$HERE/lib" || echo "$CLONE/lib"; }
+
+stage_ordered() {
+  # $1=libdir  $2=main-path  $3=order  -> echoes staged dir
+  local libdir="$1" main="$2" order="$3" s
+  s="$(mktemp -d)"; mkdir -p "$s/lib"
+  local files
+  if [[ "$order" == "forward" ]]; then
+    files="$(find "$libdir" -maxdepth 1 -name '*.sv0' | sort)"
+  else
+    files="$(find "$libdir" -maxdepth 1 -name '*.sv0' | sort -r)"
+  fi
+  while IFS= read -r f; do [[ -n "$f" ]] && cp "$f" "$s/lib/"; done <<< "$files"
+  cp "$main" "$s/main.sv0"
+  echo "$s"
+}
+
+run_c() {
+  local s="$1" bin="$s/out_c"
+  if "$SV0" native-compile --project "$s" -o "$bin" >"$s/build.log" 2>&1; then
+    "$bin"; echo $?
+  else
+    echo "BUILD_FAIL"
+  fi
+}
+
+run_vm() {
+  local s="$1" b="$s/out.sv0b" out code
+  if ! "$SV0" vm-native-compile --project "$s" "$b" >"$s/vbuild.log" 2>&1; then
+    echo "EMIT_FAIL"; return
+  fi
+  [[ -s "$b" ]] || { echo "EMIT_EMPTY"; return; }
+  out="$("$SV0" vm-run "$b" 2>&1)"
+  code="$(echo "$out" | grep -oE 'vm_exit:-?[0-9]+' | head -1 | cut -d: -f2)"
+  [[ -n "$code" ]] && echo "$(( code & 255 ))" || echo "NO_EXIT"
+}
+
+overall_fail=0
+declare -a OUT_ROWS=()
+
+for mode in "${MODES[@]}"; do
+  libdir="$(libdir_for "$mode")"
+  for order in "${ORDERS[@]}"; do
+    for backend in "${BACKENDS[@]}"; do
+      combo_result="pass"
+      details=""
+      for main in "${FIXTURES[@]}"; do
+        mainpath="$HERE/$main"
+        s="$(stage_ordered "$libdir" "$mainpath" "$order")"
+        if [[ "$backend" == "c" ]]; then got="$(run_c "$s")"; else got="$(run_vm "$s")"; fi
+        rm -rf "$s"
+        if [[ "$got" != "0" ]]; then
+          combo_result="fail"
+          details+=" $(basename "$main")=$got"
+        fi
+      done
+      [[ "$combo_result" == "fail" ]] && overall_fail=1
+      note="-"
+      [[ -n "$details" ]] && note="mismatch:$details"
+      OUT_ROWS+=("$mode	$order	$backend	$combo_result	$note")
+      echo "  $mode / $order / $backend -> $combo_result"
+    done
+  done
+done
+
+NEW_CONTENT="mode	order	backend	result	note
+$(printf '%s\n' "${OUT_ROWS[@]}")
+"
+
+if [[ "$WRITE" -eq 1 ]]; then
+  printf '%s' "$NEW_CONTENT" > "$CATALOG"
+  echo "scripts/consumer_rehearsal: wrote $CATALOG"
+else
+  if [[ ! -f "$CATALOG" ]]; then
+    echo "scripts/consumer_rehearsal: FAIL -- $CATALOG does not exist (run with --write once)" >&2
+    overall_fail=1
+  elif ! diff -q <(printf '%s' "$NEW_CONTENT") "$CATALOG" >/dev/null 2>&1; then
+    echo "scripts/consumer_rehearsal: FAIL -- live result differs from the checked-in $CATALOG" >&2
+    diff <(printf '%s' "$NEW_CONTENT") "$CATALOG" >&2 || true
+    overall_fail=1
+  fi
+fi
+
+if [[ "$overall_fail" -ne 0 ]]; then
+  echo "scripts/consumer_rehearsal: FAIL"
+  exit 1
+fi
+echo "scripts/consumer_rehearsal: PASS (${#MODES[@]} modes x ${#ORDERS[@]} orders x ${#BACKENDS[@]} backends, ${#FIXTURES[@]} fixtures, 0 fail)"

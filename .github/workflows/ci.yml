@@ -111,6 +111,12 @@ jobs:
           SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
         run: ./scripts/contract_matrix
 
+      - name: "scripts/consumer_rehearsal (BL-096 / TEST-018 offline clean-checkout rehearsal)"
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: ./scripts/consumer_rehearsal
+
       - name: Upload run record
         if: always()
         uses: actions/upload-artifact@v4

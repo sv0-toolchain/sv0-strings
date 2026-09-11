@@ -32,7 +32,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 GATE_FILES = [
     "scripts/check", "scripts/test", "scripts/sanitize", "scripts/locale_matrix",
-    "scripts/contract_matrix", ".github/workflows/ci.yml",
+    "scripts/contract_matrix", "scripts/consumer_rehearsal", ".github/workflows/ci.yml",
 ]
 # Soft signals we require to be explained. Each is a plain substring / regex
 # checked against non-comment lines.

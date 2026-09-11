@@ -43,6 +43,9 @@ python3 tools/check_accel_matrix.py || fail=1
 echo "== check_complexity_benchmarks (PERF-008 benchmark evidence schema) =="
 python3 tools/check_complexity_benchmarks.py || fail=1
 
+echo "== check_consumer_rehearsal (TEST-018 offline clean-checkout rehearsal shape) =="
+python3 tools/check_consumer_rehearsal.py || fail=1
+
 echo "== check_doc_fences =="
 python3 tools/check_doc_fences.py || fail=1
 
