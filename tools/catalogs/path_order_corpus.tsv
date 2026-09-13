@@ -1,0 +1,9 @@
+case	order	backend	result	note
+valid	entry-before-lib	c	pass	-
+valid	entry-before-lib	vm	pass	-
+valid	entry-after-lib	c	pass	-
+valid	entry-after-lib	vm	pass	-
+ambiguous	dup-first-before-lib	c	reject_ok	-
+ambiguous	dup-first-before-lib	vm	reject_ok	-
+ambiguous	dup-first-after-lib	c	reject_ok	-
+ambiguous	dup-first-after-lib	vm	reject_ok	-

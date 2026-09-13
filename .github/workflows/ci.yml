@@ -117,6 +117,12 @@ jobs:
           SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
         run: ./scripts/consumer_rehearsal
 
+      - name: "scripts/path_order_corpus (BL-119 / UP-026 / AC-036 path-order permutation)"
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: ./scripts/path_order_corpus
+
       - name: "scripts/release_manifest (BL-098 / BACKEND-007 / GOV-002 content-addressed manifest)"
         working-directory: sv0-strings
         env:

@@ -86,3 +86,5 @@ T-RELEASE-MANIFEST-001	scripts/release_manifest	BACKEND-007,GOV-002	c,vm	safe		t
 T-RELEASE-MANIFEST-SHAPE-001	tools/check_release_manifest.py	BACKEND-007,GOV-002	c,vm	safe		tool	done
 T-EXCEPTIONS-001	tools/check_exceptions.py	GOV-009,GOV-010	c,vm	safe		tool	done
 T-RELEASE-READINESS-001	tools/check_release_readiness.py	DOC-007,LIC-005,LIC-001	c,vm	safe		tool	done
+T-PATH-ORDER-CORPUS-001	scripts/path_order_corpus	UP-026	c,vm	safe	runtime	tool	done
+T-PATH-ORDER-CORPUS-SHAPE-001	tools/check_path_order_corpus.py	UP-026	c,vm	safe		tool	done

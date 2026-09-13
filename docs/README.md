@@ -47,6 +47,7 @@ under `tools/catalogs/`.
 | [`contract-mode-matrix.md`](contract-mode-matrix.md) | `check_contract_matrix.py` | the 6 (backend × contract-mode) combinations, which are supported vs. `MODE_UNSUPPORTED` |
 | [`complexity.md`](complexity.md) | `check_complexity_benchmarks.py` | worst-case time/space per `PERF-*` id, source-inspected |
 | [`consumer-rehearsal.md`](consumer-rehearsal.md) | `check_consumer_rehearsal.py` | offline clean-checkout rehearsal across workspace/installed × forward/reverse × C/VM |
+| [`path-order-corpus.md`](path-order-corpus.md) | `check_path_order_corpus.py` | project-root entry-before/after-`lib` permutation; ambiguous dup-`fn main` fails closed on both backends |
 | [`acceptance-scenarios.md`](acceptance-scenarios.md) | `check_acceptance.py` | AC-001..036 bound/deferred/toolchain-evidence/spec-unavailable disposition |
 | [`release-manifest.md`](release-manifest.md) | `check_release_manifest.py` | content-addressed manifest of every evidence catalog (regenerated every run, not a drift gate) |
 | [`exceptions-and-evidence-audit.md`](exceptions-and-evidence-audit.md) | `check_exceptions.py` | the waiver/exception registry; the fixed non-waivable safety set |

@@ -1,0 +1,219 @@
+#!/usr/bin/env bash
+# SS-012 (SPEC BL-119 / UP-026 / AC-036): path-order permutation corpus.
+#
+# UP-026: "Recursive project discovery SHALL produce the same semantic
+# program for every lexicographic traversal order." SS-188's
+# scripts/consumer_rehearsal already proves order-insensitivity WITHIN
+# `lib/`'s own file listing (ascending vs descending filename) -- but it
+# always stages the root entry file under the fixed name `main.sv0`, which
+# sorts strictly after the `lib/` directory ('l' < 'm') on every run. Every
+# other fixture in this repo shares that same implicit ordering. This script
+# is the deeper, complementary half AC-036 names as SS-012's own deliverable:
+# it forces the root entry file to sort BEFORE `lib/` too (a project
+# consisting of one directory + one file has exactly two achievable root
+# positions -- before or after that directory -- there is no third), on the
+# real sv0-strings library, on both backends, and separately proves the one
+# genuinely AMBIGUOUS case (more than one root-level `fn main`) fails closed
+# with a stable, non-empty diagnostic regardless of which duplicate would
+# sort first -- on BOTH backends, even though (a real finding of this
+# slice) they surface that diagnostic through two different, equally stable
+# guards: `native-compile`'s own driver-level ENTRY-001 pre-link check, and
+# `vm-native-compile`'s pass-through of sv0c's link-layer E0302.
+#
+# `scripts/test --self-test`'s `dup_main_probe` (SS-184) already proves
+# duplicate-main is REJECTED at all, via the raw compiler binary directly,
+# at one fixed ordering, without asserting a diagnostic identity. This
+# script strengthens all three: the consumer-facing `scripts/sv0` driver
+# commands, multiple root-level orderings, and an explicit per-backend
+# diagnostic-id grep.
+#
+# Toolchain discovery: same as scripts/sanitize / scripts/consumer_rehearsal.
+# Usage: scripts/path_order_corpus [--write]
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+if [[ -n "${SV0_TOOLCHAIN_ROOT:-}" ]]; then
+  TC="$SV0_TOOLCHAIN_ROOT"
+elif [[ -d "$HERE/../sv0c" && -x "$HERE/../build/sv0-megatu-compiler-native" ]]; then
+  TC="$HERE/.."
+elif [[ -d "$HERE/../sv0-toolchain" ]]; then
+  TC="$HERE/../sv0-toolchain"
+else
+  echo "scripts/path_order_corpus: cannot locate sv0-toolchain (set SV0_TOOLCHAIN_ROOT)" >&2
+  exit 2
+fi
+TC="$(cd "$TC" && pwd)"
+NC="$TC/build/sv0-megatu-compiler-native"
+SV0="$TC/scripts/sv0"
+[[ -x "$NC" ]] || { echo "scripts/path_order_corpus: missing $NC -- build the toolchain first" >&2; exit 2; }
+[[ -x "$SV0" ]] || { echo "scripts/path_order_corpus: missing $SV0 driver" >&2; exit 2; }
+
+WRITE=0
+[[ "${1:-}" == "--write" ]] && WRITE=1
+
+CATALOG="tools/catalogs/path_order_corpus.tsv"
+# Reuses the SAME two fixtures scripts/consumer_rehearsal exercises, so this
+# corpus needs no new checked-in .sv0 file and no fixture-provenance row --
+# only their staged FILENAME (never their content) changes across orders.
+FIXTURES=(test/cases/types_smoke.sv0 test/property/checked_overflow.sv0)
+VALID_ORDERS=(entry-before-lib entry-after-lib)
+DUP_ORDERS=(dup-first-before-lib dup-first-after-lib)
+BACKENDS=(c vm)
+
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+
+# $1=order -> echoes the staged entry filename for the VALID (single-main)
+# case. 'lib' always sorts as the literal directory name; '0_entry.sv0'
+# sorts before it ('0' < 'l'), 'main.sv0' sorts after it ('m' > 'l') -- the
+# only two achievable root positions for a {lib/, one file} project.
+entry_name_for() { [[ "$1" == "entry-before-lib" ]] && echo "0_entry.sv0" || echo "main.sv0"; }
+
+stage_valid() {
+  # $1=order $2=main-src-path -> echoes staged project dir
+  local order="$1" src="$2" s name
+  s="$(mktemp -d)"; mkdir -p "$s/lib"
+  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  name="$(entry_name_for "$order")"
+  cp "$src" "$s/$name"
+  echo "$s"
+}
+
+stage_dup() {
+  # $1=order -> echoes staged project dir with TWO root fn-main files, one
+  # returning 0 and one returning 1, positioned so which return value sorts
+  # before vs. after `lib/` is swapped between the two DUP_ORDERS values --
+  # proving E0302 fires either way, never a "whichever sorts first/last
+  # wins" silent fallback.
+  local order="$1" s
+  s="$(mktemp -d)"; mkdir -p "$s/lib"
+  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  if [[ "$order" == "dup-first-before-lib" ]]; then
+    printf 'fn main() -> i32 { return 0; }\n' > "$s/0_dup.sv0"
+    printf 'fn main() -> i32 { return 1; }\n' > "$s/zz_dup.sv0"
+  else
+    printf 'fn main() -> i32 { return 1; }\n' > "$s/0_dup.sv0"
+    printf 'fn main() -> i32 { return 0; }\n' > "$s/zz_dup.sv0"
+  fi
+  echo "$s"
+}
+
+run_c() {
+  local s="$1" bin="$s/out_c"
+  if "$SV0" native-compile --project "$s" -o "$bin" >"$s/build.log" 2>&1; then
+    "$bin"; echo $?
+  else
+    echo "BUILD_FAIL"
+  fi
+}
+
+run_vm() {
+  local s="$1" b="$s/out.sv0b" out code
+  if ! "$SV0" vm-native-compile --project "$s" "$b" >"$s/vbuild.log" 2>&1; then
+    echo "EMIT_FAIL"; return
+  fi
+  [[ -s "$b" ]] || { echo "EMIT_EMPTY"; return; }
+  out="$("$SV0" vm-run "$b" 2>&1)"
+  code="$(echo "$out" | grep -oE 'vm_exit:-?[0-9]+' | head -1 | cut -d: -f2)"
+  [[ -n "$code" ]] && echo "$(( code & 255 ))" || echo "NO_EXIT"
+}
+
+# Same build attempt as run_c/run_vm, but for the AMBIGUOUS case: success is
+# itself the failure (a regression of SS-U09's dup-entry guard). Returns
+# "reject_ok" iff the build/emit failed AND its log names a stable diagnostic
+# id -- a bare nonzero exit with no diagnostic identity would not be
+# distinguishable from an unrelated compiler crash, which UP-026 does not
+# accept as "stable". The two backends surface this through DIFFERENT guards
+# at different layers -- both real, both stable, neither a silent accept:
+# `native-compile` fails at the `scripts/sv0` driver's own pre-link
+# entry-count check (ENTRY-001, needed to pick which file to hand the linker
+# as the executable's entry object) before ever reaching the compiler;
+# `vm-native-compile` has no equivalent driver-level pre-check for the VM
+# emit path, so it surfaces sv0c's own link-layer guard (E0302) directly.
+check_c_rejects() {
+  local s="$1" bin="$s/out_c"
+  if "$SV0" native-compile --project "$s" -o "$bin" >"$s/build.log" 2>&1; then
+    echo "unexpected:BUILD_SUCCEEDED"
+  elif grep -q "ENTRY-001" "$s/build.log"; then
+    echo "reject_ok"
+  else
+    echo "unexpected:no-ENTRY-001($(tr '\n' ' ' < "$s/build.log" | head -c 80))"
+  fi
+}
+
+check_vm_rejects() {
+  local s="$1" b="$s/out.sv0b"
+  if "$SV0" vm-native-compile --project "$s" "$b" >"$s/vbuild.log" 2>&1; then
+    echo "unexpected:EMIT_SUCCEEDED"
+  elif grep -q "E0302" "$s/vbuild.log"; then
+    echo "reject_ok"
+  else
+    echo "unexpected:no-E0302($(tr '\n' ' ' < "$s/vbuild.log" | head -c 80))"
+  fi
+}
+
+overall_fail=0
+declare -a OUT_ROWS=()
+
+# ---- valid case: identical semantic result at every achievable root order ----
+for order in "${VALID_ORDERS[@]}"; do
+  for backend in "${BACKENDS[@]}"; do
+    combo_result="pass"
+    details=""
+    for main in "${FIXTURES[@]}"; do
+      s="$(stage_valid "$order" "$HERE/$main")"
+      if [[ "$backend" == "c" ]]; then got="$(run_c "$s")"; else got="$(run_vm "$s")"; fi
+      rm -rf "$s"
+      if [[ "$got" != "0" ]]; then
+        combo_result="fail"
+        details+=" $(basename "$main")=$got"
+      fi
+    done
+    [[ "$combo_result" == "fail" ]] && overall_fail=1
+    note="-"
+    [[ -n "$details" ]] && note="mismatch:$details"
+    OUT_ROWS+=("valid	$order	$backend	$combo_result	$note")
+    echo "  valid / $order / $backend -> $combo_result"
+  done
+done
+
+# ---- ambiguous case: E0302 fires regardless of which duplicate sorts first ----
+for order in "${DUP_ORDERS[@]}"; do
+  for backend in "${BACKENDS[@]}"; do
+    s="$(stage_dup "$order")"
+    if [[ "$backend" == "c" ]]; then got="$(check_c_rejects "$s")"; else got="$(check_vm_rejects "$s")"; fi
+    rm -rf "$s"
+    if [[ "$got" == "reject_ok" ]]; then
+      result="reject_ok"; note="-"
+    else
+      result="fail"; note="$got"; overall_fail=1
+    fi
+    OUT_ROWS+=("ambiguous	$order	$backend	$result	$note")
+    echo "  ambiguous / $order / $backend -> $result"
+  done
+done
+
+NEW_CONTENT="case	order	backend	result	note
+$(printf '%s\n' "${OUT_ROWS[@]}")
+"
+
+if [[ "$WRITE" -eq 1 ]]; then
+  printf '%s' "$NEW_CONTENT" > "$CATALOG"
+  echo "scripts/path_order_corpus: wrote $CATALOG"
+else
+  if [[ ! -f "$CATALOG" ]]; then
+    echo "scripts/path_order_corpus: FAIL -- $CATALOG does not exist (run with --write once)" >&2
+    overall_fail=1
+  elif ! diff -q <(printf '%s' "$NEW_CONTENT") "$CATALOG" >/dev/null 2>&1; then
+    echo "scripts/path_order_corpus: FAIL -- live result differs from the checked-in $CATALOG" >&2
+    diff <(printf '%s' "$NEW_CONTENT") "$CATALOG" >&2 || true
+    overall_fail=1
+  fi
+fi
+
+if [[ "$overall_fail" -ne 0 ]]; then
+  echo "scripts/path_order_corpus: FAIL"
+  exit 1
+fi
+echo "scripts/path_order_corpus: PASS (${#VALID_ORDERS[@]} valid orders + ${#DUP_ORDERS[@]} ambiguous orders x ${#BACKENDS[@]} backends, 0 fail)"

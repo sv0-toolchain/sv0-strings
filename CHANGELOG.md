@@ -6,6 +6,41 @@ semantic versioning per SPEC.md Section 26.
 
 ## [Unreleased]
 
+### Added
+
+- **SS-012 (BL-119 / UP-026 / AC-036): path-order permutation corpus.**
+  Closes the last open, non-`Blocked` F0 exception. `scripts/consumer_rehearsal`
+  (SS-188) already proved order-insensitivity *within* `lib/`'s own file
+  listing; every project in this repo still staged its root entry file
+  under the fixed name `main.sv0`, which sorts strictly after the `lib/`
+  directory on every run. New `scripts/path_order_corpus` (CI step) forces
+  the entry file to sort **before** `lib/` too — the only other achievable
+  root position for a `{lib/, one file}` project — on the real
+  sv0-strings library, on both backends, and confirms identical (correct)
+  results either way. Separately proves the one genuinely ambiguous
+  ordering (two root-level `fn main` declarations) fails closed on both
+  backends regardless of which duplicate would sort first, strengthening
+  `scripts/test --self-test`'s existing `dup_main_probe` (single fixed
+  ordering, no diagnostic-identity assertion) on two axes. **Real finding**:
+  the two backends reject that ambiguous case through two different,
+  equally stable diagnostics — `native-compile` fails at the `scripts/sv0`
+  driver's own pre-link `ENTRY-001` check (it must pick one file as the
+  entry object before invoking the linker) while `vm-native-compile` has
+  no equivalent driver-level pre-check and surfaces sv0c's link-layer
+  `E0302` directly — documented in `docs/path-order-corpus.md` rather than
+  treated as a bug. New `tools/check_path_order_corpus.py` (in
+  `scripts/check`) validates the checked-in `tools/catalogs/path_order_corpus.tsv`
+  shape: 8 rows (2 root orders + 2 duplicate-position swaps, x 2 backends);
+  a `valid` row must be `pass`, an `ambiguous` row must be `reject_ok`
+  (never `pass` — that would be the SS-U09 dup-entry regression — and
+  never an unexplained `fail`). New `tests.tsv` rows
+  `T-PATH-ORDER-CORPUS-001` / `T-PATH-ORDER-CORPUS-SHAPE-001` → `UP-026`,
+  moving it off `check_traceability.py`'s `ANNOTATIONS` deferral; the
+  `UP-026` row in `tools/catalogs/exceptions.tsv` removed (resolved, not
+  waived); `AC-036` in `acceptance.tsv` updated to cite both the SS-188
+  and SS-012 halves as fully closed. Traceability tally: 270 = 215 by test
+  row (89 rows) + 39 by marker + 11 by annotation.
+
 ### Changed
 
 - Post-`v1.0.0` documentation consolidation: `docs/README.md` rewritten

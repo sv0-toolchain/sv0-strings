@@ -56,10 +56,6 @@ ANNOTATIONS: dict[str, str] = {
     "UP-025": "deviation D-2 (`docs/f0-deviations.md`) — `pub` cross-module "
               "enforcement is a deferred F0 deviation (no-op for the flat "
               "all-`pub` library), scheduled post-M5 as stream F.",
-    "UP-026": "owner slice SS-012 (todo) — path-permutation project corpus. "
-              "Recursive discovery is exercised today by `scripts/test` staging "
-              "`lib/*.sv0` + one `main.sv0`; the permutation corpus + "
-              "diagnostic assertions are SS-012.",
     "TEST-005": "owner slice SS-013 (todo) — fixture-ID digest comparison. "
                 "`scripts/test --backend=both` runs every fixture stem on both "
                 "legs today; the serialized-identity digest is SS-013.",
