@@ -10,6 +10,7 @@
 # Usage:
 #   scripts/test [--backend=c|vm|both] [--contract-mode=runtime|verified|disabled]
 #                [--case <name-or-path>]... [--dir <dir>] [--record <file>]
+#                [--serialize <file>] [--digest-out <file>]
 #                [--list] [--self-test] [--keep] [--fast] [-q]
 #
 # The C leg uses `./scripts/sv0 native-compile --project --contract-mode=<m>`
@@ -20,6 +21,22 @@
 # (SPEC OQ-012); a non-runtime request is reported unsupported, not faked.
 # --fast bypasses the driver (raw megatu emitter + cc; contracts=runtime).
 # --record appends `case<TAB>backend<TAB>emitter<TAB>mode<TAB>want<TAB>got`.
+#
+# --serialize (SS-013, TEST-005/TEST-021) appends a PACKAGE-OWNED serialized
+# `{ok|err|skip, bytes}` record per case+backend:
+# `case<TAB>backend<TAB>kind<TAB>sha256(case:backend:exit)`. After every
+# target runs, the runner independently cross-checks: for every fixture with
+# both a c and a vm row, their kind MUST agree -- a stronger, separate gate
+# than each leg's own exit-vs-expectations.tsv check above, since it compares
+# the serialized record itself rather than trusting two independent
+# exit-code comparisons to have caught the same thing. It also computes the
+# TEST-005 fixture-ID digest: sha256 of the sorted set of fixture ids that
+# recorded `ok` on BOTH backends. --digest-out writes
+# `fixture_count<TAB>digest` there when given. `SV0_STRINGS_CORRUPT_SERIALIZED`
+# (self-test injected-mismatch probe only; the real gate never sets it) names
+# one fixture whose recorded VM kind is deliberately flipped before the
+# cross-check, proving a corrupted package-owned record fails the gate even
+# when both legs' own exit-code checks still pass.
 #
 # --case may be a bare stem (searched under test/cases, test/property,
 # test/fixtures/regressions) or a repo-relative path. With no --case and no
@@ -59,6 +76,8 @@ SELFTEST=0
 LIST=0
 FAST=0
 RECORD=""
+SERIALIZE=""
+DIGEST_OUT=""
 declare -a CASES=()
 DIR=""
 
@@ -70,6 +89,8 @@ for a in "$@"; do
     --case)            echo "use --case=<name>" >&2; exit 2 ;;
     --dir=*)           DIR="${a#*=}" ;;
     --record=*)        RECORD="${a#*=}" ;;
+    --serialize=*)     SERIALIZE="${a#*=}" ;;
+    --digest-out=*)    DIGEST_OUT="${a#*=}" ;;
     --list)            LIST=1 ;;
     --self-test)       SELFTEST=1 ;;
     --keep)            KEEP=1 ;;
@@ -89,6 +110,12 @@ USE_WRAPPER=1
 
 log() { [[ "$QUIET" -eq 1 ]] || echo "$@"; }
 rec() { [[ -n "$RECORD" ]] && printf '%s\n' "$*" >> "$RECORD"; return 0; }
+record_serialized() { [[ -n "$SERIALIZE" ]] && printf '%s\n' "$*" >> "$SERIALIZE"; return 0; }
+sha256_stdin() {
+  if command -v sha256sum >/dev/null 2>&1; then sha256sum | cut -d' ' -f1
+  else shasum -a 256 | cut -d' ' -f1
+  fi
+}
 
 resolve_case() {
   # echo repo-relative path for a stem or path; empty if not found
@@ -212,6 +239,13 @@ run_one() {
     elif [[ "$cgot" == "$cexp" ]]; then detail+=" C=$cgot"
     else ok=0; detail+=" C=$cgot(want $cexp)"; fi
     rec "$main	c	$em	$md	$cexp	$cgot"
+    if [[ -n "$SERIALIZE" ]]; then
+      local ckind="err"
+      [[ "$cexp" == "SKIP" ]] && ckind="skip"
+      [[ "$cgot" == "$cexp" ]] && ckind="ok"
+      local cval; cval="$(printf '%s:c:%s' "$main" "$cgot" | sha256_stdin)"
+      record_serialized "$main	c	$ckind	$cval"
+    fi
   fi
   if [[ "$BACKEND" == "vm" || "$BACKEND" == "both" ]]; then
     vexp="$(expected_exit "$main" vm)"
@@ -220,10 +254,87 @@ run_one() {
     elif [[ "$vgot" == "$vexp" ]]; then detail+=" VM=$vgot"
     else ok=0; detail+=" VM=$vgot(want $vexp)"; fi
     rec "$main	vm	$em	$md	$vexp	$vgot"
+    if [[ -n "$SERIALIZE" ]]; then
+      local vkind="err"
+      [[ "$vexp" == "SKIP" || "$vgot" == "MODE_UNSUPPORTED" ]] && vkind="skip"
+      [[ "$vgot" == "$vexp" ]] && vkind="ok"
+      # Injected-mismatch hook (TEST-021 self-test only): corrupts the
+      # PACKAGE-OWNED record for one named fixture, independent of whether
+      # its own exit-code-vs-expectations check above just reported "ok".
+      if [[ "$vkind" != "skip" && "${SV0_STRINGS_CORRUPT_SERIALIZED:-}" == "$main" ]]; then
+        if [[ "$vkind" == "ok" ]]; then vkind="err"; else vkind="ok"; fi
+      fi
+      local vval; vval="$(printf '%s:vm:%s' "$main" "$vgot" | sha256_stdin)"
+      record_serialized "$main	vm	$vkind	$vval"
+    fi
   fi
   [[ "$KEEP" -eq 1 ]] && detail+="  [$s]" || rm -rf "$s"
   if [[ "$ok" -eq 1 ]]; then log "  ok    $main   $detail"; RC=0
   else                       log "  FAIL  $main   $detail"; RC=1; fi
+}
+
+# ---- package-owned serialized comparison (SS-013, TEST-005 / TEST-021) ----
+# Reads a --serialize file and asserts: for every fixture with BOTH a c and
+# a vm row (kind != skip), their kind (ok|err) agrees. This is a SEPARATE,
+# stronger gate than each leg's own exit-vs-expectations.tsv check in
+# run_one() -- it compares the serialized record identity itself, so a
+# corrupted/divergent record fails here even if both legs' independent
+# exit-code checks happened to pass. Also computes and (optionally) writes
+# the TEST-005 fixture-ID digest: sha256 of the sorted set of fixture ids
+# that recorded `ok` on both backends.
+check_serialized_match() {
+  local file="$1" mismatches=0 id ck vk
+  while IFS= read -r id; do
+    [[ -z "$id" ]] && continue
+    ck="$(awk -F'\t' -v id="$id" '$1==id && $2=="c"{print $3; exit}' "$file")"
+    vk="$(awk -F'\t' -v id="$id" '$1==id && $2=="vm"{print $3; exit}' "$file")"
+    [[ -z "$ck" || -z "$vk" || "$ck" == "skip" || "$vk" == "skip" ]] && continue
+    if [[ "$ck" != "$vk" ]]; then
+      log "  FAIL  <serialized comparison>   $id: c=$ck vm=$vk (package-owned record diverges)"
+      mismatches=$(( mismatches + 1 ))
+    fi
+  done < <(cut -f1 "$file" | sort -u)
+
+  local both_ok n digest
+  both_ok="$(comm -12 \
+    <(awk -F'\t' '$2=="c" && $3=="ok"{print $1}' "$file" | sort -u) \
+    <(awk -F'\t' '$2=="vm" && $3=="ok"{print $1}' "$file" | sort -u))"
+  n="$(printf '%s\n' "$both_ok" | grep -c '^..*$' || true)"
+  digest="$(printf '%s\n' "$both_ok" | sha256_stdin)"
+  log "  <fixture-id-digest>   $n fixture(s) ok on both backends -> $digest"
+  [[ -n "$DIGEST_OUT" ]] && printf '%s\t%s\n' "$n" "$digest" > "$DIGEST_OUT"
+  return "$mismatches"
+}
+
+# ---- injected serialized-record mismatch probe (SS-013, TEST-021) ----
+# Distinct from injected_mismatch_probe below (which overrides the
+# EXPECTATIONS TABLE and proves the VM leg's own exit-code check is hard,
+# not advisory): this corrupts the PACKAGE-OWNED SERIALIZED RECORD itself
+# for a real, otherwise-green fixture, on a live run, and proves
+# check_serialized_match independently catches the divergence -- "a
+# deliberately corrupted VM fixture fails the gate even when the C leg
+# passes" (SS-012/013 checklist acceptance). Then proves the uncorrupted
+# run is green (control).
+serialized_mismatch_probe() {
+  local ser dig
+  ser="$(mktemp)"; dig="$(mktemp)"
+  if SV0_STRINGS_CORRUPT_SERIALIZED=test/cases/types_smoke.sv0 \
+     "$0" --backend=both --case=types_smoke.sv0 --serialize="$ser" --digest-out="$dig" -q \
+       >/dev/null 2>&1; then
+    rm -f "$ser" "$dig"
+    log "  FAIL  <serialized-mismatch probe>   corrupted record stayed green (comparison is not hard-failing)"
+    return 1
+  fi
+  : > "$ser"
+  if ! "$0" --backend=both --case=types_smoke.sv0 --serialize="$ser" --digest-out="$dig" -q \
+       >/dev/null 2>&1; then
+    rm -f "$ser" "$dig"
+    log "  FAIL  <serialized-mismatch probe>   uncorrupted record turned red (control failed)"
+    return 1
+  fi
+  rm -f "$ser" "$dig"
+  log "  ok    <serialized-mismatch probe>   corrupted VM record -> red, uncorrupted -> green"
+  return 0
 }
 
 # ---- duplicate-main negative probe (ARCH-011, UP-026) ----
@@ -293,13 +404,18 @@ fi
 wrap_lbl=$([[ "$USE_WRAPPER" -eq 1 ]] && echo "driver" || echo "raw/--fast")
 log "sv0-strings/scripts/test  backend=$BACKEND  contract-mode=$CONTRACT_MODE  path=$wrap_lbl  toolchain=$TC"
 [[ -n "$RECORD" ]] && { : > "$RECORD"; log "  recording -> $RECORD"; }
+[[ -n "$SERIALIZE" ]] && { : > "$SERIALIZE"; log "  serializing -> $SERIALIZE"; }
 fails=0
 for t in "${TARGETS[@]}"; do
   RC=0; run_one "$t"; fails=$(( fails + RC ))
 done
+if [[ -n "$SERIALIZE" ]]; then
+  check_serialized_match "$SERIALIZE"; fails=$(( fails + $? ))
+fi
 if [[ "$SELFTEST" -eq 1 ]]; then
   dup_main_probe || fails=$(( fails + 1 ))
   injected_mismatch_probe || fails=$(( fails + 1 ))
+  serialized_mismatch_probe || fails=$(( fails + 1 ))
 fi
 
 n="${#TARGETS[@]}"

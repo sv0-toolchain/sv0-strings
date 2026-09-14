@@ -18,7 +18,12 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 
 ## Coverage tally (270 requirements)
 
-- **215** covered by a `tests.tsv` row (89 rows total; SS-012 added
+- **217** covered by a `tests.tsv` row (91 rows total; SS-013 added
+  `T-SERIALIZED-COMPARISON-001` / `T-SERIALIZED-COMPARISON-SHAPE-001` →
+  `TEST-005` / `TEST-021` — moved off the `ANNOTATIONS` deferral, its real
+  evidence now the package-owned serialized `{ok|err|skip, bytes}` record
+  per fixture+backend, the fixture-ID digest, and the injected-mismatch
+  self-test (`docs/serialized-comparison.md`); SS-012 added
   `T-PATH-ORDER-CORPUS-001` / `T-PATH-ORDER-CORPUS-SHAPE-001` → `UP-026` —
   moved off the `ANNOTATIONS` deferral, its real evidence now the
   entry-before/after-`lib` permutation + ambiguous dup-`fn main`
@@ -47,7 +52,7 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 - **39** covered by a non-test verification marker in the requirement's own
   `verification` note (`review` / `inventory` / `lint` / `audit` /
   `manifest` / `documentation` / `schema`).
-- **11** covered by an explicit `ANNOTATIONS` entry in
+- **9** covered by an explicit `ANNOTATIONS` entry in
   `check_traceability.py` — each gives the real verification method and why
   a fixture row is not the right vehicle:
 
@@ -58,13 +63,26 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 | UP-023 | running hazard register — `docs/f0-deviations.md` (D-4/D-7/D-8/D-9) + SS-170 / SS-173 toolchain-limitation notes + `test/fixtures/regressions/` |
 | UP-024 | **SS-U07** (landed) — diamond import pinned upstream; the library is itself a diamond via `strings_types` and compiles C + VM |
 | UP-025 | deviation **D-2** — `pub` cross-module enforcement is a deferred F0 deviation, scheduled post-M5 stream F |
-| TEST-005 / TEST-021 | owner slice **SS-013** (todo) — serialized fixture-ID digest + injected-mismatch gate |
 | GOV-004 | decision register — `docs/audit/2026-08-30.md` + `docs/f0-deviations.md` |
 | GOV-006 | change record — per-slice `CHANGELOG.md` entries |
 | UP-014 | owner slice **SS-187** (R1, partial) — optimized generated-code + VM trace inspection; the behavioural half is covered today by `T-SANITIZE-001` (`-O1` + ASan/UBSan) and the tier-2 VM byte-parity gate |
 | PERF-007 | **N/A at R0.4** — no locale transform runs; revisit with the real service |
 
-## New this slice (SS-012)
+## New this slice (SS-013)
+
+- `TEST-005` / `TEST-021` moved from an `ANNOTATIONS` deferral (owner slice
+  SS-013, todo) to real `tests.tsv` evidence: `T-SERIALIZED-COMPARISON-001`
+  (the toolchain run, `scripts/serialized_comparison`) and
+  `T-SERIALIZED-COMPARISON-SHAPE-001` (its catalog-shape checker). `AC-035`
+  updated to cite both as bound. Both `TEST-005` and `TEST-021` rows in
+  `tools/catalogs/exceptions.tsv` are removed (resolved, not waived). With
+  this, the entire SS-012/SS-013 backlog window that opened at SS-191 is
+  closed — every previously-registered exception is either resolved or
+  `permanent` by design (D-3/BACKEND-008); `tools/catalogs/exceptions.tsv`
+  now holds only genuinely open, toolchain-gated items (D-2/D-5/D-10,
+  PERF-007).
+
+## Previous slice (SS-012)
 
 - `UP-026` moved from an `ANNOTATIONS` deferral (owner slice SS-012, todo)
   to real `tests.tsv` evidence: `T-PATH-ORDER-CORPUS-001` (the toolchain

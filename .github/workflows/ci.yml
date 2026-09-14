@@ -123,6 +123,12 @@ jobs:
           SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
         run: ./scripts/path_order_corpus
 
+      - name: "scripts/serialized_comparison (BL-121 / TEST-005 / TEST-021 / AC-035 serialized comparison)"
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: ./scripts/serialized_comparison
+
       - name: "scripts/release_manifest (BL-098 / BACKEND-007 / GOV-002 content-addressed manifest)"
         working-directory: sv0-strings
         env:

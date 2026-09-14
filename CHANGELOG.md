@@ -8,6 +8,37 @@ semantic versioning per SPEC.md Section 26.
 
 ### Added
 
+- **SS-013 (BL-121 / TEST-005 / TEST-021 / AC-035): package-owned serialized
+  comparison + fixture-ID digest.** Closes the last open, non-toolchain-gated
+  F0 exception — every remaining item in `tools/catalogs/exceptions.tsv` is
+  now either genuinely toolchain-gated (D-2/D-5/D-10, PERF-007) or a
+  permanent architectural decision (D-3). `scripts/test` gains
+  `--serialize=<file>`: a package-owned `{ok|err|skip, bytes}` record per
+  fixture+backend, cross-checked independently of each leg's own
+  exit-code-vs-`expectations.tsv` comparison — a fixture whose C and VM
+  records disagree now fails even if a bug in the shared oracle table let
+  both individual comparisons look fine. `--digest-out=<file>` writes the
+  TEST-005 artifact: sha256 of the sorted set of fixture ids that recorded
+  `ok` on both backends. New `scripts/serialized_comparison` (CI step) runs
+  this over the full 53-fixture (non-compile-fail) corpus and checks the
+  result into `tools/catalogs/serialized_comparison.tsv`
+  (`fixture_count=53`, digest, `mismatches=0`); new
+  `tools/check_serialized_comparison.py` in `scripts/check` validates the
+  catalog shape and recomputes the expected fixture count independently.
+  New `scripts/test --self-test` probe `serialized_mismatch_probe`: proves
+  TEST-021's acceptance criterion directly — `SV0_STRINGS_CORRUPT_SERIALIZED`
+  (self-test only) flips one fixture's recorded VM record on an otherwise
+  fully-green run, and the run turns red; without it, green (control). This
+  is a genuinely different corruption vector from SS-184's
+  `injected_mismatch_probe` (which overrides the expectations table, not
+  the record itself) — `docs/serialized-comparison.md` explains the split.
+  New `tests.tsv` rows `T-SERIALIZED-COMPARISON-001` /
+  `T-SERIALIZED-COMPARISON-SHAPE-001` → `TEST-005,TEST-021`, moving both off
+  `check_traceability.py`'s `ANNOTATIONS`; both rows removed from
+  `tools/catalogs/exceptions.tsv` (resolved, not waived); `AC-035` flipped
+  `deferred`→`bound`. Traceability tally: 270 = 217 by test row (91 rows) +
+  39 by marker + 9 by annotation.
+
 - **SS-012 (BL-119 / UP-026 / AC-036): path-order permutation corpus.**
   Closes the last open, non-`Blocked` F0 exception. `scripts/consumer_rehearsal`
   (SS-188) already proved order-insensitivity *within* `lib/`'s own file

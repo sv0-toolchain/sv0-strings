@@ -1,0 +1,72 @@
+#!/usr/bin/env bash
+# SS-013 (SPEC BL-121 / TEST-005 / TEST-021 / AC-035): package-owned
+# serialized comparison + fixture-ID digest.
+#
+# `scripts/test --serialize` (SS-013) records a package-owned
+# `{ok|err|skip, bytes}` per fixture+backend and independently cross-checks
+# that a fixture's kind agrees between the C and native-VM legs -- a
+# SEPARATE, stronger gate than each leg's own exit-code-vs-expectations.tsv
+# comparison, since it compares the serialized record identity itself
+# rather than trusting two independent checks to have caught the same
+# thing (`scripts/test --self-test`'s `serialized_mismatch_probe` proves
+# this is hard-failing, not advisory, via a deliberately corrupted VM
+# record on an otherwise-green fixture).
+#
+# This script runs that machinery over the FULL `test/` corpus (not just
+# the 3-fixture self-test subset) and checks the resulting fixture-ID
+# digest into `tools/catalogs/serialized_comparison.tsv` -- the TEST-005
+# artifact: sha256 of the sorted set of fixture ids that recorded `ok` on
+# BOTH backends. Like `scripts/contract_matrix` / `scripts/consumer_rehearsal`
+# / `scripts/path_order_corpus`, drift from the checked-in catalog is a
+# hard failure unless `--write` is passed to regenerate deliberately.
+#
+# Toolchain discovery: same as scripts/test itself.
+# Usage: scripts/serialized_comparison [--write]
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+WRITE=0
+[[ "${1:-}" == "--write" ]] && WRITE=1
+
+CATALOG="tools/catalogs/serialized_comparison.tsv"
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+SER="$tmp/serialized.tsv"
+DIG="$tmp/digest.tsv"
+
+if ! ./scripts/test --backend=both --dir=test --serialize="$SER" --digest-out="$DIG" -q \
+     >"$tmp/test.log" 2>&1; then
+  echo "scripts/serialized_comparison: FAIL -- scripts/test itself failed (mismatches and/or ordinary case failures); see below" >&2
+  cat "$tmp/test.log" >&2
+  exit 1
+fi
+
+[[ -s "$DIG" ]] || { echo "scripts/serialized_comparison: FAIL -- $DIG is empty (--digest-out did not write)" >&2; exit 1; }
+fixture_count="$(cut -f1 "$DIG")"
+fixture_id_digest="$(cut -f2 "$DIG")"
+
+# scripts/test already hard-failed above on any c/vm kind mismatch, so
+# reaching here means 0 mismatches; record that fact explicitly rather
+# than re-deriving it, so the catalog is a complete, self-explaining record.
+NEW_CONTENT="component	value
+fixture_count	$fixture_count
+fixture_id_digest	$fixture_id_digest
+mismatches	0
+"
+
+if [[ "$WRITE" -eq 1 ]]; then
+  printf '%s' "$NEW_CONTENT" > "$CATALOG"
+  echo "scripts/serialized_comparison: wrote $CATALOG"
+else
+  if [[ ! -f "$CATALOG" ]]; then
+    echo "scripts/serialized_comparison: FAIL -- $CATALOG does not exist (run with --write once)" >&2
+    exit 1
+  elif ! diff -q <(printf '%s' "$NEW_CONTENT") "$CATALOG" >/dev/null 2>&1; then
+    echo "scripts/serialized_comparison: FAIL -- live result differs from the checked-in $CATALOG" >&2
+    diff <(printf '%s' "$NEW_CONTENT") "$CATALOG" >&2 || true
+    exit 1
+  fi
+fi
+
+echo "scripts/serialized_comparison: PASS ($fixture_count fixture(s) ok on both backends, digest $fixture_id_digest, 0 mismatches)"

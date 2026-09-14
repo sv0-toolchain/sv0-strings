@@ -56,12 +56,6 @@ ANNOTATIONS: dict[str, str] = {
     "UP-025": "deviation D-2 (`docs/f0-deviations.md`) — `pub` cross-module "
               "enforcement is a deferred F0 deviation (no-op for the flat "
               "all-`pub` library), scheduled post-M5 as stream F.",
-    "TEST-005": "owner slice SS-013 (todo) — fixture-ID digest comparison. "
-                "`scripts/test --backend=both` runs every fixture stem on both "
-                "legs today; the serialized-identity digest is SS-013.",
-    "TEST-021": "owner slice SS-013 (todo) — package-owned serialized "
-                "comparison + injected mismatch. `scripts/test --self-test` "
-                "covers the runner self-test + dup-main negative today.",
     "GOV-004": "decision register — `docs/audit/2026-08-30.md` records source "
                "discrepancies; `docs/f0-deviations.md` is the decision log.",
     "GOV-006": "change record — per-slice `CHANGELOG.md` entries document every "

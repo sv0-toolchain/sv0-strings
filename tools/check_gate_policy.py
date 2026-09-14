@@ -33,7 +33,7 @@ REPO = Path(__file__).resolve().parent.parent
 GATE_FILES = [
     "scripts/check", "scripts/test", "scripts/sanitize", "scripts/locale_matrix",
     "scripts/contract_matrix", "scripts/consumer_rehearsal", "scripts/path_order_corpus",
-    "scripts/release_manifest",
+    "scripts/serialized_comparison", "scripts/release_manifest",
     ".github/workflows/ci.yml",
 ]
 # Soft signals we require to be explained. Each is a plain substring / regex
