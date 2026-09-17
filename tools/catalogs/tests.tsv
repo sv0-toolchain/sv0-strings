@@ -90,3 +90,5 @@ T-PATH-ORDER-CORPUS-001	scripts/path_order_corpus	UP-026	c,vm	safe	runtime	tool	
 T-PATH-ORDER-CORPUS-SHAPE-001	tools/check_path_order_corpus.py	UP-026	c,vm	safe		tool	done
 T-SERIALIZED-COMPARISON-001	scripts/serialized_comparison	TEST-005,TEST-021	c,vm	safe	runtime	tool	done
 T-SERIALIZED-COMPARISON-SHAPE-001	tools/check_serialized_comparison.py	TEST-005,TEST-021	c,vm	safe		tool	done
+T-UNSAFE-ABI-STRLEN-001	test/unsafe_abi/main.sv0	ARCH-006,DOC-005,SEC-013	c	unsafe_abi	runtime	compile-pass	done
+T-UNSAFE-ABI-GATE-001	scripts/unsafe_abi_gate	ARCH-006	c	unsafe_abi	runtime	tool	done

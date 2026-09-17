@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+# SS-204 (SPEC ARCH-006 / BL-104): enforces the two ARCH-006 verification
+# categories for strings_unsafe_abi -- "feature-off symbol absence" and
+# "feature-on ABI tests" -- that SS-203 didn't yet have a dedicated,
+# permanent, gated proof for.
+#
+#   1. feature-off symbol absence: a DEFAULT project build (no
+#      SV0_STRINGS_INCLUDE_UNSAFE_ABI) never stages lib/strings_unsafe_abi.sv0
+#      and the emitted C never mentions "strings_unsafe_abi" or a
+#      strlen(...) forward declaration -- the module genuinely isn't
+#      reachable, not just unused.
+#   2. feature-on external linkage: with the feature explicitly opted in
+#      (SV0_STRINGS_INCLUDE_UNSAFE_ABI=1), test/unsafe_abi/main.sv0 is
+#      staged, compiled, LINKED (a real cc invocation, not just emit), and
+#      RUN -- proving strings_unsafe_abi::strlen resolves against and is
+#      answered by the real host libc, not just that the emitter accepted
+#      the declaration.
+#
+# Toolchain: $SV0_TOOLCHAIN_ROOT, else the parent dir when sv0-strings is a
+# submodule, else ../sv0-toolchain. Needs build/sv0-megatu-compiler-native.
+#
+# Usage: scripts/unsafe_abi_gate [-q]
+set -uo pipefail
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$HERE"
+
+if [[ -n "${SV0_TOOLCHAIN_ROOT:-}" ]]; then
+  TC="$SV0_TOOLCHAIN_ROOT"
+elif [[ -d "$HERE/../sv0c" && -x "$HERE/../build/sv0-megatu-compiler-native" ]]; then
+  TC="$HERE/.."
+elif [[ -d "$HERE/../sv0-toolchain" ]]; then
+  TC="$HERE/../sv0-toolchain"
+else
+  echo "scripts/unsafe_abi_gate: cannot locate sv0-toolchain (set SV0_TOOLCHAIN_ROOT)" >&2
+  exit 2
+fi
+TC="$(cd "$TC" && pwd)"
+NC="$TC/build/sv0-megatu-compiler-native"
+RT="$TC/sv0c/runtime"
+QUIET="${1:-}"
+
+[[ -x "$NC" ]] || { echo "scripts/unsafe_abi_gate: missing $NC -- build the toolchain first" >&2; exit 2; }
+
+CC="${CC:-cc}"
+RC=0
+
+# ---- 1. feature-off symbol absence ----------------------------------
+s_off="$(mktemp -d)"
+mkdir -p "$s_off/lib"
+cp "$HERE"/lib/*.sv0 "$s_off/lib/"
+rm -f "$s_off/lib/strings_unsafe_abi.sv0"
+if [[ -f "$s_off/lib/strings_unsafe_abi.sv0" ]]; then
+  echo "scripts/unsafe_abi_gate: FAIL -- strings_unsafe_abi.sv0 present in default staged lib/" >&2
+  RC=1
+fi
+printf 'fn main() -> i32 { return 0; }\n' > "$s_off/main.sv0"
+if ! "$NC" --project "$s_off" > "$s_off/out.c" 2> "$s_off/err"; then
+  echo "scripts/unsafe_abi_gate: FAIL -- default (feature-off) project failed to compile" >&2
+  sed 's/^/        /' "$s_off/err" >&2
+  RC=1
+else
+  if grep -q "strings_unsafe_abi" "$s_off/out.c"; then
+    echo "scripts/unsafe_abi_gate: FAIL -- \"strings_unsafe_abi\" leaked into the default build's emitted C" >&2
+    RC=1
+  fi
+  if grep -qE '(^|[^_])strlen\(' "$s_off/out.c"; then
+    echo "scripts/unsafe_abi_gate: FAIL -- an unmangled strlen(...) forward declaration leaked into the default build" >&2
+    RC=1
+  fi
+fi
+[[ "$RC" -eq 0 ]] && [[ "$QUIET" != "-q" ]] && echo "scripts/unsafe_abi_gate: feature-off symbol absence OK"
+rm -rf "$s_off"
+
+# ---- 2. feature-on external linkage ----------------------------------
+s_on="$(mktemp -d)"
+mkdir -p "$s_on/lib"
+cp "$HERE"/lib/*.sv0 "$s_on/lib/"
+cp "$HERE/test/unsafe_abi/main.sv0" "$s_on/main.sv0"
+if ! "$NC" --project "$s_on" > "$s_on/out.c" 2> "$s_on/err"; then
+  echo "scripts/unsafe_abi_gate: FAIL -- feature-on project failed to compile" >&2
+  sed 's/^/        /' "$s_on/err" >&2
+  RC=1
+else
+  if ! "$CC" -std=c99 -O0 -I "$RT" -o "$s_on/bin" "$s_on/out.c" "$RT/sv0_runtime.c" 2> "$s_on/cc.err"; then
+    echo "scripts/unsafe_abi_gate: FAIL -- feature-on project failed to compile+link the emitted C (real libc strlen mismatch?)" >&2
+    sed 's/^/        /' "$s_on/cc.err" >&2
+    RC=1
+  else
+    "$s_on/bin"; got=$?
+    if [[ "$got" -ne 42 ]]; then
+      echo "scripts/unsafe_abi_gate: FAIL -- feature-on run exited $got, wanted 42 (real strlen linkage)" >&2
+      RC=1
+    else
+      [[ "$QUIET" != "-q" ]] && echo "scripts/unsafe_abi_gate: feature-on external linkage OK (exit 42, real libc strlen)"
+    fi
+  fi
+fi
+rm -rf "$s_on"
+
+if [[ "$RC" -eq 0 ]]; then
+  echo "scripts/unsafe_abi_gate: PASS"
+else
+  echo "scripts/unsafe_abi_gate: FAIL"
+fi
+exit "$RC"

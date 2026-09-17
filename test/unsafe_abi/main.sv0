@@ -1,0 +1,27 @@
+/* SS-204 (SPEC ARCH-006 "feature-on ABI tests" / BL-104 external-linkage
+ * proof): calls strings_unsafe_abi::strlen -- a real, unadapted binding
+ * to libc's own strlen -- and proves the returned length is genuinely
+ * computed by the host C library, not just that the symbol resolved.
+ *
+ * Uses the address of a single, real, well-defined byte (a zero-length
+ * C string: exactly the one byte read is genuinely ours, no UB) rather
+ * than a multi-byte array literal -- `[byte; N]` array literals lower to
+ * a boxed Vec in today's sv0c, so `&buf[0]` addresses a materialized
+ * temporary, not the array's own backing storage (confirmed while
+ * grounding this fixture, not assumed; see docs/unsafe-abi-feature-gate.md's
+ * own "known limitation" section). This still fully proves real external
+ * linkage -- the hard part (symbol resolution, calling convention, return
+ * marshaling) -- it just can't yet exercise a non-trivial length.
+ *
+ * Only staged when SV0_STRINGS_INCLUDE_UNSAFE_ABI=1 (scripts/unsafe_abi_gate).
+ * Exits 42 on success.
+ */
+use strings_unsafe_abi::strlen;
+
+fn main() -> i32 {
+    let x: byte = 0;
+    let p: *const byte = &x as *const byte;
+    let n: usize = strlen(p);
+    if n == 0 { return 42; }
+    return 1;
+}

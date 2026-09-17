@@ -402,7 +402,11 @@ declare -a TARGETS=()
 if [[ "$SELFTEST" -eq 1 ]]; then
   TARGETS=(test/cases/types_smoke.sv0 test/fixtures/regressions/embedded_nul_len.sv0 test/compile_fail/nested_module.sv0)
 elif [[ -n "$DIR" ]]; then
-  while IFS= read -r f; do TARGETS+=("${f#"$HERE/"}"); done < <(find "$HERE/$DIR" -name '*.sv0' | sort)
+  # SS-204: test/unsafe_abi/ is a feature-gated fixture (SV0_STRINGS_
+  # INCLUDE_UNSAFE_ABI=1 required to even compile it) with its own
+  # dedicated runner, scripts/unsafe_abi_gate -- never part of the
+  # ordinary --dir sweep, which uses the DEFAULT (feature-off) staging.
+  while IFS= read -r f; do TARGETS+=("${f#"$HERE/"}"); done < <(find "$HERE/$DIR" -name '*.sv0' -not -path '*/unsafe_abi/*' | sort)
 elif [[ "${#CASES[@]}" -gt 0 ]]; then
   for c in "${CASES[@]}"; do
     r="$(resolve_case "$c")"

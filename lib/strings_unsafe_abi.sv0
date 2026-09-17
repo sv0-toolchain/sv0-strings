@@ -21,30 +21,38 @@
  * gate exactly as it would in sv0c's own test corpus.
  *
  * ARCH-006 (feature-gated, separately versioned, excluded from the
- * default build): NOT yet a real build-time feature flag -- sv0 has no
- * such mechanism today, and building one is SS-204's own job, along
- * with the external-linkage test corpus proving these declared
- * signatures really link against a real C library (SS-203 is "write the
- * real functions"; SS-204 is "gate + prove real linkage" -- the division
- * task/sv0c-ffi-raw-pointer-abi.Rmd's own Epic F already draws). The one
- * piece that could NOT wait for SS-204: `scripts/test` / `scripts/
- * sanitize` / `scripts/path_order_corpus` all stage every top-level file
- * directly under lib (a flat wildcard copy, no subdirectories) into a
- * fresh project directory, and sv0's project mode
- * compiles every staged `.sv0` file whether imported or not (SPEC
- * ARCH-011) -- landing this file unguarded would put an `ItemExternFn`
- * in every single VM-backend `--project` build's own translation unit,
- * tripping the brand-new FFI-014 VM gate (E0553) on every existing,
- * otherwise-unrelated test. Those scripts now drop this one file from
- * the default stage (env-var opt-in: `SV0_STRINGS_INCLUDE_UNSAFE_ABI=1`)
- * -- a minimal, load-bearing slice of SS-204's own gate that had to land
- * atomically with this file, not the full feature-gate design SS-204
- * still owns.
+ * default build) -- SS-204, finalized: sv0 has no build-time feature-flag
+ * mechanism, so the gate is the same env-var opt-in SS-203 introduced out
+ * of necessity (`scripts/test` / `scripts/sanitize` / `scripts/
+ * path_order_corpus` / `scripts/consumer_rehearsal` all stage every
+ * top-level file directly under lib -- a flat wildcard copy, no
+ * subdirectories -- into a fresh project directory, and sv0's project
+ * mode compiles every staged `.sv0` file whether imported or not, SPEC
+ * ARCH-011; landing this file unguarded would put an `ItemExternFn` in
+ * every VM-backend `--project` build's own translation unit, tripping
+ * FFI-014's VM gate (E0553) on every unrelated test): `SV0_STRINGS_
+ * INCLUDE_UNSAFE_ABI=1` opts in, absent by default. Full contract,
+ * including the "separately versioned" `abi_version()` below and both
+ * ARCH-006 test categories (feature-off symbol absence; feature-on
+ * external-linkage proof against real libc), documented in
+ * `docs/unsafe-abi-feature-gate.md` and enforced by
+ * `scripts/unsafe_abi_gate` (wired into `scripts/check`).
  *
  * Never imported by any safe module (ARCH-006) -- no `strings_*` file in
  * this package references `strings_unsafe_abi`.
  */
 module strings_unsafe_abi;
+
+/// SS-204 (ARCH-006 "separately versioned"): this module's own ABI
+/// stability contract is independent of the package's SPEC release
+/// ladder (F0/R0.x/R1) -- a safe-API version bump carries no promise
+/// about exact-ABI signature stability, and vice versa. `0` here means
+/// pre-stable: any signature in this file may still change without a
+/// safe-library-visible version bump. Bump this the first time a
+/// signature here changes in an incompatible way.
+pub fn abi_version() -> string {
+    return "0.0.0-unstable";
+}
 
 /// Caller obligation: `s` must be a valid, non-null pointer to a
 /// NUL-terminated byte sequence; the pointed-to memory must remain valid

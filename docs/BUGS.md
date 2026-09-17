@@ -228,3 +228,45 @@ VM mode is always `runtime`; `--contract-mode=verified|disabled` with
 TSV carries `emitter` + `mode` per run.
 
 **Workaround.** None needed in the library; the runner records honestly.
+
+---
+
+## #7 — `[byte; N]` array literals have no real backing-storage address
+
+**Slice:** SS-204 &nbsp; **Owner:** sv0c (lowering / codegen) &nbsp; **Found:** SS-204, 2026-09-17
+&nbsp; **Status:** open, **deferred**; single-scalar address-of workaround stands for `strings_unsafe_abi`
+
+**Symptom.** `let buf: [byte; 6] = [72, 101, 108, 108, 111, 0]; let p = &buf[0] as *const byte;`
+compiles and passes type-checking, but the emitted C shows `&buf[0]` never
+addresses the array's own storage:
+
+```c
+int _sv0t0 = sv0_vec_new();
+sv0_vec_push(_sv0t0, 72); /* ... */
+int buf; buf = _sv0t0;               /* [byte; N] literal desugars to a boxed Vec */
+int _sv0t1 = sv0_idx_get(buf, 0);    /* indexing COPIES element 0 out by value */
+const uint8_t * _sv0t2 = (&_sv0t1);  /* &buf[0] addresses that fresh copy, not buf */
+```
+
+`sv0_idx_get` returns a value, not a reference into the vec's own backing
+memory, so `&buf[0]` can only ever address a local temporary — reading past
+it (as a real `strlen` on a multi-byte buffer would) is undefined behavior
+reading uninitialized stack, not the array's own contents.
+
+**Impact on SPEC.** Blocks any `strings_unsafe_abi` function whose contract
+genuinely needs a real, contiguous, multi-byte buffer address (e.g. a future
+`memcpy`/`memchr`-shaped binding) — a single-scalar workaround (the address
+of one `let x: byte = ...;` local) proves real external linkage but cannot
+exercise a non-trivial length.
+
+**Workaround (stands, `strings_unsafe_abi::strlen`'s own external-linkage
+test, `test/unsafe_abi/main.sv0`).** Address of a single, real, well-defined
+zero byte — a valid, well-defined zero-length C string, no UB, still proving
+genuine symbol resolution + calling convention + return marshaling against
+real libc (`docs/unsafe-abi-feature-gate.md`).
+
+**Not chased further here.** A real fix needs either a genuine fixed-size
+stack-array C representation (not the boxed-`Vec` desugaring every `[T; N]`
+literal gets today) or a `Vec`-backing-pointer builtin — real, sizable
+sv0c-side language/backend work, out of scope for a single test fixture.
+Revisit when a `strings_unsafe_abi` function actually needs it.

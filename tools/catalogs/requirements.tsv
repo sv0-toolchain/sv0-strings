@@ -21,7 +21,7 @@ ARCH-002	F0	9.1	Compatibility modules SHALL be the separately imported flat modu
 ARCH-003	R0.3	9.1	strings_c23 SHALL adapt to shared safe implementations rather than duplicate alg	fbb54e46572a	Implementation dependency review.	todo
 ARCH-004	R0.4	9.1	strings_posix2024 SHALL reuse strings_c23 and safe modules for common operations	da80eb96a55b	Call-graph and duplicate-code lint.	todo
 ARCH-005	R0.4	9.1	strings_legacy SHALL require an explicit import and mark every exported item dep	9787956b7dfb	Compile-warning fixtures and documentation lint.	todo
-ARCH-006	Future	9.1	strings_unsafe_abi SHALL be feature-gated, separately versioned, and excluded fr	27067edada8e	Feature-off symbol absence; feature-on ABI tests.	todo
+ARCH-006	Future	9.1	strings_unsafe_abi SHALL be feature-gated, separately versioned, and excluded fr	27067edada8e	Feature-off symbol absence; feature-on ABI tests.	done
 ARCH-007	F0	9.1	Pure sv0 implementations SHALL be the executable semantic reference. Accelerated	e736f00872f1	Reference/optimized implementation test matrix.	todo
 ARCH-008	F0	9.1	The package SHALL not depend on network services or ambient mutable global state	488e66c1f25f	Dependency and global-state scan.	todo
 ARCH-009	R0.2	9.1	Locale-independent modules SHALL return identical results under every host local	6bb6c642456b	Locale-matrix tests.	todo
@@ -261,7 +261,7 @@ DOC-001	F0	22.4	Every public function SHALL document its semantic domain (bytes,
 DOC-002	F0	22.4	README.md SHALL state current implementation tier, supported releases/backends/p	7aa2a3399f37	Release documentation checklist.	todo
 DOC-003	R0.2	22.4	Examples SHALL include empty, embedded-NUL, non-ASCII UTF-8, invalid UTF-8, exac	f8c3bef49104	Example-category inventory.	todo
 DOC-004	R0.3	22.4	docs/compatibility.md SHALL be generated from Appendix A/catalog data and SHALL 	875b52491472	Generated-file digest/rebuild test.	todo
-DOC-005	R0.3	22.4	Unsafe/ABI documentation SHALL state every caller obligation and corresponding s	cd30e348ca5b	Unsafe API documentation lint.	todo
+DOC-005	R0.3	22.4	Unsafe/ABI documentation SHALL state every caller obligation and corresponding s	cd30e348ca5b	Unsafe API documentation lint.	done
 DOC-006	R0.4	22.4	Locale and host-message documentation SHALL name supported targets/locales and d	33c1c6516ba4	Host-profile documentation review.	todo
 DOC-007	R1	22.4	The changelog SHALL identify every public contract, error, ownership, standards-	c26745028a25	Changelog completeness review.	todo
 LIC-001	F0	22.4	Implementation release SHALL be blocked until maintainers record an explicit sou	0431186fe635	Decision record and license files.	todo

@@ -94,6 +94,12 @@ jobs:
           SV0_STRINGS_REQUIRE_SANITIZERS: "1"
         run: ./scripts/sanitize
 
+      - name: "scripts/unsafe_abi_gate (SS-204 / ARCH-006 feature-off absence + feature-on external linkage)"
+        working-directory: sv0-strings
+        env:
+          SV0_TOOLCHAIN_ROOT: ${{ github.workspace }}/sv0-toolchain
+        run: ./scripts/unsafe_abi_gate
+
       - name: "scripts/locale_matrix (POSIX-014 ambient-locale independence)"
         working-directory: sv0-strings
         env:

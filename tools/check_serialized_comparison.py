@@ -11,7 +11,11 @@ Asserts:
   * `fixture_count` is a positive integer matching the real corpus size
     (every `test/**/*.sv0` fixture that is NOT under `test/compile_fail/`
     -- compile-fail fixtures assert a rejection diagnostic, not an ok/err
-    exit-code comparison, so they never appear in a serialized record);
+    exit-code comparison, so they never appear in a serialized record --
+    or `test/unsafe_abi/` -- SS-204's own feature-gated external-linkage
+    fixture, which `scripts/test`'s default `lib/` staging can't even
+    compile without `SV0_STRINGS_INCLUDE_UNSAFE_ABI=1` set, and which
+    `scripts/unsafe_abi_gate` already covers on its own, dedicated CI step);
   * `fixture_id_digest` is a 64-character lowercase hex string (a real
     sha256, not a placeholder);
   * `mismatches` is exactly `0` -- a checked-in nonzero count would mean a
@@ -61,9 +65,10 @@ def main() -> int:
             errs.append(f"unexpected component {c!r} not in {EXPECTED_COMPONENTS}")
 
     if not errs:
+        excluded_dirs = {"compile_fail", "unsafe_abi"}
         real_fixtures = [
             f for f in (REPO / "test").rglob("*.sv0")
-            if "compile_fail" not in f.relative_to(REPO / "test").parts
+            if excluded_dirs.isdisjoint(f.relative_to(REPO / "test").parts)
         ]
         want_count = len(real_fixtures)
 
