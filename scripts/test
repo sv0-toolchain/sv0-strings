@@ -137,12 +137,24 @@ expected_exit() {
   if [[ "$col" == "c" ]]; then echo "$line" | cut -f2; else echo "$line" | cut -f3; fi
 }
 
+# SS-203 (SPEC ARCH-006): strings_unsafe_abi.sv0 is a Future, feature-gated
+# module -- excluded from the default build. sv0 project mode compiles every
+# staged .sv0 file whether imported or not (ARCH-011), so leaving it in would
+# put an #[extern_c] item in every project's own translation unit, tripping
+# the VM backend's FFI-014 gate (E0553) on every unrelated VM-leg test.
+# SV0_STRINGS_INCLUDE_UNSAFE_ABI=1 opts back in (SS-204's own future tests).
+stage_lib() {
+  # $1 = destination lib/ dir (already created)
+  cp "$HERE"/lib/*.sv0 "$1/"
+  [[ -n "${SV0_STRINGS_INCLUDE_UNSAFE_ABI:-}" ]] || rm -f "$1/strings_unsafe_abi.sv0"
+}
+
 stage() {
   # $1 = main .sv0 (repo-relative)  -> echoes staged dir
   local main="$1" s
   s="$(mktemp -d)"
   mkdir -p "$s/lib"
-  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  stage_lib "$s/lib"
   cp "$HERE/$main" "$s/main.sv0"
   echo "$s"
 }
@@ -206,7 +218,7 @@ run_compile_fail() {
     log "  FAIL  $main   no 'EXPECT-FAIL: <needle>' marker"; RC=1; return
   fi
   s="$(mktemp -d)"; mkdir -p "$s/lib"
-  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  stage_lib "$s/lib"
   cp "$HERE/$main" "$s/main.sv0"
   local rc
   "$NC" --project "$s" > "$s/o.c" 2> "$s/e"; rc=$?
@@ -344,7 +356,7 @@ serialized_mismatch_probe() {
 # --self-test.
 dup_main_probe() {
   local s; s="$(mktemp -d)"; mkdir -p "$s/lib"
-  cp "$HERE"/lib/*.sv0 "$s/lib/"
+  stage_lib "$s/lib"
   printf 'fn main() -> i32 { return 0; }\n' > "$s/main.sv0"
   printf 'fn main() -> i32 { return 1; }\n' > "$s/main_two.sv0"
   if "$NC" --project "$s" > "$s/o.c" 2> "$s/e"; then

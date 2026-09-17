@@ -75,7 +75,10 @@ for main in "${FIXTURES[@]}"; do
   n=$((n + 1))
   s="$(mktemp -d)"
   mkdir -p "$s/lib"
+  # SS-203 (SPEC ARCH-006): strings_unsafe_abi.sv0 is excluded from the
+  # default build -- see scripts/test's own stage_lib() for the full reason.
   cp lib/*.sv0 "$s/lib/"
+  [[ -n "${SV0_STRINGS_INCLUDE_UNSAFE_ABI:-}" ]] || rm -f "$s/lib/strings_unsafe_abi.sv0"
   cp "$main" "$s/main.sv0"
 
   if ! "$NC" --project "$s" > "$s/out.c" 2> "$s/emit.err"; then

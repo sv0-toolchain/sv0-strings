@@ -1,11 +1,57 @@
-/// strings_unsafe_abi -- Future, feature-gated exact C ABI surface.
-///
-/// SPEC.md Section 7.1, ARCH-006, SEC-013, UP-016. Raw-pointer, exact
-/// calling-convention, and symbol-level C compatibility. NEVER imported by
-/// a safe module; excluded from the default build and from the stable safe
-/// conformance claim; separately versioned. Every function documents its
-/// full caller obligations and the corresponding safe alternative.
-///
-/// Status: not started -- gated behind an accepted sv0 FFI/ABI contract
-/// (OQ-007). Work is BL-103 / BL-104 in the Future backlog.
+/* strings_unsafe_abi -- Future exact C ABI (SPEC ARCH-006, Appendix B.8).
+ *
+ * SS-203 (BL-103 / OQ-007): OQ-007 resolved upstream by sv0c's
+ * FFI-001..015 slices (task/sv0c-ffi-raw-pointer-abi.Rmd) -- raw pointer
+ * types, `unsafe { }` blocks, and `#[extern_c]` declarations now exist,
+ * are checker-gated (E0550/E0551/E0552), and are stably rejected on the
+ * VM backend (E0553) rather than silently miscompiled. This module is
+ * the first real consumer.
+ *
+ * Every function here is a real, UNADAPTED C ABI call -- not a safe sv0
+ * signature. The caller assumes every safety obligation the equivalent
+ * libc call assumes (pointer validity, NUL-termination, no concurrent
+ * mutation, lifetime for the call's duration, and so on) and must invoke
+ * it from inside an `unsafe { }` block (SPEC Appendix B.8's own worked
+ * example). Every function's own doc comment states its full caller
+ * obligation (SPEC DOC-005) and doubles as sv0c's FFI-011 caller-
+ * obligation lint fixture -- the parent sv0-toolchain repo's
+ * `scripts/verify_extern_c_caller_obligations.py --root` already walks
+ * this file (it `rglob`s every `.sv0` under the whole workspace, this
+ * submodule included), so an undocumented `#[extern_c]` here fails that
+ * gate exactly as it would in sv0c's own test corpus.
+ *
+ * ARCH-006 (feature-gated, separately versioned, excluded from the
+ * default build): NOT yet a real build-time feature flag -- sv0 has no
+ * such mechanism today, and building one is SS-204's own job, along
+ * with the external-linkage test corpus proving these declared
+ * signatures really link against a real C library (SS-203 is "write the
+ * real functions"; SS-204 is "gate + prove real linkage" -- the division
+ * task/sv0c-ffi-raw-pointer-abi.Rmd's own Epic F already draws). The one
+ * piece that could NOT wait for SS-204: `scripts/test` / `scripts/
+ * sanitize` / `scripts/path_order_corpus` all stage every top-level file
+ * directly under lib (a flat wildcard copy, no subdirectories) into a
+ * fresh project directory, and sv0's project mode
+ * compiles every staged `.sv0` file whether imported or not (SPEC
+ * ARCH-011) -- landing this file unguarded would put an `ItemExternFn`
+ * in every single VM-backend `--project` build's own translation unit,
+ * tripping the brand-new FFI-014 VM gate (E0553) on every existing,
+ * otherwise-unrelated test. Those scripts now drop this one file from
+ * the default stage (env-var opt-in: `SV0_STRINGS_INCLUDE_UNSAFE_ABI=1`)
+ * -- a minimal, load-bearing slice of SS-204's own gate that had to land
+ * atomically with this file, not the full feature-gate design SS-204
+ * still owns.
+ *
+ * Never imported by any safe module (ARCH-006) -- no `strings_*` file in
+ * this package references `strings_unsafe_abi`.
+ */
 module strings_unsafe_abi;
+
+/// Caller obligation: `s` must be a valid, non-null pointer to a
+/// NUL-terminated byte sequence; the pointed-to memory must remain valid
+/// and must not be concurrently mutated by another thread for the
+/// duration of the call. Mirrors libc's own `strlen(3)` contract exactly
+/// -- this is the unadapted exact-ABI call, not `strings_cstr`'s safe
+/// `CStr`-based length (which validates the invariant once at
+/// construction, per MODEL-014, instead of trusting the caller).
+#[extern_c]
+fn strlen(s: *const byte) -> usize;

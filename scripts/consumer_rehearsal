@@ -86,6 +86,11 @@ stage_ordered() {
   else
     files="$(find "$libdir" -maxdepth 1 -name '*.sv0' | sort -r)"
   fi
+  # SS-203 (SPEC ARCH-006): strings_unsafe_abi.sv0 excluded from the default
+  # build -- see scripts/test's own stage_lib() for the full reason.
+  if [[ -z "${SV0_STRINGS_INCLUDE_UNSAFE_ABI:-}" ]]; then
+    files="$(printf '%s\n' "$files" | grep -v '/strings_unsafe_abi\.sv0$')"
+  fi
   while IFS= read -r f; do [[ -n "$f" ]] && cp "$f" "$s/lib/"; done <<< "$files"
   cp "$main" "$s/main.sv0"
   echo "$s"
