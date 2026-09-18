@@ -13,7 +13,10 @@ Audited toolchain revisions: see `docs/audit/2026-08-30.md`.
 ## #1 — enum struct-variant constructor literals unimplemented (`E0301`)
 
 **Slice:** SS-U13 &nbsp; **Owner:** sv0c (resolver + lowering) &nbsp; **Found:** SS-005, 2026-08-30
-&nbsp; **Status:** open, **deferred**; tuple-variant workaround stands
+&nbsp; **Status:** **RESOLVED 2026-09-18** — sv0c `3cb138e1`. `lib/strings_types.sv0`'s
+own error enums have NOT been migrated off tuple variants (see "Workaround"
+below, updated) — this closes the sv0c-side gap, not a follow-up sv0-strings
+API-migration slice.
 
 **Corrected diagnosis (2026-08-31).** The SS-005 write-up blamed a
 "struct-variant field-name namespace collision". That was **wrong** — every
@@ -33,20 +36,41 @@ tuple-variant construction (`E::T(a, b)`), and struct-variant *patterns*
 (`match .. { E::D { a, b } => }`). **Not working:** the struct-variant literal
 *expression*.
 
-**Deferred.** A prototype fix (resolver 2-segment acceptance + a `lowering.sv0`
-branch that builds `DeclNamed(enum) + StoreField(tag) + StoreField(p<slot>)`
-with name→slot mapping, on both let-init and rvalue paths) worked end to end for
-hand tests (C ↔ native VM parity), **but** compiling the modified `lowering.sv0`
-with itself triggered `sv0 panic: vec: index out of bounds` in the self-host
-loop — the exact self-hosting fragility the KC-006 comment in `lowering.sv0`
-already warns about for instruction-emitting additions to `lower_expr_to_value`.
-Not chased further: it is not on any release gate (SPEC §8.2 shapes are
-"Specified", not required) and the tuple-variant form is clean.
+**Resolved 2026-09-18 (sv0c `3cb138e1`).** The 2026-08-31 prototype's own
+finding stood: growing `lower_expr_to_value`'s inline dispatch chain with new
+instruction-emitting code (the KC-006 fragility) triggers `sv0 panic: vec:
+index out of bounds` during self-hosting. The fix is a DELEGATE function
+(`lower_tag_struct`) instead of an inline branch — mirroring
+`lower_tag_call`/`lower_tag_block`, the two other large per-tag bodies never
+inlined into that same dispatch chain — which keeps `lower_expr_to_value`'s
+own body unchanged. Resolver: a 2-segment `ExprStruct` path accepts when the
+first segment alone is a known type (mirrors the already-written-but-unwired
+`resolve_pat_shape`'s own identical `PatStruct` handling), deferring variant +
+field validation to the checker. Checker: `synth_expr` types a resolved
+2-segment path `TY_ENUM` via `resolve_ctor_path_ty` (the same function
+tuple-variant *calls* already use). Fields are stored by their real declared
+payload slot (`enum_variant_def_tok_lookup_str`, new, resolves the variant's
+own definition-site token), proven with an out-of-declaration-order
+field-literal fixture, not just declaration order.
 
-**Workaround (stands).** `lib/strings_types.sv0` error enums use **tuple
-variants** with per-variant positional documentation. Recorded SPEC deviation
-(GOV-004 / GOV-006). Revisit SS-U13 if enum struct-variant construction is
-implemented with a self-host-safe lowering shape (likely bundled with SS-U03).
+A second, genuinely separate bug surfaced verifying this fix, not assumed
+away: the new `enum_tag_lookup_str` call sites dereferenced `starts`/`ends` by
+token unconditionally, which a pre-existing synthetic unit test's
+deliberately-minimal fixture arrays don't satisfy — reproduced identically via
+both the native compiler and the frozen SML bootstrap compiler (confirmed the
+same root cause both places before fixing it once, with an explicit bounds
+guard, rather than two separate patches). Caught only by the REAL
+self-host-sv0-loop gate (compile + link + run the resulting binary) — an
+earlier, narrower "does the emitted C match a golden" check passed clean while
+this was still present, which is why that narrower check alone wasn't
+sufficient evidence during the original 2026-08-31 attempt either.
+
+**Workaround still stands (deliberately not revisited here).**
+`lib/strings_types.sv0` error enums keep their **tuple-variant** shape with
+per-variant positional documentation; migrating them to named-field struct
+variants now that the language feature exists is a separate, not-yet-decided
+follow-up (a real API-surface change to an already-shipped R1 package), not
+part of closing this sv0c-side gap.
 
 ---
 
