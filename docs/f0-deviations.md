@@ -290,7 +290,8 @@ alongside the next Track U window.
 ## SPEC-deferred (not decisions — the SPEC's own ladder)
 
 - **SS-U11** (`fill_explicit` non-elision primitive, UP-014) — SPEC-deferred to
-  **R0.3**.
+  **R0.3**; mechanism now decided (dedicated sv0c compiler intrinsic,
+  `docs/fill-explicit-non-elision-scoping.md`), implementation not started.
 - **SS-U12** (host capability ABI: locale / error / signal, UP-015) —
   SPEC-deferred to **R0.4**.
 - **SS-U13** (`Enum::Variant { field: value }` constructor literals) — deferred;

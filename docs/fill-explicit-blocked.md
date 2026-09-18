@@ -62,15 +62,22 @@ and has **no** store-elimination pass, so in practice the writes happen. But:
 
 Neither backend meets BYTE-010, so `fill_explicit` stays **Blocked**.
 
-The unblocking work is **toolchain slice SS-U11** (SPEC-deferred to R0.3):
+The unblocking work is **toolchain slice SS-U11** (SPEC-deferred to R0.3).
+The mechanism is now decided
+([`fill-explicit-non-elision-scoping.md`](fill-explicit-non-elision-scoping.md),
+2026-09-18): `fill_explicit` becomes a dedicated sv0c compiler intrinsic
+(resolver registry entry, not an attribute or block-scoped keyword), so:
 
-- **sv0doc:** a normative side-effect / non-elision rule for a marked store
-  sequence (a `fill_explicit` intrinsic or a `#[no_elide]`-style attribute).
-- **sv0c C backend:** lower the marked fill to `explicit_bzero` /
+- **sv0doc:** a normative rule that `fill_explicit` is a language-recognized
+  non-elidable store primitive a conforming backend SHALL NOT remove,
+  reorder past an observable side effect, or coalesce away.
+- **sv0c C backend:** lower the intrinsic to `explicit_bzero` /
   `memset_explicit` (or a `volatile` store barrier) so DCE cannot remove it.
-- **sv0c VM backend:** a dedicated non-elidable store opcode (or a documented
-  guarantee that `idx_set` is never elided) plus a store-trace hook for the
-  optimizer test.
+- **sv0c VM backend:** a dedicated non-elidable store opcode (`STORE_NOELIDE`
+  or similarly named) plus a store-trace hook for the optimizer test.
+
+None of this is implemented yet — the design is closed, the slice itself is
+still open.
 
 Only when **both** backends carry that guarantee does `fill_explicit` move from
 `Blocked` to implemented; it is still never a plain alias of `fill`.
