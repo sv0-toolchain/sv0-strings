@@ -306,10 +306,8 @@ pub fn copy_prefix(dst: &mut [byte], src: &[byte]) -> CopyReport {
 /// BYTE-009 (R0.1): set every byte of `dst` to `value`, touching no adjacent
 /// storage. The write is bounded by `dst.len()` on every path (BYTE-017).
 ///
-/// This is the *plain* fill. `fill_explicit` (BYTE-010) -- the version with a
-/// backend-enforced non-elision guarantee -- is a SEPARATE function that
-/// `strings_bytes` does not export while it is Blocked (SS-108; see
-/// docs/fill-explicit-blocked.md). `fill` MUST NOT be presented as it.
+/// This is the *plain* fill -- no non-elision guarantee. `fill_explicit`
+/// (BYTE-010, below) is the version that carries one.
 pub fn fill(dst: &mut [byte], value: byte) -> () {
     let n: usize = slice_len(dst);
     let mut i: usize = 0;
@@ -319,6 +317,34 @@ pub fn fill(dst: &mut [byte], value: byte) -> () {
         dst[i] = value;
         i = i + 1;
     }
+}
+
+/// BYTE-010 (R0.1): set every byte of `dst` to `value`, exactly like `fill`,
+/// but with a backend-enforced guarantee that a conforming build SHALL NOT
+/// remove, reorder past an observable side effect, or coalesce away these
+/// stores even when `dst` is provably unread afterward -- the property
+/// `explicit_bzero` / C23 `memset_explicit` provide over plain `memset`.
+/// Use this (never plain `fill`) to scrub sensitive memory (keys,
+/// passwords, plaintext) before it goes out of scope.
+///
+/// Previously `Blocked` (SS-108; see docs/fill-explicit-blocked.md for the
+/// recorded optimizer/VM-trace evidence): neither backend provided that
+/// guarantee. Unblocked by SS-U11 (sv0c `442d9e54`, sv0doc `49fce85`,
+/// sv0vm `91fbc9d`) -- `fill_explicit` is now a **compiler intrinsic**
+/// (sv0doc memory-model/ownership.md §6.5), not a plain function like
+/// `fill`: the C backend stores through a `volatile`-qualified pointer,
+/// and the VM backend uses a dedicated `CALL_BUILTIN` id distinct from
+/// the ordinary element-store loop.
+///
+/// The call below is not a wrapper in the usual sense -- sv0c's builtin
+/// dispatch (`lowering.sv0` `build_builtin_map`) recognizes the bare name
+/// `fill_explicit` as the intrinsic at ANY callee position, including
+/// this function's own body, so this call always reaches the real
+/// compiler intrinsic rather than becoming a self-call. This function
+/// exists so `use strings_bytes::fill_explicit;` resolves and the symbol
+/// is discoverable in this module's public API surface, matching `fill`.
+pub fn fill_explicit(dst: &mut [byte], value: byte) -> () {
+    fill_explicit(dst, value);
 }
 
 /// BYTE-007 / BYTE-008 (R0.1): move `len` bytes within `buf` from

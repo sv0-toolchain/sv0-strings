@@ -30,7 +30,7 @@ T-C23-STRDUP-FAMILY-001	test/property/c23_strdup_family.sv0	C23-011	c,vm	safe	ru
 T-C23-SPAN-001	test/property/c23_span.sv0	C23-012	c,vm	safe	runtime	property	done
 T-C23-STRTOK-001	test/property/c23_strtok.sv0	C23-013,TOK-008,TOK-009	c,vm	safe	runtime	property	done
 T-C23-MEMSET-001	test/property/c23_memset.sv0	C23-014	c,vm	safe	runtime	property	done
-T-COMPILEFAIL-C23-MEMSET-EXPLICIT-001	test/compile_fail/c23_memset_explicit_blocked.sv0	BYTE-010,C23-014	c	safe		compile-fail	done
+T-C23-MEMSET-EXPLICIT-001	test/property/c23_memset_explicit.sv0	BYTE-010,C23-014	c,vm	safe	runtime	property	done
 T-C23-STRLEN-001	test/property/c23_strlen.sv0	C23-015	c,vm	safe	runtime	property	done
 T-C23-LOCALE-STUBS-001	test/property/c23_locale_stubs.sv0	C23-016,C23-017	c,vm	safe	runtime	property	done
 T-C23-C21-030-001	test/property/c23_c21_030.sv0	C23-021,C23-022,C23-023,C23-024,C23-025,C23-027,C23-029,C23-030	c,vm	safe	runtime	property	done
@@ -64,12 +64,12 @@ T-BYTES-FIND-SLICE-001	test/property/bytes_find_slice.sv0	BYTE-012,PERF-002	c,vm
 T-BYTES-SPAN-001	test/property/bytes_span.sv0	BYTE-013,BYTE-014	c,vm	safe	runtime	property	done
 T-BYTES-COPY-001	test/property/bytes_copy.sv0	BYTE-003,BYTE-004,BYTE-005,BYTE-006,UP-012,SEC-003	c,vm	safe	runtime	property	done
 T-BYTES-FILL-001	test/property/bytes_fill.sv0	BYTE-009	c,vm	safe	runtime	property	done
+T-BYTES-FILL-EXPLICIT-001	test/property/bytes_fill_explicit.sv0	BYTE-010	c,vm	safe	runtime	property	done
 T-BYTES-MOVE-WITHIN-001	test/property/bytes_move_within.sv0	BYTE-007,BYTE-008,TEST-007,SEC-003	c,vm	safe	runtime	property	done
 T-ASCII-CASE-001	test/property/ascii_case.sv0	ASCII-001,ASCII-002,ASCII-003,ASCII-004,ASCII-005,ASCII-006,ASCII-008	c,vm	safe	runtime	property	done
 T-ACCEL-SELECTION-001	test/property/accel_selection.sv0	UP-011,BACKEND-003,ARCH-007	c,vm	safe	runtime	property	done
 T-PRELUDE-OPTION-RESULT-001	test/cases/prelude_option_result.sv0	UP-009,UP-020,UP-021	c,vm	safe	runtime	compile-pass	done
 T-COMPILEFAIL-C23-MEMCPY-OVERLAP-001	test/compile_fail/c23_memcpy_overlap.sv0	C23-004,SEC-004,MODEL-005,TEST-010,MODEL-011	c	safe		compile-fail	done
-T-COMPILEFAIL-FILL-EXPLICIT-001	test/compile_fail/fill_explicit_blocked.sv0	BYTE-010	c	safe		compile-fail	done
 T-TRACEABILITY-001	tools/check_traceability.py	GOV-005	c	safe		generator	done
 T-FIXTURE-PROVENANCE-001	tools/check_fixture_provenance.py	TEST-004,TEST-006	c,vm	safe		tool	done
 T-BYTES-FUZZ-001	test/fuzz/bytes_fuzz.sv0	TEST-017,UP-011,SEC-001,BYTE-002,BYTE-012	c,vm	safe	runtime	fuzz	done

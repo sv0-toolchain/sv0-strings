@@ -12,6 +12,8 @@ test/property/bytes_find_slice.sv0	0	0	SS-103 BYTE-012/PERF-002; strings_bytes::
 test/property/bytes_span.sv0	0	0	SS-104 BYTE-013/014; strings_bytes::span_in/span_not_in (strspn/strcspn-derived), C + VM
 test/property/bytes_copy.sv0	0	0	SS-105 BYTE-003/004/005/006; strings_bytes::copy (CopyResult carrier) + copy_prefix, C + VM
 test/property/bytes_fill.sv0	0	0	SS-107 BYTE-009; strings_bytes::fill (guard-byte fixtures), C + VM
+test/property/bytes_fill_explicit.sv0	0	0	SS-U11 unblock BYTE-010; strings_bytes::fill_explicit (guard-byte fixtures), C + VM
+test/property/c23_memset_explicit.sv0	0	0	SS-U11 unblock C23-014/BYTE-010; strings_c23::memset_explicit, C + VM
 test/property/bytes_move_within.sv0	0	0	SS-106 BYTE-007/008; strings_bytes::move_within (memmove semantics, 7-way overlap matrix vs temp-buffer model), C + VM
 test/property/ascii_case.sv0	0	0	SS-109 ASCII-001..006/008; strings_ascii (exhaustive 256-byte table), C + VM
 test/property/accel_selection.sv0	0	0	SS-110 UP-011/BACKEND-003/BL-037; pure/accelerated selection harness (pure-only at R0.1), C + VM

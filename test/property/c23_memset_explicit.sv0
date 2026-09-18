@@ -1,0 +1,36 @@
+/* SS-U11 unblock (SPEC C23-014 / BYTE-010): strings_c23::memset_explicit.
+ * Exit 0 = pass; nonzero = the number of the first failing check.
+ *
+ * `memset_explicit` is a one-line map to `strings_bytes::fill_explicit`,
+ * mirroring how `memset` maps to `fill` (test/property/c23_memset.sv0).
+ * Observable behavior is identical to `memset`; the non-elision guarantee
+ * is a source-inspection property, not something this program can assert
+ * at runtime. Differential coverage vs the host C oracle reuses the
+ * `memset` op (test/differential/c23_memset_oracle.py) -- observably
+ * identical to plain memset from the outside.
+ */
+use strings_c23::memset_explicit;
+
+fn main() -> i32 {
+    let d1: [byte; 6] = [9, 9, 9, 9, 9, 9];
+    memset_explicit(&mut d1[..], 90);
+    if d1[0] != 90 { return 1; }
+    if d1[5] != 90 { return 2; }
+
+    /* zero-fill -- the actual scrub case memset_explicit exists for */
+    let d2: [byte; 4] = [1, 2, 3, 4];
+    memset_explicit(&mut d2[..], 0);
+    if d2[0] != 0 { return 3; }
+    if d2[3] != 0 { return 4; }
+
+    /* empty slice -> no-op, no panic */
+    let d3: [byte; 0] = [];
+    memset_explicit(&mut d3[..], 7);
+
+    /* high byte value (unsigned, C23-018/022) */
+    let d4: [byte; 3] = [0, 0, 0];
+    memset_explicit(&mut d4[..], 255);
+    if d4[1] != 255 { return 5; }
+
+    return 0;
+}

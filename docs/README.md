@@ -60,8 +60,8 @@ under `tools/catalogs/`.
 | doc | covers |
 |---|---|
 | [`f0-deviations.md`](f0-deviations.md) | the reviewed deviation register (**D-1..D-10**): upstream-toolchain-gap and library-implementation deviations across every release rung |
-| [`fill-explicit-blocked.md`](fill-explicit-blocked.md) | why `fill_explicit`/`memset_explicit` are `Blocked` (unexported), not a stub, and the unblock path |
-| [`fill-explicit-non-elision-scoping.md`](fill-explicit-non-elision-scoping.md) | SS-U11/BYTE-010/UP-014/OQ-006: the design decision that the unblock path is a dedicated sv0c compiler intrinsic (not an attribute or block keyword) — the mechanism `fill_explicit`'s C/VM lowering will implement against |
+| [`fill-explicit-blocked.md`](fill-explicit-blocked.md) | RESOLVED 2026-09-18: history of why `fill_explicit`/`memset_explicit` were `Blocked`, and how SS-U11 unblocked them (both now exported) |
+| [`fill-explicit-non-elision-scoping.md`](fill-explicit-non-elision-scoping.md) | SS-U11/BYTE-010/UP-014/OQ-006: the design decision (dedicated sv0c compiler intrinsic, not an attribute or block keyword) that `fill_explicit`'s C/VM lowering implements |
 | [`locale-and-host-capabilities.md`](locale-and-host-capabilities.md) | the `strcoll`/`strxfrm`/`strerror` stub pattern → locale-open lifecycle → `_l` adapters → host error/signal messages — one narrative across SS-150/167/168/169, all fail-closed pending the same toolchain ABI |
 | [`legacy-aliases.md`](legacy-aliases.md) | the deprecated `<strings.h>` migration aliases (`bcmp`/`bcopy`/`bzero`/`index`/`rindex`) |
 | [`unsafe-abi-feature-gate.md`](unsafe-abi-feature-gate.md) | ARCH-006: `strings_unsafe_abi` feature-gated + absent from default builds, separately versioned, real external-linkage proof against libc (`scripts/unsafe_abi_gate`, a CI step — needs the toolchain, not run via `scripts/check`) |

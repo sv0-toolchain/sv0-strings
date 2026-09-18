@@ -40,7 +40,7 @@ BYTE-006	R0.1	10.2	copy_prefix SHALL write min(dst.len(), src.len()) bytes and r
 BYTE-007	R0.1	10.2	move_within SHALL behave as if the source bytes were first copied to a temporary	c3ac0d75e00e	Differential test against a simple temporary-buffer model.	todo
 BYTE-008	R0.1	10.2	move_within SHALL reject any source or destination range outside buf before modi	c11127c37feb	Boundary and failure-atomicity tests.	todo
 BYTE-009	R0.1	10.2	fill SHALL write exactly the destination slice and no adjacent storage.	bbb910af82de	Guard-byte fixture and sanitizer run.	todo
-BYTE-010	R0.1	10.2	fill_explicit SHALL provide a backend-enforced guarantee that the writes are obs	4092986b1e3c	Generated-C inspection, optimizer test, and VM store trace.	todo
+BYTE-010	R0.1	10.2	fill_explicit SHALL provide a backend-enforced guarantee that the writes are obs	4092986b1e3c	Generated-C inspection, optimizer test, and VM store trace.	done
 BYTE-011	F0	10.2	find and rfind SHALL return the first and last matching byte index respectively,	292a404d5531	Table fixtures and model property.	todo
 BYTE-012	R0.1	10.2	find_slice SHALL return Some(0) for an empty needle, the first match for a non-e	81d494876eb0	C23 `strstr`/POSIX `memmem`-derived byte fixtures.	todo
 BYTE-013	R0.1	10.2	span_in SHALL return the length of the maximal input prefix whose bytes are memb	d9fcd9cd067b	`strspn`-derived fixtures.	todo

@@ -1,4 +1,14 @@
-# `fill_explicit` is Blocked — recorded evidence (SS-108 / BYTE-010)
+# `fill_explicit` — history and unblock evidence (SS-108 / BYTE-010)
+
+**Status: RESOLVED 2026-09-18 (SS-U11).** `fill_explicit` is unblocked and
+exported: `strings_bytes::fill_explicit` (sv0-strings, this commit) delegates
+to sv0c's new `fill_explicit` **compiler intrinsic** (sv0c `442d9e54`, sv0doc
+`49fce85` §6.5, sv0vm `91fbc9d`) — see
+[`fill-explicit-non-elision-scoping.md`](fill-explicit-non-elision-scoping.md)
+for the design and the toolchain-side implementation. The rest of this file
+is kept as the historical record of *why* it was `Blocked` and what evidence
+justified that — useful context for anyone reviewing the SS-108/SS-U11
+history, not a currently-accurate description of the exported API.
 
 ## Requirement
 
@@ -8,10 +18,11 @@ both backends provide that guarantee, it SHALL remain `Blocked` and MUST NOT be
 aliased to ordinary `fill`.** Verification: generated-C inspection, optimizer
 test, and VM store trace.
 
-`strings_bytes` therefore **does not export `fill_explicit`**. The compile-fail
-probe `test/compile_fail/fill_explicit_blocked.sv0` pins this
-(`EXPECT-FAIL: E0309`): if a plain alias to `fill` were ever added, that fixture
-would begin compiling and the compile-fail gate would flag the regression.
+(Historical, at the time this was written: `strings_bytes` did not export
+`fill_explicit`, and a compile-fail probe pinned that — since removed, along
+with its C23 `memset_explicit` counterpart, now that both are real exported
+functions; see `test/property/bytes_fill_explicit.sv0` and
+`test/property/c23_memset_explicit.sv0` for their correctness coverage.)
 
 `strings_bytes::fill` is documented as the *plain* fill and is explicitly not
 the scrubbing primitive.
@@ -58,39 +69,29 @@ and has **no** store-elimination pass, so in practice the writes happen. But:
 "Happens to retain the stores" is not a *backend-enforced guarantee*
 (BYTE-010).
 
-## Conclusion and unblocking path
+## Conclusion (historical) and how it was resolved
 
-Neither backend meets BYTE-010, so `fill_explicit` stays **Blocked**.
+At the time of the original evidence above, neither backend met BYTE-010, so
+`fill_explicit` stayed **Blocked**. The unblocking work was **toolchain
+slice SS-U11**: sv0doc gained a normative rule that `fill_explicit` is a
+language-recognized non-elidable store primitive
+(memory-model/ownership.md §6.5); sv0c made it a compiler intrinsic whose C
+lowering stores through a `volatile`-qualified pointer (portable, no
+dependency on `explicit_bzero`/`memset_explicit` being present on every CI
+toolchain) and whose VM lowering uses a dedicated `CALL_BUILTIN` id distinct
+from the ordinary element-store loop. Both landed 2026-09-18 — see
+[`fill-explicit-non-elision-scoping.md`](fill-explicit-non-elision-scoping.md)
+for the full design and `task/sv0-strings-checklist.Rmd`'s SS-U11 row (parent
+repo) for the toolchain-side commit history.
 
-The unblocking work is **toolchain slice SS-U11** (SPEC-deferred to R0.3).
-The mechanism is now decided
-([`fill-explicit-non-elision-scoping.md`](fill-explicit-non-elision-scoping.md),
-2026-09-18): `fill_explicit` becomes a dedicated sv0c compiler intrinsic
-(resolver registry entry, not an attribute or block-scoped keyword), so:
+`strings_bytes::fill_explicit` now delegates to that intrinsic; it is still
+never a plain alias of `fill` (the intrinsic's guarantee is what makes it a
+distinct function, not a documentation nicety).
 
-- **sv0doc:** a normative rule that `fill_explicit` is a language-recognized
-  non-elidable store primitive a conforming backend SHALL NOT remove,
-  reorder past an observable side effect, or coalesce away.
-- **sv0c C backend:** lower the intrinsic to `explicit_bzero` /
-  `memset_explicit` (or a `volatile` store barrier) so DCE cannot remove it.
-- **sv0c VM backend:** a dedicated non-elidable store opcode (`STORE_NOELIDE`
-  or similarly named) plus a store-trace hook for the optimizer test.
-
-None of this is implemented yet — the design is closed, the slice itself is
-still open.
-
-Only when **both** backends carry that guarantee does `fill_explicit` move from
-`Blocked` to implemented; it is still never a plain alias of `fill`.
-
-## C23 façade addendum (SS-148, C23-014)
+## C23 façade addendum (SS-148, C23-014) — also resolved
 
 `strings_c23::memset` ships (SS-148) as the C23-recognizable one-line map to
-`strings_bytes::fill`. `memset_explicit` -- C23's own non-eliding scrub
-variant -- is subject to the exact same BYTE-010 blocker as `fill_explicit`
-above and is deliberately **not exported from `strings_c23` either**, pinned
-by `test/compile_fail/c23_memset_explicit_blocked.sv0` (`EXPECT-FAIL:
-E0309`). No separate evidence is recorded for it: the backend gap is
-identical, so this file's optimizer/VM-trace evidence and SS-U11 unblocking
-path cover both the SPEC `BYTE-010` and `C23-014` requirements at once. When
-SS-U11 lands and `fill_explicit` is implemented, `strings_c23::memset_explicit`
-becomes a one-line map to it, the same way `memset` maps to `fill` today.
+`strings_bytes::fill`. `memset_explicit` hit the exact same BYTE-010 blocker
+as `fill_explicit` above and is now, as SS-U11 anticipated, a one-line map
+to `strings_bytes::fill_explicit` — the same relationship `memset` has to
+`fill`.

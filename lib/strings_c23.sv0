@@ -50,6 +50,7 @@ use strings_bytes::span_in;
 use strings_bytes::span_not_in;
 use strings_bytes::compare;
 use strings_bytes::fill;
+use strings_bytes::fill_explicit;
 use strings_cstr::as_bytes;
 use strings_cstr::clone_owned;
 use strings_cstr::len;
@@ -580,15 +581,26 @@ pub fn strtok(s: string, separators: string, pos: usize) -> TokenStep {
 /// every path (slice bounds replace pointer/count UB).
 ///
 /// This is the *plain* fill: it carries NO backend-enforced guarantee
-/// against dead-store elimination. `memset_explicit` -- the scrubbing
-/// variant C23 added for exactly that guarantee -- stays **Blocked**
-/// (BYTE-010) and is deliberately **not exported from this module either**,
-/// mirroring `strings_bytes::fill_explicit`'s own block; see
-/// `docs/fill-explicit-blocked.md` for the recorded optimizer/VM-trace
-/// evidence and the unblocking path (toolchain slice SS-U11). `memset` MUST
-/// NOT be presented as a substitute for it.
+/// against dead-store elimination. `memset_explicit` (below) is C23's
+/// scrubbing variant, with that guarantee.
 pub fn memset(dst: &mut [byte], value: byte) -> () {
     fill(dst, value);
+}
+
+/// C23-014 addendum. Set every byte of `dst` to `value`, with the
+/// backend-enforced non-elision guarantee C23 `memset_explicit` provides
+/// over plain `memset` -- the C23-recognizable name for
+/// `strings_bytes::fill_explicit` (BYTE-010).
+///
+/// Previously **Blocked** alongside `strings_bytes::fill_explicit`
+/// (SS-108, mirrored for the C23 façade by SS-148); unblocked by the same
+/// SS-U11 compiler-intrinsic landing (sv0c `442d9e54`) -- see
+/// `docs/fill-explicit-blocked.md`'s "C23 façade addendum". `fill_explicit`
+/// resolves to the compiler intrinsic at this call site the same way it
+/// does inside `strings_bytes::fill_explicit` itself (sv0c's builtin
+/// dispatch recognizes the bare name at any callee position).
+pub fn memset_explicit(dst: &mut [byte], value: byte) -> () {
+    fill_explicit(dst, value);
 }
 
 /// C23-015 (Adapted). The `CStr` payload's byte count -- the
