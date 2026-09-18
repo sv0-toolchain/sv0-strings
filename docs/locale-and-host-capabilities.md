@@ -97,12 +97,18 @@ real implementation MUST satisfy, SS-U12 onward):
 | **thread-safety** | Two `Locale` values are independent; a comparison or transform through one never mutates process-global state (no `setlocale`/`uselocale` side effect visible to other code). Adapters that cannot guarantee this for a given host MUST return a capability error rather than touch a shared static buffer (SEC-011). |
 | **backend support** | Every host-service adapter declares C / native-VM / both support (HOST-007). R1 POSIX conformance requires **both**. Today, with SS-U12 deferred: C = not wired, VM = not wired, both fail closed to `Unavailable` **identically** — trivially cross-backend-equivalent. |
 
-**HOST-004 — unsupported locale is a typed error, never a downgrade.** Once
-SS-U12 lands, `open(HostNamed(name))` returns `Opened(Locale)` for a name
-the wired host provides, **`Unsupported`** for a valid name the host does
-not provide, and **never** falls back to ASCII or bytewise comparison (SPEC
-B.7: opening `"tr_TR.UTF-8"` on a host without it yields `Unsupported`, not
-a silent ASCII fold that would mis-order dotless-i). Today the single
+**HOST-004 — unsupported locale is a typed error, never a downgrade.**
+`docs/host-capability-abi-scoping.md`'s decided design (2026-09-18, Option
+B) narrows what "once SS-U12 lands" means in practice: `open(Posix)` will
+return real `Opened(Locale)` on both backends, but `open(HostNamed(name))`
+stays `Unsupported` for **every** name, on both backends, deliberately —
+named-locale support (a real host lookup on C, a curated locale dataset on
+the VM to keep it deterministic) is scoped to a *separate*, not-yet-started
+future slice, not SS-U12 itself. So `HostNamed`'s own path here never
+downgrades to ASCII/bytewise comparison (SPEC B.7: opening
+`"tr_TR.UTF-8"` on a host without it yields `Unsupported`, not a silent
+ASCII fold that would mis-order dotless-i) — it just never becomes
+`Opened` either, until that future slice exists. Today the single
 outcome is `Unavailable` (no service at all) — kept distinct from
 `Unsupported` per **TEST-015** so a future test can tell "the host lacks
 this locale" from "this build has no locale service".
@@ -216,15 +222,25 @@ opaque, non-pinned output.
 - **`strings_unsafe_abi`** (Future, BL-103/104): the sv0 host-call/FFI
   primitive. Until it exists there is no way to read the OS message
   tables, so §4's three adapters return `Unavailable`.
-- **SS-U12** (deferred): the versioned host-capability ABI + deterministic
-  VM mappings (sv0doc + sv0c + sv0vm; SPEC UP-015/OQ-005). Until it exists,
-  `strings_locale::open` cannot return `Opened(Locale)`, so §3's adapters
-  and `strerror_l` (§4) have nothing to call.
-- Once both land: `strcoll`/`strxfrm`/`strerror` (§1) become thin wrappers;
-  `_l` adapters (§3) delegate to `compare`/`transform` and the
-  per-supported-locale property loop becomes non-vacuous; `strerror_r`
-  fills `dst` and returns `Written`/`DestinationTooSmall`; `strerror_l`/
-  `strsignal` return `Text(owned)` (§4).
+- **SS-U12** (deferred; design decided 2026-09-18,
+  `docs/host-capability-abi-scoping.md`, Option B): the versioned
+  host-capability ABI + deterministic VM mappings (sv0doc + sv0c + sv0vm;
+  SPEC UP-015/OQ-005). Scoped to `LocaleId::Posix` only — real
+  `Opened(Locale)` on both backends, backed by this library's existing
+  deterministic ASCII-fold logic, no new host-dependent code. Until
+  implemented, `strings_locale::open` cannot return `Opened(Locale)` at
+  all, so §3's adapters and `strerror_l` (§4) have nothing to call.
+  `HostNamed(_)` locales stay `Unsupported` on both backends even once
+  SS-U12 lands — that needs a *separate*, not-yet-started future slice
+  (a real host lookup on C, a curated locale dataset on the VM).
+- Once SS-U12 (for `Posix`) and `strings_unsafe_abi` (for §4) both land:
+  `strcoll`/`strxfrm`/`strerror` (§1) become thin wrappers for the `Posix`
+  locale; `_l` adapters (§3) delegate to `compare`/`transform` for
+  `Posix` and the per-supported-locale property loop becomes non-vacuous
+  for it; `strerror_r` fills `dst` and returns `Written`/
+  `DestinationTooSmall`; `strerror_l`/`strsignal` return `Text(owned)`
+  (§4). Named-locale support for any of these stays `Unsupported` until
+  the separate future slice above lands.
 
 Until then, `HostCapability::Unsupported` / `LocaleOpen::Unavailable` /
 `HostMessage::Unavailable` / `MessageWrite::Unavailable` is the complete
