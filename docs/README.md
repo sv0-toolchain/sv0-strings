@@ -64,6 +64,7 @@ under `tools/catalogs/`.
 | [`locale-and-host-capabilities.md`](locale-and-host-capabilities.md) | the `strcoll`/`strxfrm`/`strerror` stub pattern → locale-open lifecycle → `_l` adapters → host error/signal messages — one narrative across SS-150/167/168/169, all fail-closed pending the same toolchain ABI |
 | [`legacy-aliases.md`](legacy-aliases.md) | the deprecated `<strings.h>` migration aliases (`bcmp`/`bcopy`/`bzero`/`index`/`rindex`) |
 | [`unsafe-abi-feature-gate.md`](unsafe-abi-feature-gate.md) | ARCH-006: `strings_unsafe_abi` feature-gated + absent from default builds, separately versioned, real external-linkage proof against libc (`scripts/unsafe_abi_gate`, a CI step — needs the toolchain, not run via `scripts/check`) |
+| [`annex-k-decision.md`](annex-k-decision.md) | BL-102/C23K-001..003: the product decision to **decline** C Annex K (`_s` functions) — stays permanently `Excluded`, not deferred |
 
 ## C23 / POSIX header surface
 

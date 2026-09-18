@@ -132,9 +132,9 @@ C23-027	R0.3	15.2	strncmp and other n-bounded string operations SHALL not requir
 C23-028	R0.3	15.2	The C23 type-generic search catalog SHALL distinguish the generic macro interfac	b4d78a13b69b	Macro-suppression and mutable/immutable API tests.	todo
 C23-029	R0.3	15.2	strxfrm adapters SHALL not expose destination bytes as initialized transformed d	cc983731e980	Exact-capacity, truncation, and size-query differential tests.	todo
 C23-030	R0.3	15.2	strerror SHALL accept every i32 value. Unsupported service or allocation may be 	5101ac2d8016	Known/unknown/error-range host tests.	todo
-C23K-001	R0.3	15.3	Annex K SHALL be labeled optional and Excluded from the core C23 claim unless a 	166b3acc6de1	Claim text and symbol-absence test.	todo
-C23K-002	Future	15.3	If implemented, the Annex K profile SHALL define rsize_t, runtime-constraint han	a973c13c44b2	Annex K completeness matrix.	todo
-C23K-003	Future	15.3	Annex K runtime-constraint handling SHALL not use an unscoped process-global mut	75fe66fcc8ec	Concurrency and global-state test.	todo
+C23K-001	R0.3	15.3	Annex K SHALL be labeled optional and Excluded from the core C23 claim unless a 	166b3acc6de1	Claim text and symbol-absence test.	done
+C23K-002	Future	15.3	If implemented, the Annex K profile SHALL define rsize_t, runtime-constraint han	a973c13c44b2	Annex K completeness matrix.	done
+C23K-003	Future	15.3	Annex K runtime-constraint handling SHALL not use an unscoped process-global mut	75fe66fcc8ec	Concurrency and global-state test.	done
 POSIX-001	R0.4	16.2	Every function and required non-function declaration in POSIX.1-2024 Issue 8 <st	b4b01d12a0fd	POSIX matrix extraction/completeness script.	todo
 POSIX-002	R0.4	16.2	memmem SHALL map to binary-safe strings_bytes::find_slice and support embedded z	e690dbcdce99	POSIX differential vectors.	todo
 POSIX-003	R0.4	16.2	stpcpy/stpncpy SHALL return a safe written-end offset or view, not a raw interio	13f2e6174d14	Differential boundary fixtures.	todo

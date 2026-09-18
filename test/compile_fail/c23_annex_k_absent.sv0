@@ -3,12 +3,15 @@
  * EXPECT-FAIL: E0309
  *
  * C23 Annex K (the `_s` bounds-checked functions) is OPTIONAL in C23 and
- * Excluded from this library's core C23 claim. No safe module exports any
- * Annex K symbol; a future Annex K profile, if ever built, would be a
- * separately versioned surface (like `strings_unsafe_abi`). This probe pins
- * the exclusion: importing an Annex K name fails to resolve, and if one
- * were ever added this fixture would start compiling and the compile-fail
- * gate would flag the regression.
+ * Excluded from this library's core C23 claim. SS-202 (BL-102) decided
+ * this permanently: DECLINED, not deferred -- see
+ * `docs/annex-k-decision.md` for the full rationale (near-zero real-world
+ * adoption outside Microsoft's own CRT, a weaker safety story than this
+ * package's own native API, and C23K-002/003 together mean there's no
+ * cheap partial "yes"). No safe module exports any Annex K symbol. This
+ * probe pins the exclusion: importing an Annex K name fails to resolve,
+ * and if one were ever added this fixture would start compiling and the
+ * compile-fail gate would flag the regression.
  *
  * `memcpy_s` stands in for the whole Annex K set (`memmove_s`, `strcpy_s`,
  * `strncpy_s`, `strcat_s`, `strncat_s`, `strtok_s`, `memset_s`,
