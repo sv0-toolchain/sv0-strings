@@ -65,6 +65,7 @@ under `tools/catalogs/`.
 | [`legacy-aliases.md`](legacy-aliases.md) | the deprecated `<strings.h>` migration aliases (`bcmp`/`bcopy`/`bzero`/`index`/`rindex`) |
 | [`unsafe-abi-feature-gate.md`](unsafe-abi-feature-gate.md) | ARCH-006: `strings_unsafe_abi` feature-gated + absent from default builds, separately versioned, real external-linkage proof against libc (`scripts/unsafe_abi_gate`, a CI step — needs the toolchain, not run via `scripts/check`) |
 | [`annex-k-decision.md`](annex-k-decision.md) | BL-102/C23K-001..003: the product decision to **decline** C Annex K (`_s` functions) — stays permanently `Excluded`, not deferred |
+| [`unicode-package-scope-decision.md`](unicode-package-scope-decision.md) | OQ-008/BL-105: the scoping decision that full Unicode operations (normalization, grapheme segmentation, collation, full case folding) belong in a separate, not-yet-started `unicode` package — `sv0-strings` stays byte/UTF-8-scalar-oriented |
 
 ## C23 / POSIX header surface
 
