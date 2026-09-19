@@ -287,6 +287,49 @@ capability ABI) and SS-U18 (reserved-name extension): out of scope for a
 library-only slice. Tracked as a deferred toolchain follow-up; revisit
 alongside the next Track U window.
 
+## D-11 — public function names must be unique project-wide, not per-module (SS-U12)
+
+**SPEC.** No explicit SPEC requirement names this; it is an implicit
+assumption behind every module boundary the SPEC draws (e.g. §17.1's own
+`compare`/`transform`/`compare_ignore_case` names, chosen independently of
+`strings_bytes::compare`/`strings_ascii::compare_ignore_case` already
+existing elsewhere in the same library).
+
+**What the toolchain does.** sv0c compiles a whole project as one flat
+concatenation and resolves an unqualified call by bare name across the
+WHOLE project, not per-module (the same "no true multi-module
+namespacing yet" root cause D-2 already documents for `pub`/private
+enforcement — this is a more severe consequence of it). Confirmed while
+landing SS-U12: declaring `strings_locale::compare_ignore_case` (a second,
+different-arity public function sharing a bare name with
+`strings_ascii::compare_ignore_case`) silently corrupted an UNRELATED,
+already-shipped call site — `strings_posix2024::strcasecmp`'s own
+`use strings_ascii::compare_ignore_case;` + `compare_ignore_case(a, b)`
+call started resolving against the new module's wrong-arity function
+instead, a genuine `wrong number of arguments` compile error in code that
+was never touched. This is not limited to a file importing-and-shadowing
+its own same-named symbol (a narrower, separately-confirmed case: a `use`
+alias and a local declaration of the identical bare name in the SAME file
+mangle to the identical C symbol) — it reaches across files that never
+import each other at all.
+
+**What sv0-strings does.** Every public function name across the whole
+`lib/` tree must be checked for uniqueness before it's added, not just
+within its own module. `strings_locale` (SS-167/SS-U12) is the concrete
+case that surfaced this: its public API is `locale_compare` /
+`locale_compare_ignore_case` / `locale_transform`, prefixed specifically
+to guarantee no future collision, rather than SPEC §17.1's bare
+`compare`/`compare_ignore_case`/`transform`. No project-wide registry or
+lint enforces this today; it is discipline, checked by hand, the same way
+D-2's `pub`/private gap is worked around by convention (an all-`pub`,
+flat-module surface) rather than by a compiler guarantee.
+
+**Schedule.** The real fix is the same multi-module linker D-2 already
+schedules (per-file origin tracking through resolve/check) — scoped
+**post-M5**, `task/sv0-toolchain-milestone-cross-cutting.Rmd` stream F.
+Until it lands, this deviation (and D-2) both apply to any new public
+symbol added anywhere in this library.
+
 ## SPEC-deferred (not decisions — the SPEC's own ladder)
 
 - **SS-U12** (host capability ABI: locale / error / signal, UP-015) —

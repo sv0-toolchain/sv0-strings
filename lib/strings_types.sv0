@@ -477,3 +477,50 @@ pub enum LocaleCompare {
     Greater,
     Unsupported,
 }
+
+/* Outcome of a bounded-buffer locale-collation-key transform --
+ * `strings_posix2024::strxfrm_l` (SS-168) and `strings_c23::strxfrm`
+ * (SS-150), once SS-U12 landed a real (POSIX-only) `Locale` capability.
+ * No `Unsupported` arm: by the time either caller reaches the transform
+ * itself, the locale capability has already been checked once, at
+ * acquisition (`strings_locale::open`) -- `strcoll_l`/`strxfrm_l` take an
+ * already-opened `&Locale`, and `strxfrm` opens the fixed POSIX locale
+ * internally, which per SS-U12's design never fails. The only remaining
+ * way this can fail is an ordinary bounded-write capacity problem,
+ * unrelated to locale support at all -- mirrors `MessageWrite`'s own
+ * Written/DestinationTooSmall shape (SS-169) without its third
+ * FFI-unavailable arm, which doesn't apply here.
+ *
+ *   Written(usize)            -- the transform key's byte length; it fit
+ *                                 in `dst` and was written in full.
+ *   DestinationTooSmall(usize) -- the key's required byte length; `dst`
+ *                                 is left COMPLETELY untouched (no
+ *                                 partial/truncated key).
+ */
+pub enum TransformWrite {
+    Written(usize),
+    DestinationTooSmall(usize),
+}
+
+/* `_l`-adapter twin of `TransformWrite` -- `strings_posix2024::strxfrm_l`
+ * (SS-168) takes a raw, not-yet-opened `LocaleId` (POSIX-008's own
+ * explicit-locale-per-call shape), so its outcome space has a THIRD
+ * possibility `TransformWrite` doesn't need to express: the locale itself
+ * might not open at all (every `HostNamed` today). `strings_locale::
+ * locale_transform` never needs this arm because it only ever receives an
+ * ALREADY-opened capability id -- by the time a caller has one, the
+ * locale question is already answered.
+ */
+pub enum LocaleTransformWrite {
+    Written(usize),
+    DestinationTooSmall(usize),
+    Unsupported,
+}
+
+/* `_l`-adapter twin for the size-query form (`strxfrm_l_size`) -- same
+ * reasoning as `LocaleTransformWrite` above, without a destination.
+ */
+pub enum LocaleTransformSize {
+    Size(usize),
+    Unsupported,
+}

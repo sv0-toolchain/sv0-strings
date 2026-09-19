@@ -1,48 +1,82 @@
 /* SS-168 (SPEC POSIX-008, POSIX-009, HOST-003): strings_posix2024::strcoll_l
- * / strxfrm_l / strxfrm_l_size explicit-locale `_l` capability stubs.
+ * / strxfrm_l / strxfrm_l_size explicit-locale `_l` capability adapters.
  * Exit 0 = pass; nonzero = the number of the first failing check.
  *
- * The versioned host-capability ABI (toolchain slice SS-U12) is deferred,
- * so no `Locale` can be opened -- every `_l` adapter fails closed to
- * `HostCapability::Unsupported` for EVERY `LocaleId`, on both backends.
- * This fixture pins the fail-closed behavior directly:
- *   - `strcoll_l` returns `Unsupported` even for identical strings and for
- *     strings a bytewise comparator would order -- so a regression that
- *     silently aliased it to `strings_bytes::compare` would be caught the
- *     moment it stopped returning `Unsupported` (HOST-004 / SPEC B.7: the
- *     Turkish `tr_TR.UTF-8` case must never downgrade to an ASCII fold).
- *   - `strxfrm_l`'s `dst` is provably untouched (no partial key).
- *   - the outcome is deterministic and identical across every `LocaleId`
- *     including `Posix` -- no ambient-locale dependence (POSIX-008).
+ * Unblocked by SS-U12 (2026-09-18, Option B): `LocaleId::Posix` now opens
+ * a real capability and every adapter below delegates to `strings_locale`
+ * (plain byte-wise collation, POSIX/C-locale rules). `LocaleId::
+ * HostNamed(_)` stays `Unsupported`, for EVERY name, on both backends,
+ * unconditionally -- proven directly:
+ *   - `strcoll_l` returns `Unsupported` for a `HostNamed` locale even for
+ *     identical strings and for strings a bytewise comparator would
+ *     order -- so a regression that silently aliased it to
+ *     `strings_bytes::compare` regardless of locale would be caught the
+ *     moment it stopped returning `Unsupported` for those cases (HOST-004
+ *     / SPEC B.7: the Turkish `tr_TR.UTF-8` case must never downgrade to
+ *     an ASCII fold).
+ *   - `strxfrm_l`'s `dst` is provably untouched when the locale is
+ *     `Unsupported` (no partial key) and correctly filled for `Posix`.
+ *   - the outcome is deterministic and locale-independent of anything
+ *     ambient (POSIX-008).
  *   - `strcoll_l` and `strxfrm_l` agree on the SAME `LocaleId` argument
- *     (POSIX-009: one explicit locale object shared by both). The HOST-003
+ *     (POSIX-009: one explicit locale shared by both) -- the HOST-003
  *     "bytewise compare of two `strxfrm_l` keys has the same sign as
- *     `strcoll_l`" property holds vacuously while zero locales are
- *     supported; `docs/locale-and-host-capabilities.md` is the contract for when
- *     SS-U12 makes a locale openable.
+ *     `strcoll_l`" property now holds non-vacuously for `Posix`:
+ *     `strings_locale::locale_transform` is an identity copy under plain
+ *     byte-wise collation, so comparing two keys byte-wise is exactly
+ *     comparing the two original inputs byte-wise.
  */
-use strings_types::HostCapability;
 use strings_locale::LocaleId;
 use strings_posix2024::strcoll_l;
 use strings_posix2024::strxfrm_l;
 use strings_posix2024::strxfrm_l_size;
+use strings_types::LocaleCompare;
+use strings_types::LocaleTransformWrite;
+use strings_types::LocaleTransformSize;
 
-fn is_unsupported(r: HostCapability) -> bool {
+fn is_unsupported(r: LocaleCompare) -> bool {
     return match r {
-        HostCapability::Unsupported => { true },
+        LocaleCompare::Less => { false },
+        LocaleCompare::Equal => { false },
+        LocaleCompare::Greater => { false },
+        LocaleCompare::Unsupported => { true },
     };
 }
 
 fn main() -> i32 {
     /* ================= strcoll_l (POSIX-008 / HOST-004) ================= */
-    /* identical strings: a bytewise comparator would say Equal. */
-    if is_unsupported(strcoll_l("abc", "abc", LocaleId::Posix)) != true { return 1; }
-    /* differing strings: a bytewise comparator would say Less/Greater. */
-    if is_unsupported(strcoll_l("abc", "abd", LocaleId::Posix)) != true { return 2; }
-    if is_unsupported(strcoll_l("zzz", "aaa", LocaleId::Posix)) != true { return 3; }
-    if is_unsupported(strcoll_l("", "", LocaleId::Posix)) != true { return 4; }
+    let c1: LocaleCompare = strcoll_l("abc", "abc", LocaleId::Posix);
+    let eq1: bool = match c1 {
+        LocaleCompare::Less => { false },
+        LocaleCompare::Equal => { true },
+        LocaleCompare::Greater => { false },
+        LocaleCompare::Unsupported => { false },
+    };
+    if !eq1 { return 1; }
 
-    /* a common host locale name -> still Unsupported (no service). */
+    let c2: LocaleCompare = strcoll_l("abc", "abd", LocaleId::Posix);
+    let lt2: bool = match c2 {
+        LocaleCompare::Less => { true },
+        LocaleCompare::Equal => { false },
+        LocaleCompare::Greater => { false },
+        LocaleCompare::Unsupported => { false },
+    };
+    if !lt2 { return 2; }
+
+    let c3: LocaleCompare = strcoll_l("zzz", "aaa", LocaleId::Posix);
+    let gt3: bool = match c3 {
+        LocaleCompare::Less => { false },
+        LocaleCompare::Equal => { false },
+        LocaleCompare::Greater => { true },
+        LocaleCompare::Unsupported => { false },
+    };
+    if !gt3 { return 3; }
+
+    let c4: LocaleCompare = strcoll_l("", "", LocaleId::Posix);
+    if is_unsupported(c4) { return 4; }
+
+    /* a common host locale name -> Unsupported (this build does not
+       provide named locales). */
     if is_unsupported(strcoll_l("abc", "abd", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 5; }
     /* SPEC B.7: a locale whose collation differs from ASCII must never
        silently fall back to an ASCII/bytewise ordering. */
@@ -52,29 +86,102 @@ fn main() -> i32 {
     if is_unsupported(strcoll_l("a", "b", LocaleId::HostNamed("not-a-locale"))) != true { return 8; }
 
     /* deterministic: repeated calls with the same args, same outcome. */
-    if is_unsupported(strcoll_l("abc", "abc", LocaleId::Posix)) != true { return 9; }
+    let c9: LocaleCompare = strcoll_l("abc", "abc", LocaleId::Posix);
+    let eq9: bool = match c9 {
+        LocaleCompare::Less => { false },
+        LocaleCompare::Equal => { true },
+        LocaleCompare::Greater => { false },
+        LocaleCompare::Unsupported => { false },
+    };
+    if !eq9 { return 9; }
     if is_unsupported(strcoll_l("abc", "abd", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 10; }
 
     /* ================= strxfrm_l (HOST-003 / POSIX-009) ================= */
     let dst: [byte; 8] = [9, 9, 9, 9, 9, 9, 9, 9];
-    if is_unsupported(strxfrm_l(&mut dst[..], "hello", LocaleId::Posix)) != true { return 20; }
-    /* dst provably untouched -- no partial/synthesized collation key. */
-    if dst[0] != 9 { return 21; }
-    if dst[7] != 9 { return 22; }
+    let tw1: LocaleTransformWrite = strxfrm_l(&mut dst[..], "hello", LocaleId::Posix);
+    let n1: usize = match tw1 {
+        LocaleTransformWrite::Written(k) => { k },
+        LocaleTransformWrite::DestinationTooSmall(_k) => { return 20; },
+        LocaleTransformWrite::Unsupported => { return 20; },
+    };
+    if n1 != 5 { return 21; }
+    if dst[0] != 104 { return 22; }  /* 'h' */
 
-    if is_unsupported(strxfrm_l(&mut dst[..], "hello", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 23; }
-    if dst[3] != 9 { return 24; }
+    /* HostNamed -> Unsupported, dst provably untouched. */
+    let sentinel: byte = dst[3];
+    let tw2: LocaleTransformWrite = strxfrm_l(&mut dst[..], "en_US-shaped", LocaleId::HostNamed("en_US.UTF-8"));
+    let unsup2: bool = match tw2 {
+        LocaleTransformWrite::Written(_k) => { false },
+        LocaleTransformWrite::DestinationTooSmall(_k) => { false },
+        LocaleTransformWrite::Unsupported => { true },
+    };
+    if !unsup2 { return 23; }
+    if dst[3] != sentinel { return 24; }
 
     let empty_dst: [byte; 0] = [];
-    if is_unsupported(strxfrm_l(&mut empty_dst[..], "x", LocaleId::Posix)) != true { return 25; }
+    let tw3: LocaleTransformWrite = strxfrm_l(&mut empty_dst[..], "x", LocaleId::Posix);
+    let toosmall3: bool = match tw3 {
+        LocaleTransformWrite::Written(_k) => { false },
+        LocaleTransformWrite::DestinationTooSmall(k) => { k == 1 },
+        LocaleTransformWrite::Unsupported => { false },
+    };
+    if !toosmall3 { return 25; }
 
-    /* strcoll_l and strxfrm_l share one explicit LocaleId and agree on it. */
-    if is_unsupported(strxfrm_l(&mut dst[..], "abc", LocaleId::HostNamed("tr_TR.UTF-8"))) != true { return 26; }
+    /* strcoll_l and strxfrm_l share one explicit LocaleId and agree on it
+       -- a HostNamed locale is Unsupported for both. */
+    let tw4: LocaleTransformWrite = strxfrm_l(&mut dst[..], "abc", LocaleId::HostNamed("tr_TR.UTF-8"));
+    let unsup4: bool = match tw4 {
+        LocaleTransformWrite::Written(_k) => { false },
+        LocaleTransformWrite::DestinationTooSmall(_k) => { false },
+        LocaleTransformWrite::Unsupported => { true },
+    };
+    if !unsup4 { return 26; }
+
+    /* HOST-003: bytewise compare of two strxfrm_l keys under Posix has the
+       same sign as strcoll_l of the originals -- non-vacuous now. */
+    let ka: [byte; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    let kb: [byte; 8] = [0, 0, 0, 0, 0, 0, 0, 0];
+    let mut ka2: [byte; 8] = ka;
+    let mut kb2: [byte; 8] = kb;
+    let twa: LocaleTransformWrite = strxfrm_l(&mut ka2[..], "abc", LocaleId::Posix);
+    let na: usize = match twa {
+        LocaleTransformWrite::Written(k) => { k },
+        LocaleTransformWrite::DestinationTooSmall(_k) => { return 27; },
+        LocaleTransformWrite::Unsupported => { return 27; },
+    };
+    let twb: LocaleTransformWrite = strxfrm_l(&mut kb2[..], "abd", LocaleId::Posix);
+    let nb: usize = match twb {
+        LocaleTransformWrite::Written(k) => { k },
+        LocaleTransformWrite::DestinationTooSmall(_k) => { return 28; },
+        LocaleTransformWrite::Unsupported => { return 28; },
+    };
+    if na != 3 { return 29; }
+    if nb != 3 { return 30; }
+    /* "abc" < "abd" byte-wise, matching strcoll_l("abc","abd",Posix) above
+       (Less, checked at #2) -- keys[2] is the differing byte. */
+    if ka2[2] >= kb2[2] { return 31; }
 
     /* ================= strxfrm_l_size ================= */
-    if is_unsupported(strxfrm_l_size("hello", LocaleId::Posix)) != true { return 30; }
-    if is_unsupported(strxfrm_l_size("", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 31; }
-    if is_unsupported(strxfrm_l_size("abc", LocaleId::HostNamed("not-a-locale"))) != true { return 32; }
+    let sz1: LocaleTransformSize = strxfrm_l_size("hello", LocaleId::Posix);
+    let szok1: bool = match sz1 {
+        LocaleTransformSize::Size(k) => { k == 5 },
+        LocaleTransformSize::Unsupported => { false },
+    };
+    if !szok1 { return 40; }
+
+    let sz2: LocaleTransformSize = strxfrm_l_size("", LocaleId::HostNamed("en_US.UTF-8"));
+    let unsupsz2: bool = match sz2 {
+        LocaleTransformSize::Size(_k) => { false },
+        LocaleTransformSize::Unsupported => { true },
+    };
+    if !unsupsz2 { return 41; }
+
+    let sz3: LocaleTransformSize = strxfrm_l_size("abc", LocaleId::HostNamed("not-a-locale"));
+    let unsupsz3: bool = match sz3 {
+        LocaleTransformSize::Size(_k) => { false },
+        LocaleTransformSize::Unsupported => { true },
+    };
+    if !unsupsz3 { return 42; }
 
     return 0;
 }

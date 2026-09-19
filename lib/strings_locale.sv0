@@ -6,15 +6,59 @@
 /// never a native API input, and an unsupported locale fails closed rather
 /// than downgrading to ASCII or bytewise comparison.
 ///
+/// NAMING NOTE: this module exports `locale_compare` / `locale_transform` /
+/// `locale_compare_ignore_case` rather than SPEC §17.1's bare `compare` /
+/// `transform` / `compare_ignore_case`. Confirmed toolchain limitation, not
+/// a style choice: sv0c's flat-concat compilation resolves an unqualified
+/// call by bare name across the WHOLE project, not per-module -- two
+/// different modules each declaring a public function with the identical
+/// bare name (`strings_bytes::compare` / a `strings_locale::compare`;
+/// `strings_ascii::compare_ignore_case` / a `strings_locale::
+/// compare_ignore_case`) made an UNRELATED, already-shipped call site
+/// (`strings_posix2024::strcasecmp`'s own `compare_ignore_case(a, b)`,
+/// importing `strings_ascii`'s version) silently mangle to the wrong
+/// (wrong-arity) target and fail to compile. This is a real, project-wide
+/// name-resolution gap (no true per-module namespacing yet -- the same
+/// underlying limitation SS-U08/SS-U09 already recorded for `pub`
+/// visibility and project discovery), not specific to this file; renaming
+/// was the pragmatic fix, so every exported name here is prefixed
+/// `locale_` to guarantee it can never collide with any other module's
+/// own public surface.
+///
+/// CAPABILITY-TYPE NOTE: `LocaleOpen::Opened` carries a raw `usize`
+/// capability id, not a wrapping `Locale` struct. Also a confirmed
+/// toolchain limitation, and the SAME one already documented for
+/// `Option`/`Result` (`docs/f0-deviations.md` D-4): a struct-typed
+/// payload inside an enum tuple-variant does not lower on the C backend
+/// (the payload slot is a plain `int` word; the codegen has no case for
+/// "unwrap a struct into its word representation" before storing into
+/// it) -- confirmed here directly (`LocaleOpen::Opened(Locale)` hit a
+/// real `assigning to 'int' from incompatible type 'Locale'` C compile
+/// error), not assumed from D-4's own generic-enum framing. Every
+/// `loc`-typed parameter below is `usize`, matching this project's own
+/// established workaround (`strings_checked::CheckedUsize::Ok(usize)`,
+/// not a wrapping struct) rather than inventing a new one.
+///
 /// R0.4 progress:
-///   SS-167  LocaleId + open() capability-lifecycle STUB (this file).
-///           HOST-001 / HOST-002 / HOST-004. The real service is blocked on
-///           the versioned host-capability ABI (toolchain slice SS-U12,
-///           SPEC UP-015 / OQ-005) -- until it lands, `open` fails closed
-///           for every locale, so no locale-sensitive comparison exists to
-///           silently downgrade. Lifecycle contract:
+///   SS-167  LocaleId + open() capability lifecycle (this file). HOST-001 /
+///           HOST-002 / HOST-004.
+///   SS-U12  Real capability landed 2026-09-18 (design:
+///           `docs/host-capability-abi-scoping.md`, Option B). `open`
+///           returns `Opened(<capability id>)` for `LocaleId::Posix` on
+///           BOTH backends, backed by this library's own already-shipped
+///           deterministic ASCII-independent byte collation and ASCII
+///           case fold -- no host call, no new host-dependent code.
+///           `HostNamed(_)` stays `Unsupported` on both backends,
+///           unconditionally: real named-locale support (a real host
+///           lookup on C, a curated locale dataset on the VM to stay
+///           deterministic) is a separate, not-yet-started future slice,
+///           deliberately not absorbed into this one. Lifecycle contract:
 ///           `docs/locale-and-host-capabilities.md`.
 module strings_locale;
+
+use strings_types::Ordering;
+use strings_types::TransformWrite;
+use strings_cstr::as_bytes;
 
 /// SPEC §17.1: the locale a caller asks for. `Posix` is the named "C" /
 /// "POSIX" locale (the deterministic profile `strings_ascii` /
@@ -28,38 +72,169 @@ pub enum LocaleId {
 
 /// Outcome of `open` (SPEC §17.1 `open(id) -> Result<Locale, LocaleError>`;
 /// a concrete carrier -- a generic `Result` with a struct `Ok` slot does
-/// not lower on the C backend, D-4). No `Opened(Locale)` arm exists yet:
-/// the host-capability ABI (SS-U12) is deferred, so a `Locale` object can
-/// never be constructed at R0.4.
+/// not lower on the C backend, D-4).
 ///
-///   Unsupported  -- (reserved for SS-U12+) a `HostNamed` locale the wired
-///                   host does not provide -- a typed error, NEVER a silent
-///                   downgrade to ASCII/bytewise (HOST-004).
-///   Unavailable  -- R0.4: no host locale-capability service is wired on
-///                   this build at all; every `open` returns this. Distinct
-///                   from `Unsupported` per TEST-015 ("distinguish
-///                   unavailable locale from semantic failure").
+///   Opened(usize) -- `id` names a locale this build actually provides;
+///                     the payload is the opaque capability id (HOST-002
+///                     -- see the module-level CAPABILITY-TYPE NOTE for
+///                     why it's a raw `usize`, not a wrapping struct). Not
+///                     meaningful to compare or branch on directly. Under
+///                     SS-U12's landed (Option B) scope, this arm is
+///                     reached ONLY for `LocaleId::Posix`, on both
+///                     backends, and the id is always `0`.
+///   Unsupported   -- `id` is a locale this build does not provide (every
+///                     `HostNamed` today) -- a typed error, NEVER a
+///                     silent downgrade to ASCII/bytewise (HOST-004).
+///   Unavailable   -- reserved: no host locale-capability service wired
+///                     on this build AT ALL. Unreachable today (the
+///                     POSIX capability is always wired), kept distinct
+///                     from `Unsupported` per TEST-015 for a future
+///                     build variant that might disable it entirely.
 pub enum LocaleOpen {
+    Opened(usize),
     Unsupported,
     Unavailable,
 }
 
-/// SPEC §17.1 (Host-dependent, capability-lifecycle STUB). Open an explicit
-/// locale object. **Always `LocaleOpen::Unavailable` today** -- the
-/// versioned host-capability ABI with equivalent VM behavior (SS-U12) is
-/// deferred, so there is no locale service to open, on either backend.
-/// This is deliberately NOT `Blocked`/unexported (`fill_explicit`'s
-/// treatment): a callable function that fails closed with a typed,
-/// inspectable outcome is safer than an absent symbol, and there is no
-/// incorrectness risk -- the enum cannot carry a `Locale`, so no
-/// locale-sensitive operation can be reached, so nothing can silently
-/// downgrade (HOST-001 / HOST-004).
+/// SPEC §17.1 (Host-dependent). Open an explicit locale object.
 ///
-/// Ownership / thread-safety / backend support: `docs/locale-and-host-capabilities.md`.
+/// `LocaleId::Posix` -> `Opened(0)`, always, on both backends: the
+/// POSIX/C locale's own collation and case-fold rules are byte-wise
+/// comparison and the fixed ASCII `A`..`Z`<->`a`..`z` map respectively --
+/// exactly what `locale_compare`/`locale_compare_ignore_case` below
+/// already implement deterministically, with no host call. `0` is the
+/// only capability id this build ever hands out.
+///
+/// `LocaleId::HostNamed(_)` -> `Unsupported`, for EVERY name, on both
+/// backends -- unconditionally, not a stub pending future wiring. Real
+/// named-locale support needs a real host lookup (C) and a curated,
+/// VM-embedded locale dataset to stay deterministic (VM); that is a
+/// separate, larger, not-yet-scoped future slice
+/// (`docs/host-capability-abi-scoping.md`'s "Option A"), never a silent
+/// ASCII/bytewise downgrade (HOST-004; SPEC B.7: `"tr_TR.UTF-8"` must
+/// never be answered with an ASCII fold that mis-handles dotless-i).
+///
+/// Ownership / thread-safety / backend support:
+/// `docs/locale-and-host-capabilities.md`.
 pub fn open(id: LocaleId) -> LocaleOpen {
     match id {
-        LocaleId::Posix => {},
-        LocaleId::HostNamed(_name) => {},
+        LocaleId::Posix => { return LocaleOpen::Opened(0); },
+        LocaleId::HostNamed(_name) => { return LocaleOpen::Unsupported; },
     }
-    return LocaleOpen::Unavailable;
+    return LocaleOpen::Unsupported;
+}
+
+/// SPEC §17.1 (`compare`; exported here as `locale_compare` -- see the
+/// module-level NAMING NOTE). Three-way locale-sensitive collation of `a`
+/// and `b` under the capability `loc` (from `LocaleOpen::Opened`) --
+/// POSIX/C-locale collation is defined to be plain byte-wise ordering
+/// (the same rule `strcoll` under the "C" locale follows in real libc),
+/// so this is `strings_bytes::compare`'s own algorithm over each string's
+/// bytes (reimplemented locally, not imported and called -- see the
+/// module-level NAMING NOTE for why: an import of a same-bare-name symbol
+/// from another module produced resolution corruption elsewhere in the
+/// project). `loc` is presently unused beyond typing: under SS-U12's
+/// landed scope the ONLY value `open` ever hands out is `0` (see `open`),
+/// so there is nothing to branch on yet -- accepting `loc` at all is what
+/// makes this a real §17.1 function rather than a POSIX-only free
+/// function, and keeps the signature stable for when a second openable
+/// locale exists.
+///
+/// Total: cannot fail. By the time a caller holds a capability id, `open`
+/// already succeeded for it -- there is no "unsupported" outcome left to
+/// express here (unlike `LocaleOpen`, which is where that check lives).
+pub fn locale_compare(a: string, b: string, loc: usize) -> Ordering {
+    return locale_byte_compare(as_bytes(a), as_bytes(b));
+}
+
+fn locale_byte_compare(a: &[byte], b: &[byte]) -> Ordering {
+    let alen: usize = slice_len(a);
+    let blen: usize = slice_len(b);
+    let mut n: usize = alen;
+    if blen < alen { n = blen; }
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(n <= alen)
+        loop_invariant(n <= blen)
+    {
+        let av: byte = a[i];
+        let bv: byte = b[i];
+        if av < bv { return Ordering::Less; }
+        if av > bv { return Ordering::Greater; }
+        i = i + 1;
+    }
+    if alen < blen { return Ordering::Less; }
+    if alen > blen { return Ordering::Greater; }
+    return Ordering::Equal;
+}
+
+/// SPEC §17.1 (`compare_ignore_case`; exported here as
+/// `locale_compare_ignore_case` -- see the module-level NAMING NOTE).
+/// Case-insensitive comparison of `a` and `b` under the capability `loc`
+/// -- POSIX/C-locale case folding is the fixed ASCII `A`..`Z`<->`a`..`z`
+/// map (ASCII-007), the same fold `strings_ascii::compare_ignore_case`
+/// and `strings_posix2024::strcasecmp_l(_, _, LocaleId::Posix)` already
+/// implement (reimplemented locally here for the same reason
+/// `locale_compare` above is). Total, for the same reason `locale_compare`
+/// above is.
+pub fn locale_compare_ignore_case(a: string, b: string, loc: usize) -> Ordering {
+    return locale_ascii_fold_compare(as_bytes(a), as_bytes(b));
+}
+
+fn locale_ascii_lower(value: byte) -> byte {
+    if value >= 65 {
+        if value <= 90 { return value + 32; }
+    }
+    return value;
+}
+
+fn locale_ascii_fold_compare(a: &[byte], b: &[byte]) -> Ordering {
+    let alen: usize = slice_len(a);
+    let blen: usize = slice_len(b);
+    let mut n: usize = alen;
+    if blen < alen { n = blen; }
+    let mut i: usize = 0;
+    while i < n
+        loop_invariant(i <= n)
+        loop_invariant(n <= alen)
+        loop_invariant(n <= blen)
+    {
+        let av: byte = locale_ascii_lower(a[i]);
+        let bv: byte = locale_ascii_lower(b[i]);
+        if av < bv { return Ordering::Less; }
+        if av > bv { return Ordering::Greater; }
+        i = i + 1;
+    }
+    if alen < blen { return Ordering::Less; }
+    if alen > blen { return Ordering::Greater; }
+    return Ordering::Equal;
+}
+
+/// SPEC §17.1 (`transform`; exported here as `locale_transform` -- see
+/// the module-level NAMING NOTE). Transform `src` into its collation key
+/// for the capability `loc`, written into `dst`, bounded by `dst`'s
+/// capacity (POSIX-009 / HOST-003): `strings_bytes::compare` of two keys
+/// produced under the SAME `loc` has the same sign as `locale_compare` of
+/// the two original inputs. Under POSIX/C collation (plain byte-wise
+/// ordering, see `locale_compare` above), a string is trivially its own
+/// valid key -- comparing two copies of themselves byte-wise has exactly
+/// the same sign as comparing the originals byte-wise, by construction.
+/// So this is an identity copy: it writes `src`'s own bytes into `dst`,
+/// bounded, never partial.
+pub fn locale_transform(src: string, dst: &mut [byte], loc: usize) -> TransformWrite {
+    let need: usize = string_len(src);
+    let cap: usize = slice_len(dst);
+    if need > cap {
+        return TransformWrite::DestinationTooSmall(need);
+    }
+    let bytes: &[byte] = as_bytes(src);
+    let mut i: usize = 0;
+    while i < need
+        loop_invariant(i <= need)
+    {
+        dst[i] = bytes[i];
+        i = i + 1;
+    }
+    return TransformWrite::Written(need);
 }

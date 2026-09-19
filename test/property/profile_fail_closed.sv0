@@ -3,12 +3,18 @@
  * Exit 0 = pass; nonzero = the number of the first failing check.
  *
  * A profile claim (e.g. "CX host-locale subprofile") may only be made when
- * every host service it needs is actually wired. While the versioned
- * host-capability ABI (toolchain slice SS-U12) and the FFI / host-call
- * primitive are both deferred, EVERY host-dependent entry point in this
- * library must return its typed "not available" value -- never a silent
- * success, never a downgrade to a bytewise/ASCII substitute. This fixture
- * calls every exported host-dependent entry point once and pins that.
+ * every host service it needs is actually wired. SS-U12 (2026-09-18)
+ * landed the versioned host-capability ABI for `LocaleId::Posix` only
+ * (Option B); the FFI / host-call primitive (`strings_unsafe_abi`) is
+ * still deferred, and every `HostNamed` locale is still `Unsupported` by
+ * design. This fixture calls every exported host-dependent entry point
+ * once and pins the resulting fail-closed/succeeds split precisely: the
+ * C23/`_l` locale-collation family and the locale lifecycle itself
+ * (`open`) now really run for `Posix`; the host-message family
+ * (`strerror_r`/`strerror_l`/`strsignal`, FFI-blocked) and every
+ * `HostNamed` locale everywhere still fail closed -- never a silent
+ * success where one isn't wired, never a downgrade to a bytewise/ASCII
+ * substitute where one is.
  *
  * The POSIX-locale subprofile (`strcasecmp_l(_, _, Posix)` etc.) DOES run
  * -- it is a fixed ASCII fold with no host dependency -- and returns an
@@ -19,6 +25,10 @@ use strings_types::HostCapability;
 use strings_types::HostMessage;
 use strings_types::MessageWrite;
 use strings_types::LocaleCompare;
+use strings_types::Ordering;
+use strings_types::TransformWrite;
+use strings_types::LocaleTransformWrite;
+use strings_types::LocaleTransformSize;
 use strings_c23::strcoll;
 use strings_c23::strxfrm;
 use strings_c23::strxfrm_size;
@@ -75,19 +85,50 @@ fn lc_equal(c: LocaleCompare) -> bool {
 }
 
 fn main() -> i32 {
-    /* ---- C23 host-dependent stubs (SS-150 / SS-151) ---- */
-    if hc_unsupported(strcoll("abc", "abc")) != true { return 1; }
+    /* ---- C23 locale collation, real now for the fixed POSIX/C locale
+       (SS-U12); strerror is still FFI-blocked (SS-150 / SS-151) ---- */
+    let cc: Ordering = strcoll("abc", "abc");
+    let cceq: bool = match cc {
+        Ordering::Equal => { true },
+        Ordering::Less => { false },
+        Ordering::Greater => { false },
+    };
+    if !cceq { return 1; }
     let d: [byte; 4] = [1, 1, 1, 1];
-    if hc_unsupported(strxfrm(&mut d[..], "abc")) != true { return 2; }
-    if hc_unsupported(strxfrm_size("abc")) != true { return 3; }
+    let dtw: TransformWrite = strxfrm(&mut d[..], "abc");
+    let dwritten: bool = match dtw {
+        TransformWrite::Written(k) => { k == 3 },
+        TransformWrite::DestinationTooSmall(_k) => { false },
+    };
+    if !dwritten { return 2; }
+    if strxfrm_size("abc") != 3 { return 3; }
     if hc_unsupported(strerror(0)) != true { return 4; }
 
-    /* ---- POSIX `_l` collation / transform (SS-168) ---- */
-    if hc_unsupported(strcoll_l("a", "b", LocaleId::Posix)) != true { return 10; }
-    if hc_unsupported(strcoll_l("a", "b", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 11; }
+    /* ---- POSIX `_l` collation / transform: Posix real, HostNamed still
+       Unsupported (SS-168) ---- */
+    let lc10: LocaleCompare = strcoll_l("a", "b", LocaleId::Posix);
+    let lc10lt: bool = match lc10 {
+        LocaleCompare::Less => { true },
+        LocaleCompare::Equal => { false },
+        LocaleCompare::Greater => { false },
+        LocaleCompare::Unsupported => { false },
+    };
+    if !lc10lt { return 10; }
+    if lc_unsupported(strcoll_l("a", "b", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 11; }
     let e: [byte; 4] = [2, 2, 2, 2];
-    if hc_unsupported(strxfrm_l(&mut e[..], "a", LocaleId::Posix)) != true { return 12; }
-    if hc_unsupported(strxfrm_l_size("a", LocaleId::HostNamed("de_DE.UTF-8"))) != true { return 13; }
+    let etw: LocaleTransformWrite = strxfrm_l(&mut e[..], "a", LocaleId::Posix);
+    let ewritten: bool = match etw {
+        LocaleTransformWrite::Written(k) => { k == 1 },
+        LocaleTransformWrite::DestinationTooSmall(_k) => { false },
+        LocaleTransformWrite::Unsupported => { false },
+    };
+    if !ewritten { return 12; }
+    let sz13: LocaleTransformSize = strxfrm_l_size("a", LocaleId::HostNamed("de_DE.UTF-8"));
+    let sz13unsup: bool = match sz13 {
+        LocaleTransformSize::Size(_k) => { false },
+        LocaleTransformSize::Unsupported => { true },
+    };
+    if !sz13unsup { return 13; }
 
     /* ---- POSIX owned message capability (SS-169) ---- */
     let m: [byte; 8] = [3, 3, 3, 3, 3, 3, 3, 3];
@@ -105,16 +146,26 @@ fn main() -> i32 {
     if lc_equal(strcasecmp_l("i", "I", LocaleId::Posix)) != true { return 32; }
     if lc_equal(strncasecmp_l(&x[..], &y[..], 1, LocaleId::Posix)) != true { return 33; }
 
-    /* ---- locale capability lifecycle (SS-167) ---- */
-    if is_open_unavailable(open(LocaleId::Posix)) != true { return 40; }
-    if is_open_unavailable(open(LocaleId::HostNamed("en_US.UTF-8"))) != true { return 41; }
+    /* ---- locale capability lifecycle: Posix really opens now (SS-U12);
+       HostNamed stays Unsupported (SS-167) ---- */
+    if is_open_opened(open(LocaleId::Posix)) != true { return 40; }
+    if is_open_unsupported(open(LocaleId::HostNamed("en_US.UTF-8"))) != true { return 41; }
 
     return 0;
 }
 
-fn is_open_unavailable(r: LocaleOpen) -> bool {
+fn is_open_opened(r: LocaleOpen) -> bool {
     return match r {
-        LocaleOpen::Unavailable => { true },
+        LocaleOpen::Opened(_cap) => { true },
         LocaleOpen::Unsupported => { false },
+        LocaleOpen::Unavailable => { false },
+    };
+}
+
+fn is_open_unsupported(r: LocaleOpen) -> bool {
+    return match r {
+        LocaleOpen::Opened(_cap) => { false },
+        LocaleOpen::Unsupported => { true },
+        LocaleOpen::Unavailable => { false },
     };
 }

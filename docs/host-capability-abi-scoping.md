@@ -1,6 +1,43 @@
 # Versioned host-capability ABI — scoping doc (SS-U12 / UP-015 / OQ-005)
 
-**Status: DECIDED — Option B (POSIX-only on both backends, generation-free handles), 2026-09-18.**
+**Status: IMPLEMENTED — Option B, 2026-09-18. `strings_locale::open` returns
+a real `Opened(<capability id>)` for `LocaleId::Posix` on both backends;
+`docs/locale-and-host-capabilities.md` is the up-to-date usage doc.**
+
+Two design points below were adjusted during implementation, each behind a
+confirmed toolchain limitation found while landing this doc's own design
+(not assumed, not worked around silently):
+
+- **Capability handle type.** This doc's own §1 recommended a generation-
+  free `Locale` **struct** wrapping `capability_id: usize`. Implementation
+  hit a real C compile error (`assigning to 'int' from incompatible type
+  'Locale'`) — a struct-typed payload inside an enum tuple-variant
+  (`LocaleOpen::Opened(Locale)`) does not lower on the C backend, the SAME
+  limitation already documented for `Option`/`Result`
+  (`docs/f0-deviations.md` D-4), now confirmed directly rather than
+  assumed from D-4's generic-enum framing. Landed shape: `LocaleOpen::
+  Opened(usize)` — the capability id directly, no wrapping struct,
+  matching this project's own established workaround
+  (`strings_checked::CheckedUsize::Ok(usize)`).
+- **Public function names.** `strings_locale` exports `locale_compare` /
+  `locale_compare_ignore_case` / `locale_transform`, not SPEC §17.1's bare
+  `compare` / `compare_ignore_case` / `transform`. Confirmed toolchain
+  limitation: sv0c's flat-concat compilation resolves an unqualified call
+  by bare name across the WHOLE project, not per-module — declaring a
+  same-bare-name public function in a second module silently corrupted an
+  unrelated, already-shipped call site elsewhere in the project
+  (`strings_posix2024::strcasecmp`'s own call to `strings_ascii::
+  compare_ignore_case` started resolving against the new, wrong-arity
+  `strings_locale::compare_ignore_case` instead). This is a real,
+  project-wide name-resolution gap — the same underlying "no true
+  per-module namespacing yet" limitation SS-U08/SS-U09 already recorded
+  for `pub` visibility and project discovery — not specific to this
+  slice. `lib/strings_locale.sv0`'s own module-level comments carry the
+  full detail.
+
+Neither point changes the DECIDED scope (Option B, POSIX-only, no new
+host-dependent code) — both are representation-level adjustments forced
+by the toolchain, not scope changes.
 
 Like SS-U11's own scoping doc
 ([`fill-explicit-non-elision-scoping.md`](fill-explicit-non-elision-scoping.md)),

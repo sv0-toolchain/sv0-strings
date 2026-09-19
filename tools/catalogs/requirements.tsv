@@ -142,8 +142,8 @@ POSIX-004	R0.4	16.2	strlcpy/strlcat SHALL return the total length attempted and 
 POSIX-005	R0.4	16.2	strnlen SHALL inspect at most n bytes and return min(first_nul_index, n) without	df8632b7d39d	Bounded-read guard-page test.	todo
 POSIX-006	R0.4	16.2	strtok_r SHALL use caller-owned explicit state. The safe native tokenizer remain	2cfc5d439b6e	Interleaved-state differential token boundaries.	todo
 POSIX-007	R0.4	16.2	strcasecmp/strncasecmp SHALL be exact for the POSIX locale profile; non-POSIX lo	9c05e27ff364	POSIX-locale exhaustive ASCII test.	todo
-POSIX-008	R0.4	16.2	_l functions SHALL reject an invalid or unsupported locale handle with a typed e	85acfdfa24d7	Invalid-locale and ambient-locale tests.	todo
-POSIX-009	R0.4	16.2	strcoll_l/strxfrm_l SHALL share one explicit locale object and satisfy the trans	ebbb519dee31	Locale-specific property tests.	todo
+POSIX-008	R0.4	16.2	_l functions SHALL reject an invalid or unsupported locale handle with a typed e	85acfdfa24d7	Invalid-locale and ambient-locale tests.	done
+POSIX-009	R0.4	16.2	strcoll_l/strxfrm_l SHALL share one explicit locale object and satisfy the trans	ebbb519dee31	Locale-specific property tests.	done
 POSIX-010	R0.4	16.2	strerror_r SHALL write only within caller-provided capacity, report insufficient	55903a10c339	Concurrency, capacity, and guard-byte tests.	todo
 POSIX-011	R0.4	16.2	strerror_l and strsignal SHALL be Host-dependent and SHALL define ownership/life	7d27c37794f7	Host adapter and lifetime tests.	todo
 POSIX-012	R0.4	16.2	ffs, ffsl, and ffsll SHALL remain in the XSI subprofile and use explicit-width s	c69245958ddb	Width and exhaustive/sampled bit tests.	todo
@@ -157,9 +157,9 @@ LEGACY-002	R0.4	16.3	bcmp SHALL map to byte equality/ordering, bcopy to overlap-
 LEGACY-003	R0.4	16.3	Each legacy symbol SHALL emit or document a deprecation replacement.	56a50053bf37	Compile-warning and docs checks.	todo
 LEGACY-004	R0.4	16.3	Legacy aliases SHALL retain safe slice/CStr types; historical raw-pointer hazard	8199776c6c06	Signature lint.	todo
 HOST-001	R0.4	17.2	Locale-sensitive behavior SHALL require an explicit locale object or the named P	427ff6ebc4cf	API and perturbation tests.	todo
-HOST-002	R0.4	17.2	A locale object SHALL have documented ownership, thread-safety, and backend supp	b3d8f67bae4f	Capability lifecycle tests.	todo
-HOST-003	R0.4	17.2	Locale transform and comparison SHALL be consistent: comparing transformed outpu	1480ace97b71	Property test per supported locale.	todo
-HOST-004	R0.4	17.2	Unsupported locales SHALL return a typed error and SHALL not downgrade silently 	3256f2a29d64	Negative locale tests.	todo
+HOST-002	R0.4	17.2	A locale object SHALL have documented ownership, thread-safety, and backend supp	b3d8f67bae4f	Capability lifecycle tests.	done
+HOST-003	R0.4	17.2	Locale transform and comparison SHALL be consistent: comparing transformed outpu	1480ace97b71	Property test per supported locale.	done
+HOST-004	R0.4	17.2	Unsupported locales SHALL return a typed error and SHALL not downgrade silently 	3256f2a29d64	Negative locale tests.	done
 HOST-005	R0.3	17.2	Error and signal message adapters SHALL return owned sv0 strings or a documented	3c4208fba239	Concurrency/lifetime tests.	todo
 HOST-006	R0.4	17.2	Error messages SHALL not be treated as stable protocol identifiers. Structured e	01a2b139ac99	Documentation and snapshot-policy test.	todo
 HOST-007	R1	17.2	Host-service adapters SHALL declare whether they are available on C, VM, or both	1f20f2b8fc5a	Capability manifest.	todo

@@ -14,6 +14,7 @@
 use strings_types::Option;
 use strings_types::Ordering;
 use strings_types::HostCapability;
+use strings_types::TransformWrite;
 use strings_c23::strchr;
 use strings_c23::strrchr;
 use strings_c23::strchr_int;
@@ -87,14 +88,28 @@ fn main() -> i32 {
 
     /* ================= C23-024 / C23-029: strxfrm ==================
      * size-query form takes NO &mut buffer (cannot construct an invalid
-     * mutable reference); writing form never exposes destination bytes. */
-    if is_unsupported(strxfrm_size("hello")) != true { return 50; }
+     * mutable reference); writing form never exposes destination bytes
+     * when the key doesn't fit. Unblocked by SS-U12 (2026-09-18): both
+     * are real now (POSIX/C-locale collation) -- strxfrm_size("hello")
+     * is 5, and a too-small destination reports DestinationTooSmall
+     * without writing anything, still satisfying C23-029. */
+    if strxfrm_size("hello") != 5 { return 50; }
     let dst: [byte; 4] = [9, 9, 9, 9];
-    if is_unsupported(strxfrm(&mut dst[..], "hello")) != true { return 51; }
+    let tw: TransformWrite = strxfrm(&mut dst[..], "hello");
+    let toosmall: bool = match tw {
+        TransformWrite::Written(_k) => { false },
+        TransformWrite::DestinationTooSmall(k) => { k == 5 },
+    };
+    if !toosmall { return 51; }
     if dst[0] != 9 { return 52; }     /* untouched -- no indeterminate transformed bytes */
     if dst[3] != 9 { return 53; }
     let zero_dst: [byte; 0] = [];
-    if is_unsupported(strxfrm(&mut zero_dst[..], "x")) != true { return 54; }
+    let tw2: TransformWrite = strxfrm(&mut zero_dst[..], "x");
+    let toosmall2: bool = match tw2 {
+        TransformWrite::Written(_k) => { false },
+        TransformWrite::DestinationTooSmall(k) => { k == 1 },
+    };
+    if !toosmall2 { return 54; }
 
     /* ================= C23-030: strerror accepts every i32 ==========
      * An unknown / out-of-range error number is NOT an invalid argument --

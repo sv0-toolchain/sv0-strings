@@ -1,24 +1,23 @@
-/* SS-150 (SPEC C23-016, C23-017): strings_c23::strcoll / strxfrm / strerror
- * capability stubs.
+/* SS-150 (SPEC C23-016, C23-017): strings_c23::strcoll / strxfrm / strerror.
  * Exit 0 = pass; nonzero = the number of the first failing check.
  *
- * All three fail closed to `HostCapability::Unsupported` today (no
- * `strings_locale` service exists until R0.4, no host-call primitive
- * exists at all until `strings_unsafe_abi` lands). This fixture proves the
- * fail-closed behavior directly:
- *   - `strcoll`/`strxfrm` never fall back to byte comparison/copy, even on
- *     inputs where that fallback would "look right" (so a regression that
- *     silently aliased them to `strings_bytes::compare`/`copy` would be
- *     caught the moment it stopped returning `Unsupported`).
- *   - `strxfrm`'s `dst` is provably untouched.
- *   - `strerror` returns `Unsupported` uniformly across the FULL `i32`
- *     range, including 0, a POSIX-shaped small positive, a large positive,
- *     and the very edges of the type -- no branch on `errnum` exists to
- *     misbehave at a boundary.
+ * strcoll/strxfrm unblocked by SS-U12 (2026-09-18): both are now real,
+ * thin wrappers over strings_locale's fixed-POSIX-locale collation
+ * (plain byte-wise ordering -- the same rule C's own strcoll follows
+ * under the "C" locale). strerror stays a capability STUB: it needs
+ * strings_unsafe_abi's FFI primitive (Future, BL-103/104), a completely
+ * separate, not-yet-started prerequisite from SS-U12, to read the OS
+ * error-message tables at all -- proven fail-closed across the FULL i32
+ * range for errnum, including 0, a POSIX-shaped small positive, a large
+ * positive, and the very edges of the type -- no branch on errnum exists
+ * to misbehave at a boundary.
  */
 use strings_types::HostCapability;
+use strings_types::Ordering;
+use strings_types::TransformWrite;
 use strings_c23::strcoll;
 use strings_c23::strxfrm;
+use strings_c23::strxfrm_size;
 use strings_c23::strerror;
 
 fn is_unsupported(r: HostCapability) -> bool {
@@ -29,23 +28,60 @@ fn is_unsupported(r: HostCapability) -> bool {
 
 fn main() -> i32 {
     /* ================= strcoll (C23-016) ================= */
-    /* identical strings: a bytewise comparator would say Equal; the stub
-       must still say Unsupported, not silently compute a real answer. */
-    if is_unsupported(strcoll("abc", "abc")) != true { return 1; }
-    /* different strings: a bytewise comparator would say Less/Greater. */
-    if is_unsupported(strcoll("abc", "abd")) != true { return 2; }
-    if is_unsupported(strcoll("zzz", "aaa")) != true { return 3; }
-    if is_unsupported(strcoll("", "")) != true { return 4; }
+    let c1: Ordering = strcoll("abc", "abc");
+    let eq1: bool = match c1 {
+        Ordering::Less => { false },
+        Ordering::Equal => { true },
+        Ordering::Greater => { false },
+    };
+    if !eq1 { return 1; }
+
+    let c2: Ordering = strcoll("abc", "abd");
+    let lt2: bool = match c2 {
+        Ordering::Less => { true },
+        Ordering::Equal => { false },
+        Ordering::Greater => { false },
+    };
+    if !lt2 { return 2; }
+
+    let c3: Ordering = strcoll("zzz", "aaa");
+    let gt3: bool = match c3 {
+        Ordering::Less => { false },
+        Ordering::Equal => { false },
+        Ordering::Greater => { true },
+    };
+    if !gt3 { return 3; }
+
+    let c4: Ordering = strcoll("", "");
+    let eq4: bool = match c4 {
+        Ordering::Less => { false },
+        Ordering::Equal => { true },
+        Ordering::Greater => { false },
+    };
+    if !eq4 { return 4; }
 
     /* ================= strxfrm (C23-016) ================= */
     let dst: [byte; 8] = [9, 9, 9, 9, 9, 9, 9, 9];
-    if is_unsupported(strxfrm(&mut dst[..], "hello")) != true { return 10; }
-    /* dst is provably untouched -- no partial/synthesized transform. */
-    if dst[0] != 9 { return 11; }
-    if dst[7] != 9 { return 12; }
+    let tw1: TransformWrite = strxfrm(&mut dst[..], "hello");
+    let n1: usize = match tw1 {
+        TransformWrite::Written(k) => { k },
+        TransformWrite::DestinationTooSmall(_k) => { return 10; },
+    };
+    if n1 != 5 { return 11; }
+    if dst[0] != 104 { return 12; }   /* 'h' */
+    if dst[5] != 9 { return 13; }     /* untouched past the key */
 
     let empty_dst: [byte; 0] = [];
-    if is_unsupported(strxfrm(&mut empty_dst[..], "x")) != true { return 13; }
+    let tw2: TransformWrite = strxfrm(&mut empty_dst[..], "x");
+    let toosmall2: bool = match tw2 {
+        TransformWrite::Written(_k) => { false },
+        TransformWrite::DestinationTooSmall(k) => { k == 1 },
+    };
+    if !toosmall2 { return 14; }
+
+    /* ================= strxfrm_size ================= */
+    if strxfrm_size("hello") != 5 { return 15; }
+    if strxfrm_size("") != 0 { return 16; }
 
     /* ================= strerror (C23-017) ================= */
     if is_unsupported(strerror(0)) != true { return 20; }

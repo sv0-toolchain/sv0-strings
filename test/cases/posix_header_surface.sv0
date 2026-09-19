@@ -10,10 +10,12 @@
  *     (`memmem`) is `None`, never a null pointer.
  *   - `locale_t` -> `strings_locale::LocaleId`: a locale identity
  *     constructs and threads through an `_l` adapter (`strcoll_l`), which
- *     fails closed to a typed `HostCapability` (no unmanaged handle).
+ *     fails closed to a typed `LocaleCompare::Unsupported` for a locale
+ *     this build does not provide (no unmanaged handle) -- unblocked by
+ *     SS-U12 (2026-09-18): `LocaleId::Posix` now really collates.
  */
 use strings_types::Option;
-use strings_types::HostCapability;
+use strings_types::LocaleCompare;
 use strings_posix2024::strnlen;
 use strings_posix2024::memmem;
 use strings_posix2024::strcoll_l;
@@ -26,9 +28,12 @@ fn present(o: Option<usize>) -> bool {
     };
 }
 
-fn unsupported(h: HostCapability) -> bool {
+fn unsupported(h: LocaleCompare) -> bool {
     return match h {
-        HostCapability::Unsupported => { true },
+        LocaleCompare::Less => { false },
+        LocaleCompare::Equal => { false },
+        LocaleCompare::Greater => { false },
+        LocaleCompare::Unsupported => { true },
     };
 }
 
@@ -47,8 +52,17 @@ fn main() -> i32 {
     if present(memmem(&hay[..], &needle_miss[..])) != false { return 3; }
 
     /* locale_t -> LocaleId: identity constructs and threads through an
-       `_l` adapter; fail-closed typed result, no raw handle */
-    if unsupported(strcoll_l("a", "b", LocaleId::Posix)) != true { return 4; }
+       `_l` adapter. Posix really collates now (SS-U12); a HostNamed
+       locale this build does not provide still fails closed, typed,
+       never a raw handle. */
+    let c: LocaleCompare = strcoll_l("a", "b", LocaleId::Posix);
+    let lt: bool = match c {
+        LocaleCompare::Less => { true },
+        LocaleCompare::Equal => { false },
+        LocaleCompare::Greater => { false },
+        LocaleCompare::Unsupported => { false },
+    };
+    if !lt { return 4; }
     if unsupported(strcoll_l("a", "b", LocaleId::HostNamed("en_US.UTF-8"))) != true { return 5; }
 
     return 0;

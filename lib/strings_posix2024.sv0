@@ -58,7 +58,6 @@ use strings_types::EndOffsetResult;
 use strings_types::CopyReport;
 use strings_types::AppendResult;
 use strings_types::TokenStep;
-use strings_types::HostCapability;
 use strings_types::HostMessage;
 use strings_types::MessageWrite;
 use strings_types::LocaleCompare;
@@ -70,6 +69,13 @@ use strings_ascii::to_lower;
 use strings_cstr::as_bytes;
 use strings_c23::strtok;
 use strings_locale::LocaleId;
+use strings_locale::LocaleOpen;
+use strings_locale::open;
+use strings_locale::locale_compare;
+use strings_locale::locale_transform;
+use strings_types::LocaleTransformWrite;
+use strings_types::LocaleTransformSize;
+use strings_types::TransformWrite;
 
 /// First `0x00` in `buf` within `limit`, else `limit` -- the effective end
 /// of a bounded, possibly non-terminated source (local copy of the helper
@@ -344,23 +350,24 @@ pub fn strncasecmp_l(a: &[byte], b: &[byte], n: usize, loc: LocaleId) -> LocaleC
 /// of the `_l` forms is that they never consult `LC_COLLATE` or any ambient
 /// process locale (POSIX-008 / HOST-001).
 ///
-/// **Always `HostCapability::Unsupported` today**, for EVERY `loc`
-/// including `LocaleId::Posix`. The versioned host-capability ABI with
-/// equivalent VM behavior (toolchain slice SS-U12, SPEC UP-015 / OQ-005) is
-/// deferred, so `strings_locale::open` returns `Unavailable` for every id,
-/// no `Locale` object can be constructed, and there is no collation service
-/// for this adapter to delegate to on either backend. This NEVER degrades
-/// to `strings_bytes::compare` or any bytewise / ASCII ordering: SPEC B.7
-/// requires that a locale whose fold/collation rules differ from ASCII
-/// (e.g. Turkish dotless-i) yield a typed "unsupported", never a silent
-/// mis-ordering (HOST-004). Consistency contract with `strxfrm_l`:
-/// `docs/locale-and-host-capabilities.md`.
-pub fn strcoll_l(a: string, b: string, loc: LocaleId) -> HostCapability {
-    match loc {
-        LocaleId::Posix => {},
-        LocaleId::HostNamed(_name) => {},
+/// Unblocked by SS-U12 (2026-09-18, Option B): `LocaleId::Posix` now opens
+/// a real capability and delegates to `strings_locale::locale_compare`
+/// (POSIX/C-locale collation, plain byte-wise ordering). `LocaleId::
+/// HostNamed(_)` stays `LocaleCompare::Unsupported` for EVERY name, on both
+/// backends -- unconditionally, not a stub. This NEVER degrades to
+/// `strings_bytes::compare` or any bytewise / ASCII ordering for an
+/// unsupported locale: SPEC B.7 requires that a locale whose fold/collation
+/// rules differ from ASCII (e.g. Turkish dotless-i) yield a typed
+/// "unsupported", never a silent mis-ordering (HOST-004). Consistency
+/// contract with `strxfrm_l`: `docs/locale-and-host-capabilities.md`.
+pub fn strcoll_l(a: string, b: string, loc: LocaleId) -> LocaleCompare {
+    let lo: LocaleOpen = open(loc);
+    match lo {
+        LocaleOpen::Opened(cap) => { return ord_to_lc(locale_compare(a, b, cap)); },
+        LocaleOpen::Unsupported => {},
+        LocaleOpen::Unavailable => {},
     }
-    return HostCapability::Unsupported;
+    return LocaleCompare::Unsupported;
 }
 
 /// POSIX Issue 8 `strxfrm_l` (XSI). Transform `src` into its collation key
@@ -370,16 +377,27 @@ pub fn strcoll_l(a: string, b: string, loc: LocaleId) -> HostCapability {
 /// `loc` (HOST-003 / POSIX-009). `loc` is the same explicit `LocaleId`
 /// passed to `strcoll_l`; no ambient locale is read.
 ///
-/// **Always `HostCapability::Unsupported` today** (same reason as
-/// `strcoll_l`). `dst` is left completely untouched -- no partial,
-/// truncated, or synthesized key is ever written, so a caller cannot
-/// mistake stale destination bytes for a real collation key.
-pub fn strxfrm_l(dst: &mut [byte], src: string, loc: LocaleId) -> HostCapability {
-    match loc {
-        LocaleId::Posix => {},
-        LocaleId::HostNamed(_name) => {},
+/// Unblocked by SS-U12 (same reason as `strcoll_l`): `LocaleId::Posix`
+/// delegates to `strings_locale::locale_transform` (identity copy under
+/// plain byte-wise collation). `LocaleId::HostNamed(_)` -> `Unsupported`,
+/// `dst` left completely untouched -- no partial, truncated, or
+/// synthesized key is ever written, so a caller cannot mistake stale
+/// destination bytes for a real collation key.
+pub fn strxfrm_l(dst: &mut [byte], src: string, loc: LocaleId) -> LocaleTransformWrite {
+    let lo: LocaleOpen = open(loc);
+    match lo {
+        LocaleOpen::Opened(cap) => {
+            let tw: TransformWrite = locale_transform(src, dst, cap);
+            match tw {
+                TransformWrite::Written(n) => { return LocaleTransformWrite::Written(n); },
+                TransformWrite::DestinationTooSmall(n) => { return LocaleTransformWrite::DestinationTooSmall(n); },
+            }
+            return LocaleTransformWrite::Unsupported;
+        },
+        LocaleOpen::Unsupported => {},
+        LocaleOpen::Unavailable => {},
     }
-    return HostCapability::Unsupported;
+    return LocaleTransformWrite::Unsupported;
 }
 
 /// Size query for `strxfrm_l`: the number of bytes a collation key for
@@ -388,14 +406,18 @@ pub fn strxfrm_l(dst: &mut [byte], src: string, loc: LocaleId) -> HostCapability
 /// "call with a NULL / zero-length destination to learn the size" dance
 /// (mirrors `strings_c23::strxfrm_size`, SS-151).
 ///
-/// **Always `HostCapability::Unsupported` today** (same reason as
-/// `strcoll_l` / `strxfrm_l`).
-pub fn strxfrm_l_size(src: string, loc: LocaleId) -> HostCapability {
-    match loc {
-        LocaleId::Posix => {},
-        LocaleId::HostNamed(_name) => {},
+/// Unblocked by SS-U12 (same reason as `strcoll_l` / `strxfrm_l`):
+/// `LocaleId::Posix` returns the key's real length (identity transform
+/// under plain byte-wise collation, so this is just `src`'s own byte
+/// length); `LocaleId::HostNamed(_)` -> `Unsupported`.
+pub fn strxfrm_l_size(src: string, loc: LocaleId) -> LocaleTransformSize {
+    let lo: LocaleOpen = open(loc);
+    match lo {
+        LocaleOpen::Opened(_cap) => { return LocaleTransformSize::Size(string_len(src)); },
+        LocaleOpen::Unsupported => {},
+        LocaleOpen::Unavailable => {},
     }
-    return HostCapability::Unsupported;
+    return LocaleTransformSize::Unsupported;
 }
 
 /// POSIX Issue 8 `strerror_r` (the POSIX, thread-safe form -- NOT the GNU

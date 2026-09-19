@@ -1,47 +1,86 @@
-/* SS-167 (SPEC HOST-001, HOST-002, HOST-004, TEST-015):
- * strings_locale::open capability lifecycle stub.
- * Exit 0 = pass; nonzero = the number of the first failing check.
+/* SS-167 (SPEC HOST-001, HOST-002, HOST-004, TEST-015): strings_locale::open
+ * capability lifecycle. Exit 0 = pass; nonzero = the number of the first
+ * failing check.
  *
- * The versioned host-capability ABI (SS-U12) is deferred, so `open` fails
- * closed for EVERY locale on both backends -- `LocaleOpen` has no
- * `Opened(Locale)` arm, so no `Locale` object can exist, so no
- * locale-sensitive comparison exists to silently downgrade to ASCII or
- * bytewise (HOST-001 / HOST-004). This fixture pins that. Lifecycle
- * contract prose: docs/locale-and-host-capabilities.md.
+ * SS-U12 (2026-09-18, Option B) landed a real capability for
+ * `LocaleId::Posix`: `open` returns `Opened(<capability id>)` on both
+ * backends, backed by this library's own deterministic ASCII-independent
+ * byte collation and ASCII case fold -- no host call. `LocaleId::
+ * HostNamed(_)` stays `Unsupported`, for every name, on both backends,
+ * unconditionally -- real named-locale support is a separate, not-yet-
+ * started future slice (`docs/host-capability-abi-scoping.md`'s "Option
+ * A"), never a silent ASCII/bytewise downgrade (HOST-001 / HOST-004).
+ * Lifecycle contract prose: docs/locale-and-host-capabilities.md.
  */
 use strings_locale::LocaleId;
 use strings_locale::LocaleOpen;
 use strings_locale::open;
 
-fn is_unavailable(r: LocaleOpen) -> bool {
-    return match r {
-        LocaleOpen::Unavailable => { true },
-        LocaleOpen::Unsupported => { false },
-    };
-}
-
 fn main() -> i32 {
-    /* the named POSIX locale: still needs the host-capability wiring, so
-       it is Unavailable too (the deterministic POSIX-locale *profile* is
-       strings_ascii / strings_posix2024::strcasecmp, which take no Locale) */
-    if is_unavailable(open(LocaleId::Posix)) != true { return 1; }
+    /* the named POSIX locale: now really opens. */
+    let lo1: LocaleOpen = open(LocaleId::Posix);
+    let cap1: usize = match lo1 {
+        LocaleOpen::Opened(cap) => { cap },
+        LocaleOpen::Unsupported => { return 1; },
+        LocaleOpen::Unavailable => { return 1; },
+    };
 
-    /* a common host locale name -> Unavailable (no service), NOT a silent
-       fallback */
-    if is_unavailable(open(LocaleId::HostNamed("en_US.UTF-8"))) != true { return 2; }
+    /* a common host locale name -> Unsupported (this build does not
+       provide named locales), NOT a silent fallback */
+    let lo2: LocaleOpen = open(LocaleId::HostNamed("en_US.UTF-8"));
+    let unsup2: bool = match lo2 {
+        LocaleOpen::Opened(_cap) => { false },
+        LocaleOpen::Unsupported => { true },
+        LocaleOpen::Unavailable => { false },
+    };
+    if !unsup2 { return 2; }
 
     /* the SPEC B.7 case: a locale whose fold rules differ from ASCII
-       (Turkish dotless i) must never downgrade to ASCII */
-    if is_unavailable(open(LocaleId::HostNamed("tr_TR.UTF-8"))) != true { return 3; }
+       (Turkish dotless i) must never downgrade to ASCII -- stays
+       Unsupported, never silently Opened with an ASCII fold underneath */
+    let lo3: LocaleOpen = open(LocaleId::HostNamed("tr_TR.UTF-8"));
+    let unsup3: bool = match lo3 {
+        LocaleOpen::Opened(_cap) => { false },
+        LocaleOpen::Unsupported => { true },
+        LocaleOpen::Unavailable => { false },
+    };
+    if !unsup3 { return 3; }
 
-    /* empty / nonsense names -> Unavailable, no crash */
-    if is_unavailable(open(LocaleId::HostNamed(""))) != true { return 4; }
-    if is_unavailable(open(LocaleId::HostNamed("not-a-locale"))) != true { return 5; }
+    /* empty / nonsense names -> Unsupported, no crash */
+    let lo4: LocaleOpen = open(LocaleId::HostNamed(""));
+    let unsup4: bool = match lo4 {
+        LocaleOpen::Opened(_cap) => { false },
+        LocaleOpen::Unsupported => { true },
+        LocaleOpen::Unavailable => { false },
+    };
+    if !unsup4 { return 4; }
+
+    let lo5: LocaleOpen = open(LocaleId::HostNamed("not-a-locale"));
+    let unsup5: bool = match lo5 {
+        LocaleOpen::Opened(_cap) => { false },
+        LocaleOpen::Unsupported => { true },
+        LocaleOpen::Unavailable => { false },
+    };
+    if !unsup5 { return 5; }
 
     /* deterministic: repeated opens of the same id give the same outcome
-       (no hidden state, no ambient-locale dependence -- HOST-001) */
-    if is_unavailable(open(LocaleId::HostNamed("en_US.UTF-8"))) != true { return 6; }
-    if is_unavailable(open(LocaleId::Posix)) != true { return 7; }
+       (no hidden state, no ambient-locale dependence -- HOST-001), and
+       Posix always hands out the same capability id */
+    let lo6: LocaleOpen = open(LocaleId::HostNamed("en_US.UTF-8"));
+    let unsup6: bool = match lo6 {
+        LocaleOpen::Opened(_cap) => { false },
+        LocaleOpen::Unsupported => { true },
+        LocaleOpen::Unavailable => { false },
+    };
+    if !unsup6 { return 6; }
+
+    let lo7: LocaleOpen = open(LocaleId::Posix);
+    let cap7: usize = match lo7 {
+        LocaleOpen::Opened(cap) => { cap },
+        LocaleOpen::Unsupported => { return 7; },
+        LocaleOpen::Unavailable => { return 7; },
+    };
+    if cap7 != cap1 { return 9; }
 
     return 0;
 }

@@ -57,6 +57,9 @@ use strings_cstr::len;
 use strings_checked::checked_add;
 use strings_checked::CheckedUsize;
 use strings_tokenize::next;
+use strings_types::TransformWrite;
+use strings_locale::locale_compare;
+use strings_locale::locale_transform;
 
 /// C23-004 (Adapted). Copy `n` bytes of `src` into `dst`. Overlap is a
 /// compile-time borrow exclusion: two distinct safe slice arguments cannot
@@ -623,48 +626,46 @@ pub fn strlen(value: string) -> usize {
     return len(value);
 }
 
-/// C23-016 (Host-dependent, capability STUB). Locale-sensitive collation
-/// order of `a` and `b`. **Always `HostCapability::Unsupported` today** --
-/// `strings_locale` (SPEC Section 17) stays fully unimplemented until R0.4
-/// (BL-080), and there is no cross-backend host-locale service to delegate
-/// to. `a` and `b` are never inspected or compared; there is deliberately
-/// **no bytewise-comparison fallback** (C23-016 explicitly forbids
-/// approximating collation with plain byte order -- that is a different,
-/// well-defined operation `strcmp`/`strings_bytes::compare` already
-/// provide, and confusing the two is exactly the failure mode this stub
-/// exists to prevent). Once `strings_locale::compare` lands, this becomes a
-/// thin delegating wrapper the same way every other adapter in this file
-/// is.
-pub fn strcoll(a: string, b: string) -> HostCapability {
-    return HostCapability::Unsupported;
+/// C23-016. Locale-sensitive collation order of `a` and `b`. Unblocked by
+/// SS-U12 (2026-09-18): a thin wrapper over `strings_locale::
+/// locale_compare` under the fixed POSIX/C locale -- the same default C's
+/// own `strcoll` uses before any `setlocale` call, and the only locale
+/// this library ever opens without an explicit `_l`-style parameter (this
+/// library has no function that reads ambient `LC_*` state, HOST-001).
+/// POSIX/C-locale collation is plain byte-wise ordering; this is NOT the
+/// same operation as `strcmp`/`strings_bytes::compare` by accident of
+/// implementation -- C23-016 mandates they be allowed to coincide exactly
+/// for the "C" locale, unlike any other locale, where collation and byte
+/// order may differ (hence why the general form must stay locale-aware,
+/// not simplified to a direct byte-compare call).
+pub fn strcoll(a: string, b: string) -> Ordering {
+    return locale_compare(a, b, 0);
 }
 
-/// C23-016 / C23-029 (Host-dependent, capability STUB). Locale-sensitive
-/// transform of `src` into `dst` for later bytewise comparison. **Always
-/// `HostCapability::Unsupported` today**, for the same reason as `strcoll`
-/// above; `dst` is never written to (no partial or synthesized transform is
-/// ever observable -- so C23-029's "SHALL NOT expose destination bytes as
-/// initialized transformed data when the standard makes their
-/// representation indeterminate" holds trivially: nothing is ever written,
-/// let alone exposed). Once `strings_locale::transform` lands (R0.4), this
-/// becomes a thin delegating wrapper; the real form returns a report whose
-/// payload is readable only when `required < n`, and callers who need the
-/// length first use `strxfrm_size` below.
-pub fn strxfrm(dst: &mut [byte], src: string) -> HostCapability {
-    return HostCapability::Unsupported;
+/// C23-016 / C23-029. Locale-sensitive transform of `src` into `dst` for
+/// later bytewise comparison. Unblocked by SS-U12: a thin wrapper over
+/// `strings_locale::locale_transform` under the fixed POSIX/C locale (see
+/// `strcoll` above). `dst` is left completely untouched when the key
+/// doesn't fit (`DestinationTooSmall`) -- C23-029's "SHALL NOT expose
+/// destination bytes as initialized transformed data when the standard
+/// makes their representation indeterminate" holds because nothing is
+/// ever partially written.
+pub fn strxfrm(dst: &mut [byte], src: string) -> TransformWrite {
+    return locale_transform(src, dst, 0);
 }
 
-/// C23-024 (Host-dependent, capability STUB). The size-query form: how many
-/// bytes `strxfrm(_, src)` would need. Takes **NO** destination -- C23-024
-/// requires the zero-sized-destination query to be modeled "without
-/// constructing an invalid mutable reference", and the cleanest way to
-/// guarantee that is a signature with no `&mut [byte]` at all rather than a
-/// `&mut []` a caller has to fabricate. **Always `HostCapability::Unsupported`
-/// today**; once wired, this returns the required length and the two-call
-/// pattern (`strxfrm_size` then an owned buffer then `strxfrm`) replaces C's
-/// pass-`NULL`-with-size-0 idiom.
-pub fn strxfrm_size(src: string) -> HostCapability {
-    return HostCapability::Unsupported;
+/// C23-024. The size-query form: how many bytes `strxfrm(_, src)` would
+/// need. Takes **NO** destination -- C23-024 requires the zero-sized-
+/// destination query to be modeled "without constructing an invalid
+/// mutable reference", and the cleanest way to guarantee that is a
+/// signature with no `&mut [byte]` at all rather than a `&mut []` a
+/// caller has to fabricate. Unblocked by SS-U12: under POSIX/C collation
+/// (plain byte-wise ordering), the transform is an identity copy, so the
+/// required length is simply `src`'s own byte length -- total, no
+/// capability outcome to express (the fixed POSIX locale this function
+/// uses never fails to open).
+pub fn strxfrm_size(src: string) -> usize {
+    return string_len(src);
 }
 
 /// C23-017 (Host-dependent, capability STUB). An owned host error message
