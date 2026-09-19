@@ -16,6 +16,8 @@ tag needs exist and are internally consistent:
     actual tagged section to be about;
   * `README.md` names the same version the changelog just released, so the
     front door and the changelog can't drift out of sync;
+  * for any release after v1.0.0, `docs/v<version>-release-review.md`
+    exists and points at the same evidence catalogs;
   * `docs/r1-gate-review.md` (the SPEC §24.6 sign-off) exists and points at
     the release-evidence catalogs (release_manifest.tsv, exceptions.tsv,
     acceptance.tsv) that actually back its claims.
@@ -66,6 +68,21 @@ def main() -> int:
                 errs.append(f"docs/r1-gate-review.md does not reference "
                             f"tools/catalogs/{cat} -- the sign-off must point at "
                             "the evidence that backs it")
+
+    # Every release after v1.0.0 needs its own review note: the r1 gate
+    # review is the v1.0.0 sign-off and cannot speak for later changes.
+    if latest and latest != "1.0.0":
+        note = REPO / "docs" / f"v{latest}-release-review.md"
+        if not note.exists():
+            errs.append(f"docs/v{latest}-release-review.md is missing -- every "
+                        "release after v1.0.0 needs a review note stating what "
+                        "changed and what is still not claimed")
+        else:
+            text = note.read_text(encoding="utf-8")
+            for cat in EVIDENCE_CATALOGS:
+                if cat not in text:
+                    errs.append(f"docs/v{latest}-release-review.md does not "
+                                f"reference tools/catalogs/{cat}")
 
     if errs:
         for e in errs:

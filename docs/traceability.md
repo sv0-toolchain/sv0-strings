@@ -66,7 +66,7 @@ information: `ARCH-006`, `ARCH-013`, `CSTR-015`, `CSTR-016`, `TEXT-017`.
 | GOV-004 | decision register — `docs/audit/2026-08-30.md` + `docs/f0-deviations.md` |
 | GOV-006 | change record — per-slice `CHANGELOG.md` entries |
 | UP-014 | owner slice **SS-187** (R1, partial) — optimized generated-code + VM trace inspection; the behavioural half is covered today by `T-SANITIZE-001` (`-O1` + ASan/UBSan) and the tier-2 VM byte-parity gate |
-| PERF-007 | **N/A at R0.4** — no locale transform runs; revisit with the real service |
+| PERF-007 | POSIX-locale transform runs and never allocates (caller buffer + tested `strxfrm_l_size`); registered exception stays open only for `HostNamed` locales (no host service) |
 
 ## New this slice (SS-013)
 

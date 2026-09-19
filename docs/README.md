@@ -30,6 +30,7 @@ what's explicitly deferred to the next rung.
 | [`r0.3-gate-review.md`](r0.3-gate-review.md) | R0.3 | C23 `<string.h>` façade |
 | [`r0.4-gate-review.md`](r0.4-gate-review.md) | R0.4 | POSIX.1-2024 `<string.h>`/`<strings.h>` façade, host-locale capability |
 | [`r1-gate-review.md`](r1-gate-review.md) | **R1 — `v1.0.0`** | full evidence-infrastructure closure, license/provenance, maintainer sign-off |
+| [`v1.1.0-release-review.md`](v1.1.0-release-review.md) | **`v1.1.0`** | claim delta since `v1.0.0`, compatibility statement, evidence, what is still not claimed |
 
 ## Requirement & evidence infrastructure (R1)
 

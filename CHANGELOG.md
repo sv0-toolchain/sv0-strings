@@ -6,7 +6,77 @@ semantic versioning per SPEC.md Section 26.
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-09-19
+
+Second tagged release. Closes every tracked slice left after `v1.0.0`:
+the two `Blocked` non-eliding-fill exports (`fill_explicit`,
+`memset_explicit`) are real, the POSIX-locale collation/transform
+capability is real on both backends, the opt-in raw C ABI module has a
+real binding with external-linkage tests, and the two scoping decisions
+(Annex K, Unicode algorithms) are recorded. Evidence: `docs/v1.1.0-release-review.md`.
+
+**Versioning note.** Four previously always-`Unsupported` capability stubs
+(`strings_c23::strcoll`/`strxfrm`/`strxfrm_size` and
+`strings_posix2024::strcoll_l`/`strxfrm_l`/`strxfrm_l_size`) changed
+return type when they became real. They were documented from `v1.0.0`
+(`docs/locale-and-host-capabilities.md`) as fail-closed capability stubs
+awaiting the host-capability ABI (SS-U12), and could not yield a useful
+value, so this is treated as a minor release; a caller that matched on
+the old single-variant `HostCapability` result must update its `match`.
+See "Changed" below for the exact signatures.
+
 ### Added
+
+- **`fill_explicit` / `memset_explicit` are real exports (SS-108 / SS-148,
+  unblocked by SS-U11).** `strings_bytes::fill_explicit(dst: &mut [byte],
+  value: byte) -> ()` and `strings_c23::memset_explicit` (a one-line map to
+  it, mirroring `memset` -> `fill`) delegate to the new sv0c
+  `fill_explicit` compiler intrinsic, whose stores are non-elidable: the C
+  runtime stores through a `volatile`-qualified pointer and the VM has a
+  dedicated builtin id. The two `compile_fail` "stays blocked" probes were
+  deleted (they would now compile — the intended unblock signal) and
+  replaced by `test/property/bytes_fill_explicit.sv0` and
+  `test/property/c23_memset_explicit.sv0`. `BYTE-010` / `C23-014` flipped
+  to `done`; `docs/fill-explicit-blocked.md` is kept as a marked-RESOLVED
+  historical record. Toolchain side: sv0doc `memory-model/ownership.md`
+  section 6.5, sv0c `442d9e54`, sv0vm `91fbc9d`, and a gcc+clang
+  dead-code-elimination regression fixture (SS-201 / NEW-003).
+- **`strings_locale` is real for `LocaleId::Posix` on both backends
+  (SS-167 / SS-168, unblocked by SS-U12).** `open(LocaleId::Posix)` returns
+  `LocaleOpen::Opened(<capability id>)`; `locale_compare`,
+  `locale_compare_ignore_case` and `locale_transform` implement the
+  deterministic POSIX-locale policy (bytewise collation, ASCII fold), with
+  no host call and no ambient process locale. `HostNamed(_)` stays
+  `Unsupported` unconditionally on every backend (named-locale support is
+  a separate, not-started slice). New carriers in `strings_types`:
+  `TransformWrite`, `LocaleTransformWrite`, `LocaleTransformSize`.
+  `POSIX-008`, `POSIX-009`, `HOST-002`, `HOST-003`, `HOST-004` flipped to
+  `done`. Design: `docs/host-capability-abi-scoping.md` (Option B).
+  Toolchain prerequisite (sv0c `4918818b`): real `&StructType`
+  (immutable struct reference) support on both backends.
+- **Opt-in raw C ABI, feature-gated and linkage-tested (SS-203 / SS-204,
+  ARCH-006).** `strings_unsafe_abi` has its first real function, a
+  `#[extern_c] fn strlen(s: *const byte) -> usize;` bound to libc's own
+  `strlen`, plus `abi_version()` (`"0.0.0-unstable"`, versioned
+  independently of this package). Excluded from default `lib/` staging
+  (`SV0_STRINGS_INCLUDE_UNSAFE_ABI=1` opts in); `scripts/unsafe_abi_gate`
+  proves both feature-off symbol absence and feature-on external linkage
+  (real `cc` link + run). See `docs/unsafe-abi-feature-gate.md`.
+- **Two scoping decisions recorded (SS-202, SS-205).** C Annex K is
+  declined permanently (`docs/annex-k-decision.md`; `C23K-001..003` done);
+  full Unicode algorithms (normalization, grapheme segmentation, collation,
+  full case folding) belong in a separate future `unicode` package, with
+  this package staying byte/UTF-8-scalar-oriented
+  (`docs/unicode-package-scope-decision.md`).
+- **Deviation D-11 (`docs/f0-deviations.md`).** Public function names must
+  be unique project-wide, not merely per-module: sv0c's flat-concat
+  compilation has no per-module namespacing, and a same-bare-name public
+  function in a second module can silently corrupt an unrelated call site.
+  This is why `strings_locale`'s public functions carry a `locale_` prefix
+  rather than SPEC section 17.1's bare names.
+- **SS-U13 resolved** (sv0c `3cb138e1`): `Enum::Variant { field: value }`
+  constructor literals now compile on both backends; recorded in
+  `docs/BUGS.md` #1. The library's own error enums remain tuple-variant.
 
 - **SS-013 (BL-121 / TEST-005 / TEST-021 / AC-035): package-owned serialized
   comparison + fixture-ID digest.** Closes the last open, non-toolchain-gated
@@ -74,6 +144,31 @@ semantic versioning per SPEC.md Section 26.
 
 ### Changed
 
+- **Return types of six former capability stubs** (real for the POSIX
+  locale; `HostNamed` still `Unsupported`):
+  - `strings_c23::strcoll(a, b)`: `HostCapability` -> `Ordering`.
+  - `strings_c23::strxfrm(dst, src)`: `HostCapability` -> `TransformWrite`.
+  - `strings_c23::strxfrm_size(src)`: `HostCapability` -> `usize`.
+  - `strings_posix2024::strcoll_l(a, b, loc)`: `HostCapability` ->
+    `LocaleCompare` (`Less` / `Equal` / `Greater` / `Unsupported`).
+  - `strings_posix2024::strxfrm_l(dst, src, loc)`: `HostCapability` ->
+    `LocaleTransformWrite` (`Written` / `DestinationTooSmall` /
+    `Unsupported`).
+  - `strings_posix2024::strxfrm_l_size(src, loc)`: `HostCapability` ->
+    `LocaleTransformSize` (`Size` / `Unsupported`).
+  `strerror`, `strerror_r`, `strerror_l` and `strsignal` (host message
+  text, SS-169) are unchanged: still fail-closed stubs, blocked on an FFI
+  host-call primitive rather than on this release's work.
+- `strings_locale` public surface is `open` / `locale_compare` /
+  `locale_compare_ignore_case` / `locale_transform` (SPEC section 17.1's
+  bare `compare` / `transform` names are not used; see D-11), and
+  `LocaleOpen::Opened` carries a raw `usize` capability id rather than a
+  `Locale` struct (a struct payload in an enum tuple-variant does not
+  lower on the C backend; same class as D-4).
+- `PERF-007` exception rationale narrowed: the POSIX-locale transform now
+  runs and allocates nothing (it writes into the caller's buffer, with a
+  documented, tested `strxfrm_l_size` size query); the exception stays
+  open only for `HostNamed` locales, which still have no host service.
 - Post-`v1.0.0` documentation consolidation: `docs/README.md` rewritten
   from its Sep-3 pre-F0 snapshot (6 of 28 docs listed) into a complete,
   categorized index of every doc under `docs/`. Merged four docs that

@@ -1,7 +1,7 @@
 # sv0-strings
 
 [![CI](https://github.com/sv0-toolchain/sv0-strings/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/sv0-toolchain/sv0-strings/actions/workflows/ci.yml)
-[![Release](https://img.shields.io/badge/release-v1.0.0-blue)](docs/r1-gate-review.md)
+[![Release](https://img.shields.io/badge/release-v1.1.0-blue)](docs/r1-gate-review.md)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-informational)](#license)
 
 A safe strings library for the [sv0](https://github.com/sv4u/sv0-toolchain)
@@ -18,14 +18,18 @@ types, contracts, checked results, or explicitly unsafe ABI functions.
 
 ## Status
 
-**`v1.0.0` — R1 shipped.** The full release ladder (F0 through R1) is
+**`v1.1.0` — R1 shipped, plus the post-R1 follow-ups.** The full release ladder (F0 through R1) is
 complete on both the C backend and the native sv0 VM: safe byte/UTF-8/C-string
 operations, the C23 and POSIX.1-2024 Issue 8 compatibility façades, and a
 complete cross-backend evidence chain (traceability, fuzz, sanitizer,
 contract-mode matrix, pure/accelerated equivalence, complexity, an offline
 clean-checkout rehearsal, acceptance-scenario binding, and an immutable
-content-addressed release manifest). See
-[`docs/r1-gate-review.md`](docs/r1-gate-review.md) for the full sign-off.
+content-addressed release manifest). `v1.1.0` adds the non-eliding
+`fill_explicit` / `memset_explicit`, real POSIX-locale collation and
+transform, and an opt-in, linkage-tested raw C ABI module. See
+[`docs/r1-gate-review.md`](docs/r1-gate-review.md) (the `v1.0.0` sign-off) and
+[`docs/v1.1.0-release-review.md`](docs/v1.1.0-release-review.md) (what changed
+since, and what is still not claimed).
 
 ### Release ladder (SPEC §2.3 / §24)
 
@@ -36,8 +40,8 @@ content-addressed release manifest). See
 | **R0.2** | UTF-8 text, `CStr` / `CString` / `CBuffer`, and explicit-state tokenization. | ✅ complete |
 | **R0.3** | C23 compatibility façade for all non-host-dependent core interfaces, against an independent C oracle. | ✅ complete |
 | **R0.4** | POSIX.1-2024 façade (Issue 8 additions, deterministic POSIX-locale policy) and host locale/error/signal capabilities. | ✅ complete ([gate review](docs/r0.4-gate-review.md)) |
-| **R1** | Stable cross-backend release: full forward/reverse traceability, fuzz/sanitizer/leak/allocation-failure evidence, offline clean-checkout rehearsal, acceptance-scenario evidence binding, immutable release manifest. | ✅ complete ([gate review](docs/r1-gate-review.md)) — **tagged `v1.0.0`** |
-| **Future** | Optional exact C ABI, additional locales, Unicode algorithms, optimizations. | not started |
+| **R1** | Stable cross-backend release: full forward/reverse traceability, fuzz/sanitizer/leak/allocation-failure evidence, offline clean-checkout rehearsal, acceptance-scenario evidence binding, immutable release manifest. | ✅ complete ([gate review](docs/r1-gate-review.md)) — **tagged `v1.0.0`**; follow-ups tagged `v1.1.0` ([review](docs/v1.1.0-release-review.md)) |
+| **Future** | Named (`HostNamed`) locales, host error/signal message text (needs an FFI host-call primitive), a separate Unicode-algorithms package, optimizations. The optional raw C ABI shipped in `v1.1.0` (opt-in `strings_unsafe_abi`); C Annex K is declined. | not started |
 
 ## Quick example
 
@@ -151,7 +155,7 @@ are grouped by what a consumer is most likely to reach for first.
 | `strings_cstr` | validated borrowed `CStr`, owned `CString`, and bounded mutable `CBuffer` for NUL-terminated interop |
 | `strings_tokenize` | explicit-state, reentrant tokenization — no module-global continuation state, input never mutated |
 | `strings_checked` | checked unsigned size arithmetic used by every module ahead of allocation or addressing |
-| `strings_locale` | explicit locale capability lifecycle (`LocaleId`, `Locale`, `open`, `compare`, `transform`) — no ambient process locale |
+| `strings_locale` | explicit locale capability lifecycle (`LocaleId`, `open`, `locale_compare`, `locale_compare_ignore_case`, `locale_transform`) — real for `LocaleId::Posix`, `HostNamed` unsupported; no ambient process locale |
 | `strings_c23` | safe compatibility façade for ISO C23 `<string.h>` |
 | `strings_posix2024` | safe compatibility façade for POSIX.1-2024 Issue 8 `<string.h>`/`<strings.h>`, including `_l` locale variants |
 | `strings_legacy` | opt-in, deprecated `<strings.h>` migration aliases (`bcmp`, `bcopy`, `bzero`, `index`, `rindex`) |

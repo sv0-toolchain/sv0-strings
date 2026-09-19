@@ -60,9 +60,10 @@ ANNOTATIONS: dict[str, str] = {
                "discrepancies; `docs/f0-deviations.md` is the decision log.",
     "GOV-006": "change record — per-slice `CHANGELOG.md` entries document every "
                "material change to public semantics / errors / dispositions.",
-    "PERF-007": "N/A at R0.4 — no locale transform runs (every host-locale "
-                "adapter is a fail-closed stub); revisit with the real service "
-                "(`docs/r0.4-gate-review.md`).",
+    "PERF-007": "POSIX-locale transform runs and never allocates (caller "
+                "buffer + tested `strxfrm_l_size` size query); named-locale "
+                "transforms still have no host service, so the registered "
+                "exception stays open for them (`docs/traceability.md`).",
     "UP-014": "owner slice SS-187 (R1) — optimized generated-code + VM trace "
               "inspection. `T-SANITIZE-001` (`-O1` + ASan/UBSan) and the "
               "tier-2 VM byte-parity gate cover the behavioural half.",
